@@ -1,0 +1,165 @@
+-- =========================================================
+-- SETUP DO DASHBOARD "disparochat" — rode isso no
+-- Supabase: Project > SQL Editor > New query > Run
+-- =========================================================
+-- Premissas (ajuste se não bater com a regra real do seu negócio):
+--   - "Envio"     = linha cujo campo `realizado` não é nulo
+--   - "Leads"     = total de linhas no filtro
+--   - "Interação" = linhas em que `interacao` não é nulo
+--   - "Pagas"     = linhas em que `pagas` não é nulo
+--   - "Faturado"  = soma de `valor` apenas nas linhas pagas
+--   - "Valor"     = soma de `valor` em todas as linhas do filtro
+--   - "Gastado"   = soma de `gasto`
+--   - "ROI"       = Faturado / Gastado
+--   - "Conversão" = Pagas / Leads
+--
+-- OBS: a coluna `valor` é do tipo texto no banco (às vezes vem
+-- como "erro" em vez de número), então uso uma conversão segura
+-- que ignora qualquer valor que não seja um número válido.
+-- =========================================================
+
+-- função auxiliar: converte texto para numeric com segurança
+-- (retorna null se não for um número válido, em vez de dar erro)
+create or replace function safe_numeric(txt text)
+returns numeric
+language sql
+immutable
+as $$
+  select case
+    when txt is null then null
+    when trim(txt) ~ '^-?[0-9]+(\.[0-9]+)?$' then trim(txt)::numeric
+    else null
+  end;
+$$;
+
+-- 1) KPIs principais (cards do topo)
+create or replace function dashboard_kpis(
+  p_campanha text default null,
+  p_origem text default null,
+  p_meta text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  total_leads bigint,
+  gastado numeric,
+  interacao_pct numeric,
+  pagas bigint,
+  faturado numeric,
+  roi numeric,
+  conversao_pct numeric,
+  valor numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    count(*) as total_leads,
+    coalesce(sum(gasto), 0) as gastado,
+    case when count(*) > 0
+      then round(100.0 * count(*) filter (where interacao is not null) / count(*), 2)
+      else 0 end as interacao_pct,
+    count(*) filter (where pagas is not null) as pagas,
+    coalesce(sum(safe_numeric(valor)) filter (where pagas is not null), 0) as faturado,
+    case when coalesce(sum(gasto), 0) > 0
+      then round(coalesce(sum(safe_numeric(valor)) filter (where pagas is not null), 0) / sum(gasto), 2)
+      else 0 end as roi,
+    case when count(*) > 0
+      then round(100.0 * count(*) filter (where pagas is not null) / count(*), 2)
+      else 0 end as conversao_pct,
+    coalesce(sum(safe_numeric(valor)), 0) as valor
+  from disparochat
+  where (p_campanha is null or campanha = p_campanha)
+    and (p_origem is null or origem = p_origem)
+    and (p_meta is null or meta = p_meta)
+    and (p_date_from is null or realizado >= p_date_from)
+    and (p_date_to is null or realizado <= p_date_to);
+$$;
+
+-- 2) Envios por dia (gráfico de barras no topo)
+create or replace function dashboard_envios_por_dia(
+  p_campanha text default null,
+  p_origem text default null,
+  p_meta text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  dia date,
+  envios bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    date(realizado) as dia,
+    count(*) as envios
+  from disparochat
+  where realizado is not null
+    and (p_campanha is null or campanha = p_campanha)
+    and (p_origem is null or origem = p_origem)
+    and (p_meta is null or meta = p_meta)
+    and (p_date_from is null or realizado >= p_date_from)
+    and (p_date_to is null or realizado <= p_date_to)
+  group by 1
+  order by 1;
+$$;
+
+-- 3) Tabela de campanhas únicas (Leads + Reenvios)
+create or replace function dashboard_campanhas(
+  p_origem text default null,
+  p_meta text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  campanha text,
+  leads bigint,
+  reenvios bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    campanha,
+    count(*) as leads,
+    count(*) filter (where reenvio is not null) as reenvios
+  from disparochat
+  where campanha is not null
+    and (p_origem is null or origem = p_origem)
+    and (p_meta is null or meta = p_meta)
+    and (p_date_from is null or realizado >= p_date_from)
+    and (p_date_to is null or realizado <= p_date_to)
+  group by campanha
+  order by leads desc;
+$$;
+
+-- 4) Valores distintos para popular os filtros (dropdowns)
+create or replace function dashboard_filtros()
+returns table (
+  campanhas text[],
+  origens text[],
+  metas text[]
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    (select array_agg(distinct campanha) from disparochat where campanha is not null),
+    (select array_agg(distinct origem) from disparochat where origem is not null),
+    (select array_agg(distinct meta) from disparochat where meta is not null);
+$$;
+
+-- Libera a execução dessas funções para o público (chave anon)
+grant execute on function dashboard_kpis to anon;
+grant execute on function dashboard_envios_por_dia to anon;
+grant execute on function dashboard_campanhas to anon;
+grant execute on function dashboard_filtros to anon;
