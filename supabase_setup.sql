@@ -628,9 +628,12 @@ $$;
 -- Padrão: dia de hoje (horário de Brasília), com filtro opcional de
 -- data e campanha.
 -- =========================================================
+drop function if exists dashboard_funil(date, text);
+
 create or replace function dashboard_funil(
   p_data date default null,
-  p_campanha text default null
+  p_campanha text default null,
+  p_origem text default null
 )
 returns table (
   leads bigint,
@@ -651,6 +654,7 @@ as $$
     select d.*
     from disparochat d, alvo
     where (p_campanha is null or d.campanha = p_campanha)
+      and (p_origem is null or d.origem = p_origem)
       and coalesce(d.reenvio, d.realizado) is not null
       and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia
   )
@@ -669,9 +673,13 @@ $$;
 -- Padrão: dia de hoje (horário de Brasília), com filtro opcional de
 -- data e campanha.
 -- =========================================================
+drop function if exists dashboard_funil_produtos(date, text);
+
 create or replace function dashboard_funil_produtos(
   p_data date default null,
-  p_campanha text default null
+  p_campanha text default null,
+  p_origem text default null,
+  p_produto text default null
 )
 returns table (
   leads bigint,
@@ -691,6 +699,8 @@ as $$
     select t.*
     from total_produtos t, alvo
     where (p_campanha is null or t.campanha = p_campanha)
+      and (p_origem is null or t.origem = p_origem)
+      and (p_produto is null or t.produto = p_produto)
       and t.created_at is not null
       and (t.created_at at time zone 'America/Sao_Paulo')::date = alvo.dia
   )
