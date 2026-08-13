@@ -129,7 +129,7 @@ set search_path = public
 stable
 as $$
   with envios_dia as (
-    select date(realizado) as dia, count(*) as envios
+    select (realizado at time zone 'America/Sao_Paulo')::date as dia, count(*) as envios
     from disparochat
     where realizado is not null
       and (p_campanha is null or campanha = p_campanha)
@@ -140,7 +140,7 @@ as $$
     group by 1
   ),
   reenvios_dia as (
-    select date(reenvio) as dia, count(*) as reenvios
+    select (reenvio at time zone 'America/Sao_Paulo')::date as dia, count(*) as reenvios
     from disparochat
     where reenvio is not null
       and (p_campanha is null or campanha = p_campanha)
@@ -289,8 +289,8 @@ $$;
 -- =========================================================
 
 -- 5) KPIs do dia (hoje) — mensagens, entregues/lidas %, falhas %, templates ativos
--- "Hoje" = coalesce(reenvio, realizado) caiu na data de hoje (reenvio e realizado
--- não são somados separadamente — é a mesma linha, só pega qual estiver preenchido)
+-- IMPORTANTE: o servidor do Postgres roda em UTC (3h à frente de Brasília), então
+-- convertemos os timestamps para America/Sao_Paulo antes de comparar com "hoje".
 create or replace function dashboard_hoje_kpis()
 returns table (
   mensagens_hoje bigint,
@@ -310,8 +310,12 @@ as $$
     from disparochat
     where meta in ('sent', 'delivered', 'read', 'failed')
       and (
-        (coalesce(reenvio, realizado) is not null and date(coalesce(reenvio, realizado)) = current_date)
-        or (status_atualizado is not null and date(status_atualizado) = current_date)
+        (coalesce(reenvio, realizado) is not null
+          and (coalesce(reenvio, realizado) at time zone 'America/Sao_Paulo')::date
+            = (now() at time zone 'America/Sao_Paulo')::date)
+        or (status_atualizado is not null
+          and (status_atualizado at time zone 'America/Sao_Paulo')::date
+            = (now() at time zone 'America/Sao_Paulo')::date)
       )
   ),
   agg as (
@@ -392,8 +396,12 @@ as $$
   where mensagem is not null
     and meta in ('sent', 'delivered', 'read', 'failed')
     and (
-      (coalesce(reenvio, realizado) is not null and date(coalesce(reenvio, realizado)) = current_date)
-      or (status_atualizado is not null and date(status_atualizado) = current_date)
+      (coalesce(reenvio, realizado) is not null
+        and (coalesce(reenvio, realizado) at time zone 'America/Sao_Paulo')::date
+          = (now() at time zone 'America/Sao_Paulo')::date)
+      or (status_atualizado is not null
+        and (status_atualizado at time zone 'America/Sao_Paulo')::date
+          = (now() at time zone 'America/Sao_Paulo')::date)
     )
   group by mensagem
   order by (
