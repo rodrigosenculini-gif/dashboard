@@ -134,12 +134,12 @@ export default async function handler(req, res) {
     params = [];
   } else if (type === 'funil') {
     const p_data = req.query.data || null;
-    sql = 'select * from dashboard_funil($1::date,$2::text)';
-    params = [p_data, p_campanha];
+    sql = 'select * from dashboard_funil($1::date,$2::text,$3::text)';
+    params = [p_data, p_campanha, p_origem];
   } else if (type === 'funil_produtos') {
     const p_data = req.query.data || null;
-    sql = 'select * from dashboard_funil_produtos($1::date,$2::text)';
-    params = [p_data, p_campanha];
+    sql = 'select * from dashboard_funil_produtos($1::date,$2::text,$3::text,$4::text)';
+    params = [p_data, p_campanha, p_origem, req.query.produto || null];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
