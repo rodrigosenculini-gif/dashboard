@@ -815,14 +815,32 @@ function N8nExecucoes() {
       {error && <div className="state-msg error">Erro: {error}</div>}
 
       <div className="kpi-grid">
-        <div className="kpi"><p className="kpi-label">Total</p><p className="kpi-value">{fmtInt(stats?.total)}</p></div>
-        <div className="kpi"><p className="kpi-label">Sucesso</p><p className="kpi-value accent">{fmtInt(stats?.success)}</p></div>
-        <div className="kpi"><p className="kpi-label">Erro</p><p className="kpi-value" style={{ color: '#d99089' }}>{fmtInt(stats?.error)}</p></div>
+        <div className="kpi">
+          <p className="kpi-label">Total{stats?.total_capped ? ' (parcial)' : ''}</p>
+          <p className="kpi-value">{fmtInt(stats?.total)}{stats?.total_capped ? '+' : ''}</p>
+        </div>
+        <div className="kpi">
+          <p className="kpi-label">Sucesso{stats?.success_capped ? ' (parcial)' : ''}</p>
+          <p className="kpi-value accent">{fmtInt(stats?.success)}{stats?.success_capped ? '+' : ''}</p>
+        </div>
+        <div className="kpi">
+          <p className="kpi-label">Erro{stats?.error_capped ? ' (parcial)' : ''}</p>
+          <p className="kpi-value" style={{ color: '#d99089' }}>{fmtInt(stats?.error)}{stats?.error_capped ? '+' : ''}</p>
+        </div>
         <div className="kpi"><p className="kpi-label">Pendentes</p><p className="kpi-value">{fmtInt(stats?.pending)}</p></div>
       </div>
+      {(stats?.total_capped) && (
+        <div className="state-msg" style={{ marginTop: -10, marginBottom: 14 }}>
+          Volume muito alto pro per&iacute;odo escolhido &mdash; os n&uacute;meros com "+" s&atilde;o um piso (h&aacute; mais do que isso). Tente um intervalo menor pra ver o total exato.
+        </div>
+      )}
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Tempo m&eacute;dio de execu&ccedil;&atilde;o</p><p className="kpi-value">{fmtDuracao(stats?.avg_duration_sec)}</p></div>
-        <div className="kpi"><p className="kpi-label">Tempo m&eacute;dio pendente</p><p className="kpi-value">{fmtDuracao(stats?.avg_pending_sec)}</p></div>
+        <div className="kpi">
+          <p className="kpi-label">Tempo m&eacute;dio pendente</p>
+          <p className="kpi-value">{fmtDuracao(stats?.avg_pending_sec)}</p>
+          <p className="kpi-sub" style={{ textAlign: 'left' }}>hist&oacute;rico acumulado &middot; {fmtInt(stats?.avg_pending_sample_size)} execu&ccedil;&otilde;es observadas</p>
+        </div>
       </div>
 
       <div className="panel table-panel">
