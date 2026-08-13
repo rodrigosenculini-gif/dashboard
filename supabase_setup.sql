@@ -93,7 +93,7 @@ as $$
   from agg;
 $$;
 
--- 2) Envios por dia (gráfico de barras no topo)
+-- 2) Envios por dia (gráfico de barras no topo) — inclui reenvios também
 create or replace function dashboard_envios_por_dia(
   p_campanha text default null,
   p_origem text default null,
@@ -103,24 +103,42 @@ create or replace function dashboard_envios_por_dia(
 )
 returns table (
   dia date,
-  envios bigint
+  envios bigint,
+  reenvios bigint
 )
 language sql
 security definer
 set search_path = public
 stable
 as $$
+  with envios_dia as (
+    select date(realizado) as dia, count(*) as envios
+    from disparochat
+    where realizado is not null
+      and (p_campanha is null or campanha = p_campanha)
+      and (p_origem is null or origem = p_origem)
+      and (p_meta is null or meta = p_meta)
+      and (p_date_from is null or realizado >= p_date_from)
+      and (p_date_to is null or realizado <= p_date_to)
+    group by 1
+  ),
+  reenvios_dia as (
+    select date(reenvio) as dia, count(*) as reenvios
+    from disparochat
+    where reenvio is not null
+      and (p_campanha is null or campanha = p_campanha)
+      and (p_origem is null or origem = p_origem)
+      and (p_meta is null or meta = p_meta)
+      and (p_date_from is null or reenvio >= p_date_from)
+      and (p_date_to is null or reenvio <= p_date_to)
+    group by 1
+  )
   select
-    date(realizado) as dia,
-    count(*) as envios
-  from disparochat
-  where realizado is not null
-    and (p_campanha is null or campanha = p_campanha)
-    and (p_origem is null or origem = p_origem)
-    and (p_meta is null or meta = p_meta)
-    and (p_date_from is null or realizado >= p_date_from)
-    and (p_date_to is null or realizado <= p_date_to)
-  group by 1
+    coalesce(e.dia, r.dia) as dia,
+    coalesce(e.envios, 0) as envios,
+    coalesce(r.reenvios, 0) as reenvios
+  from envios_dia e
+  full outer join reenvios_dia r on e.dia = r.dia
   order by 1;
 $$;
 
