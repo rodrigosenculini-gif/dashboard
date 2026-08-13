@@ -288,10 +288,16 @@ $$;
 -- read=lido, failed=falha. "Template" = coluna mensagem.
 -- =========================================================
 
--- 5) KPIs do dia (hoje) — mensagens, entregues/lidas %, falhas %, templates ativos
+-- 5) KPIs do dia — mensagens, entregues/lidas %, falhas %, templates ativos
 -- IMPORTANTE: o servidor do Postgres roda em UTC (3h à frente de Brasília), então
--- convertemos os timestamps para America/Sao_Paulo antes de comparar com "hoje".
-create or replace function dashboard_hoje_kpis()
+-- convertemos os timestamps para America/Sao_Paulo antes de comparar as datas.
+-- p_data (opcional) permite escolher outro dia; padrão é hoje (em horário de Brasília).
+drop function if exists dashboard_hoje_kpis();
+
+create or replace function dashboard_hoje_kpis(
+  p_data date default null,
+  p_campanha text default null
+)
 returns table (
   mensagens_hoje bigint,
   entregues_lidas_qtd bigint,
@@ -305,17 +311,19 @@ security definer
 set search_path = public
 stable
 as $$
-  with hoje as (
-    select *
-    from disparochat
-    where meta in ('sent', 'delivered', 'read', 'failed')
+  with alvo as (
+    select coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date) as dia
+  ),
+  hoje as (
+    select d.*
+    from disparochat d, alvo
+    where d.meta in ('sent', 'delivered', 'read', 'failed')
+      and (p_campanha is null or d.campanha = p_campanha)
       and (
-        (coalesce(reenvio, realizado) is not null
-          and (coalesce(reenvio, realizado) at time zone 'America/Sao_Paulo')::date
-            = (now() at time zone 'America/Sao_Paulo')::date)
-        or (status_atualizado is not null
-          and (status_atualizado at time zone 'America/Sao_Paulo')::date
-            = (now() at time zone 'America/Sao_Paulo')::date)
+        (coalesce(d.reenvio, d.realizado) is not null
+          and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia)
+        or (d.status_atualizado is not null
+          and (d.status_atualizado at time zone 'America/Sao_Paulo')::date = alvo.dia)
       )
   ),
   agg as (
@@ -336,8 +344,13 @@ as $$
   from agg;
 $$;
 
--- 6) Taxa de falha por minuto (janela recente, default últimos 60 minutos)
-create or replace function dashboard_falha_por_minuto(p_minutos int default 60)
+-- 6) Taxa de falha por minuto (janela recente, default últimos 60 minutos, tempo real)
+drop function if exists dashboard_falha_por_minuto(int);
+
+create or replace function dashboard_falha_por_minuto(
+  p_minutos int default 60,
+  p_campanha text default null
+)
 returns table (
   minuto timestamptz,
   total bigint,
@@ -360,14 +373,20 @@ as $$
   where status_atualizado is not null
     and status_atualizado >= now() - (greatest(p_minutos, 1) || ' minutes')::interval
     and meta in ('sent', 'delivered', 'read', 'failed')
+    and (p_campanha is null or campanha = p_campanha)
   group by 1
   order by 1;
 $$;
 
--- 7) Por template (mensagem) — hoje: enviados/entregues/lidas/falhas + falha %
+-- 7) Por template (mensagem) — enviados/entregues/lidas/falhas + falha %
 -- Só entram templates preenchidos de verdade (mensagem is not null) — a lista
 -- é dinâmica, baseada no que existir na base, nunca fixa.
-create or replace function dashboard_por_template_hoje()
+drop function if exists dashboard_por_template_hoje();
+
+create or replace function dashboard_por_template_hoje(
+  p_data date default null,
+  p_campanha text default null
+)
 returns table (
   template text,
   enviados bigint,
@@ -381,32 +400,34 @@ security definer
 set search_path = public
 stable
 as $$
+  with alvo as (
+    select coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date) as dia
+  )
   select
-    mensagem as template,
-    count(*) filter (where meta = 'sent') as enviados,
-    count(*) filter (where meta = 'delivered') as entregues,
-    count(*) filter (where meta = 'read') as lidas,
-    count(*) filter (where meta = 'failed') as falhas,
-    case when count(*) filter (where meta in ('sent', 'delivered', 'read', 'failed')) > 0
+    d.mensagem as template,
+    count(*) filter (where d.meta = 'sent') as enviados,
+    count(*) filter (where d.meta = 'delivered') as entregues,
+    count(*) filter (where d.meta = 'read') as lidas,
+    count(*) filter (where d.meta = 'failed') as falhas,
+    case when count(*) filter (where d.meta in ('sent', 'delivered', 'read', 'failed')) > 0
       then round(
-        100.0 * count(*) filter (where meta = 'failed') /
-        count(*) filter (where meta in ('sent', 'delivered', 'read', 'failed')), 1)
+        100.0 * count(*) filter (where d.meta = 'failed') /
+        count(*) filter (where d.meta in ('sent', 'delivered', 'read', 'failed')), 1)
       else 0 end as falha_pct
-  from disparochat
-  where mensagem is not null
-    and meta in ('sent', 'delivered', 'read', 'failed')
+  from disparochat d, alvo
+  where d.mensagem is not null
+    and d.meta in ('sent', 'delivered', 'read', 'failed')
+    and (p_campanha is null or d.campanha = p_campanha)
     and (
-      (coalesce(reenvio, realizado) is not null
-        and (coalesce(reenvio, realizado) at time zone 'America/Sao_Paulo')::date
-          = (now() at time zone 'America/Sao_Paulo')::date)
-      or (status_atualizado is not null
-        and (status_atualizado at time zone 'America/Sao_Paulo')::date
-          = (now() at time zone 'America/Sao_Paulo')::date)
+      (coalesce(d.reenvio, d.realizado) is not null
+        and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia)
+      or (d.status_atualizado is not null
+        and (d.status_atualizado at time zone 'America/Sao_Paulo')::date = alvo.dia)
     )
-  group by mensagem
+  group by d.mensagem
   order by (
-    count(*) filter (where meta = 'sent') + count(*) filter (where meta = 'delivered') +
-    count(*) filter (where meta = 'read') + count(*) filter (where meta = 'failed')
+    count(*) filter (where d.meta = 'sent') + count(*) filter (where d.meta = 'delivered') +
+    count(*) filter (where d.meta = 'read') + count(*) filter (where d.meta = 'failed')
   ) desc;
 $$;
 
