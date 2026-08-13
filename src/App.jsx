@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, Legend } from 'recharts'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
+const VISIBLE_DEFAULT = 6
 
 async function callApi(type, params) {
   const qs = new URLSearchParams({ type, ...params })
@@ -24,7 +25,18 @@ function fmtMin(n) {
   return `${(n ?? 0).toString().replace('.', ',')} min`
 }
 
+function ExpandToggle({ expanded, onToggle, hiddenCount }) {
+  if (hiddenCount <= 0 && !expanded) return null
+  return (
+    <button className="expand-btn" onClick={onToggle}>
+      {expanded ? 'Mostrar menos' : `Mostrar mais (+${hiddenCount})`}
+    </button>
+  )
+}
+
 function BreakdownList({ title, items, loading }) {
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
   const max = Math.max(1, ...items.map((i) => Number(i.leads) || 0))
   return (
     <div className="panel table-panel breakdown">
@@ -35,7 +47,7 @@ function BreakdownList({ title, items, loading }) {
       {items.length === 0 && !loading && (
         <div className="state-msg">Sem dados para os filtros selecionados.</div>
       )}
-      {items.map((i) => (
+      {visible.map((i) => (
         <div className="breakdown-row" key={i.valor}>
           <span className="campanha-nome">{i.valor}</span>
           <span className="bar-cell">
@@ -46,6 +58,51 @@ function BreakdownList({ title, items, loading }) {
           </span>
         </div>
       ))}
+      <ExpandToggle
+        expanded={expanded}
+        onToggle={() => setExpanded((v) => !v)}
+        hiddenCount={items.length - VISIBLE_DEFAULT}
+      />
+    </div>
+  )
+}
+
+function CampanhasList({ items, loading }) {
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
+  const maxLeads = Math.max(1, ...items.map((c) => Number(c.leads) || 0))
+  const maxReenvios = Math.max(1, ...items.map((c) => Number(c.reenvios) || 0))
+  return (
+    <div className="panel table-panel">
+      <p className="section-label">Campanhas &Uacute;nicas</p>
+      <div className="campanha-row head">
+        <span>Campanha</span><span>Leads</span><span>Reenvios</span>
+      </div>
+      {items.length === 0 && !loading && (
+        <div className="state-msg">Nenhum dado para os filtros selecionados.</div>
+      )}
+      {visible.map((c) => (
+        <div className="campanha-row" key={c.campanha}>
+          <span className="campanha-nome">{c.campanha}</span>
+          <span className="bar-cell">
+            <span className="bar-track">
+              <span className="bar-fill" style={{ width: `${(Number(c.leads) / maxLeads) * 100}%` }} />
+            </span>
+            <span className="bar-value">{fmtInt(c.leads)}</span>
+          </span>
+          <span className="bar-cell">
+            <span className="bar-track">
+              <span className="bar-fill reenvio" style={{ width: `${(Number(c.reenvios) / maxReenvios) * 100}%` }} />
+            </span>
+            <span className="bar-value">{fmtInt(c.reenvios)}</span>
+          </span>
+        </div>
+      ))}
+      <ExpandToggle
+        expanded={expanded}
+        onToggle={() => setExpanded((v) => !v)}
+        hiddenCount={items.length - VISIBLE_DEFAULT}
+      />
     </div>
   )
 }
@@ -131,9 +188,6 @@ export default function App() {
     return () => clearInterval(id)
   }, [loadDados])
 
-  const maxLeads = Math.max(1, ...campanhas.map((c) => Number(c.leads) || 0))
-  const maxReenvios = Math.max(1, ...campanhas.map((c) => Number(c.reenvios) || 0))
-
   return (
     <div className="app">
       <div className="topbar">
@@ -198,32 +252,7 @@ export default function App() {
         <div className="kpi"><p className="kpi-label">Tempo m&eacute;dio resposta</p><p className="kpi-value">{fmtMin(kpis?.tempo_resposta_min)}</p></div>
       </div>
 
-      <div className="panel table-panel">
-        <p className="section-label">Campanhas &Uacute;nicas</p>
-        <div className="campanha-row head">
-          <span>Campanha</span><span>Leads</span><span>Reenvios</span>
-        </div>
-        {campanhas.length === 0 && !loading && (
-          <div className="state-msg">Nenhum dado para os filtros selecionados.</div>
-        )}
-        {campanhas.map((c) => (
-          <div className="campanha-row" key={c.campanha}>
-            <span className="campanha-nome">{c.campanha}</span>
-            <span className="bar-cell">
-              <span className="bar-track">
-                <span className="bar-fill" style={{ width: `${(Number(c.leads) / maxLeads) * 100}%` }} />
-              </span>
-              <span className="bar-value">{fmtInt(c.leads)}</span>
-            </span>
-            <span className="bar-cell">
-              <span className="bar-track">
-                <span className="bar-fill reenvio" style={{ width: `${(Number(c.reenvios) / maxReenvios) * 100}%` }} />
-              </span>
-              <span className="bar-value">{fmtInt(c.reenvios)}</span>
-            </span>
-          </div>
-        ))}
-      </div>
+      <CampanhasList items={campanhas} loading={loading} />
 
       <div className="breakdown-grid">
         <BreakdownList title="Por Conversa" items={porConversa} loading={loading} />
