@@ -651,12 +651,8 @@ as $$
     select d.*
     from disparochat d, alvo
     where (p_campanha is null or d.campanha = p_campanha)
-      and (
-        (coalesce(d.reenvio, d.realizado) is not null
-          and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia)
-        or (d.status_atualizado is not null
-          and (d.status_atualizado at time zone 'America/Sao_Paulo')::date = alvo.dia)
-      )
+      and coalesce(d.reenvio, d.realizado) is not null
+      and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia
   )
   select
     count(*) as leads,
