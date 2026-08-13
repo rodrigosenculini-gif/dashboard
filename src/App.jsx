@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
-import { supabase } from './supabaseClient'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
+
+async function callApi(type, params) {
+  const qs = new URLSearchParams({ type, ...params })
+  const res = await fetch(`/api/dashboard?${qs.toString()}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `Erro ao buscar ${type}`)
+  return data
+}
 
 function fmtInt(n) {
   return new Intl.NumberFormat('pt-BR').format(n ?? 0)
@@ -29,22 +36,26 @@ export default function App() {
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
 
-  const rpcArgsBase = useMemo(() => ({
-    p_campanha: campanha || null,
-    p_origem: origem || null,
-    p_meta: meta || null,
-    p_date_from: dataInicio ? new Date(dataInicio).toISOString() : null,
-    p_date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : null,
+  const apiArgsBase = useMemo(() => ({
+    campanha: campanha || '',
+    origem: origem || '',
+    meta: meta || '',
+    date_from: dataInicio ? new Date(dataInicio).toISOString() : '',
+    date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : '',
   }), [campanha, origem, meta, dataInicio, dataFim])
 
   const loadFiltros = useCallback(async () => {
-    const { data, error } = await supabase.rpc('dashboard_filtros')
-    if (!error && data && data[0]) {
-      setFiltros({
-        campanhas: data[0].campanhas || [],
-        origens: data[0].origens || [],
-        metas: data[0].metas || [],
-      })
+    try {
+      const data = await callApi('filtros', {})
+      if (data && data[0]) {
+        setFiltros({
+          campanhas: data[0].campanhas || [],
+          origens: data[0].origens || [],
+          metas: data[0].metas || [],
+        })
+      }
+    } catch {
+      // silencioso: erro aqui nao e critico para os KPIs aparecerem
     }
   }, [])
 
@@ -52,30 +63,27 @@ export default function App() {
     setLoading(true)
     setError(null)
     try {
-      const [kpiRes, enviosRes, campanhasRes] = await Promise.all([
-        supabase.rpc('dashboard_kpis', rpcArgsBase),
-        supabase.rpc('dashboard_envios_por_dia', rpcArgsBase),
-        supabase.rpc('dashboard_campanhas', {
-          p_origem: rpcArgsBase.p_origem,
-          p_meta: rpcArgsBase.p_meta,
-          p_date_from: rpcArgsBase.p_date_from,
-          p_date_to: rpcArgsBase.p_date_to,
+      const [kpiData, enviosData, campanhasData] = await Promise.all([
+        callApi('kpis', apiArgsBase),
+        callApi('envios', apiArgsBase),
+        callApi('campanhas', {
+          origem: apiArgsBase.origem,
+          meta: apiArgsBase.meta,
+          date_from: apiArgsBase.date_from,
+          date_to: apiArgsBase.date_to,
         }),
       ])
-      if (kpiRes.error) throw kpiRes.error
-      if (enviosRes.error) throw enviosRes.error
-      if (campanhasRes.error) throw campanhasRes.error
 
-      setKpis(kpiRes.data?.[0] ?? null)
-      setEnvios(enviosRes.data ?? [])
-      setCampanhas(campanhasRes.data ?? [])
+      setKpis(kpiData?.[0] ?? null)
+      setEnvios(enviosData ?? [])
+      setCampanhas(campanhasData ?? [])
       setLastUpdate(new Date())
     } catch (e) {
-      setError(e.message || 'Erro ao carregar dados do Supabase.')
+      setError(e.message || 'Erro ao carregar dados.')
     } finally {
       setLoading(false)
     }
-  }, [rpcArgsBase])
+  }, [apiArgsBase])
 
   useEffect(() => { loadFiltros() }, [loadFiltros])
   useEffect(() => { loadDados() }, [loadDados])
@@ -91,23 +99,23 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar">
-        <h1><span className="pulse" /> Disparos — Dashboard</h1>
+        <h1><span className="pulse" /> Disparos &mdash; Dashboard</h1>
         <span className="status-line">
-          {loading ? 'atualizando…' : lastUpdate ? `atualizado às ${lastUpdate.toLocaleTimeString('pt-BR')}` : ''}
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${lastUpdate.toLocaleTimeString('pt-BR')}` : ''}
         </span>
       </div>
 
       <div className="filters">
         <select value={campanha} onChange={(e) => setCampanha(e.target.value)}>
-          <option value="">campanha — todas</option>
+          <option value="">campanha &mdash; todas</option>
           {filtros.campanhas.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={origem} onChange={(e) => setOrigem(e.target.value)}>
-          <option value="">origem — todas</option>
+          <option value="">origem &mdash; todas</option>
           {filtros.origens.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
         <select value={meta} onChange={(e) => setMeta(e.target.value)}>
-          <option value="">meta — todos</option>
+          <option value="">meta &mdash; todos</option>
           {filtros.metas.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
         <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
@@ -133,18 +141,18 @@ export default function App() {
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Total Leads</p><p className="kpi-value">{fmtInt(kpis?.total_leads)}</p></div>
         <div className="kpi"><p className="kpi-label">Gastado</p><p className="kpi-value">{fmtMoney(kpis?.gastado)}</p></div>
-        <div className="kpi"><p className="kpi-label">Interação %</p><p className="kpi-value">{fmtPct(kpis?.interacao_pct)}</p></div>
+        <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o %</p><p className="kpi-value">{fmtPct(kpis?.interacao_pct)}</p></div>
         <div className="kpi"><p className="kpi-label">Pagas</p><p className="kpi-value">{fmtInt(kpis?.pagas)}</p></div>
       </div>
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Faturado</p><p className="kpi-value">{fmtMoney(kpis?.faturado)}</p></div>
         <div className="kpi"><p className="kpi-label">ROI</p><p className="kpi-value accent">{(kpis?.roi ?? 0).toString().replace('.', ',')}</p></div>
-        <div className="kpi"><p className="kpi-label">Conversão</p><p className="kpi-value">{fmtPct(kpis?.conversao_pct)}</p></div>
+        <div className="kpi"><p className="kpi-label">Convers&atilde;o</p><p className="kpi-value">{fmtPct(kpis?.conversao_pct)}</p></div>
         <div className="kpi"><p className="kpi-label">Valor</p><p className="kpi-value">{fmtMoney(kpis?.valor)}</p></div>
       </div>
 
       <div className="panel table-panel">
-        <p className="section-label">Campanhas Únicas</p>
+        <p className="section-label">Campanhas &Uacute;nicas</p>
         <div className="campanha-row head">
           <span>Campanha</span><span>Leads</span><span>Reenvios</span>
         </div>
