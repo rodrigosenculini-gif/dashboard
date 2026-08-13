@@ -491,8 +491,8 @@ function EntradasLP() {
 
       <div className="filters">
         <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
-        <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto \u2014 todos" />
-        <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem \u2014 todas" />
+        <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto — todos" />
+        <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
         <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
         <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
       </div>
@@ -603,9 +603,9 @@ function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, 
         <div className="filters">
           <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
           <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
-          <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem \u2014 todas" />
+          <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
           {showProduto && (
-            <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto \u2014 todos" />
+            <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto — todos" />
           )}
         </div>
 
@@ -847,4 +847,3 @@ export default function App() {
     </div>
   )
 }
-// touch: força novo deploy 1786621575
