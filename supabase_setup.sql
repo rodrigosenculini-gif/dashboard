@@ -282,6 +282,117 @@ as $$
   limit 20;
 $$;
 
+-- =========================================================
+-- PAINEL "LEILÃO — DETALHADO" (visão de operação em tempo real)
+-- Mapeamento de status (coluna meta): sent=enviado, delivered=entregue,
+-- read=lido, failed=falha. "Template" = coluna mensagem.
+-- =========================================================
+
+-- 5) KPIs do dia (hoje) — mensagens, entregues/lidas %, falhas %, templates ativos
+create or replace function dashboard_hoje_kpis()
+returns table (
+  mensagens_hoje bigint,
+  entregues_lidas_qtd bigint,
+  entregues_lidas_pct numeric,
+  falhas_qtd bigint,
+  falhas_pct numeric,
+  templates_ativos bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with hoje as (
+    select *
+    from disparochat
+    where status_atualizado is not null
+      and date(status_atualizado) = current_date
+      and meta in ('sent', 'delivered', 'read', 'failed')
+  ),
+  agg as (
+    select
+      count(*) as total,
+      count(*) filter (where meta in ('delivered', 'read')) as entregues_lidas,
+      count(*) filter (where meta = 'failed') as falhas,
+      count(distinct mensagem) filter (where mensagem is not null) as templates_ativos
+    from hoje
+  )
+  select
+    total,
+    entregues_lidas,
+    case when total > 0 then round(100.0 * entregues_lidas / total, 1) else 0 end,
+    falhas,
+    case when total > 0 then round(100.0 * falhas / total, 1) else 0 end,
+    templates_ativos
+  from agg;
+$$;
+
+-- 6) Taxa de falha por minuto (janela recente, default últimos 60 minutos)
+create or replace function dashboard_falha_por_minuto(p_minutos int default 60)
+returns table (
+  minuto timestamptz,
+  total bigint,
+  falhas bigint,
+  falha_pct numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    date_trunc('minute', status_atualizado) as minuto,
+    count(*) as total,
+    count(*) filter (where meta = 'failed') as falhas,
+    case when count(*) > 0
+      then round(100.0 * count(*) filter (where meta = 'failed') / count(*), 1)
+      else 0 end as falha_pct
+  from disparochat
+  where status_atualizado is not null
+    and status_atualizado >= now() - (greatest(p_minutos, 1) || ' minutes')::interval
+    and meta in ('sent', 'delivered', 'read', 'failed')
+  group by 1
+  order by 1;
+$$;
+
+-- 7) Por template (mensagem) — hoje: enviados/entregues/lidas/falhas + falha %
+create or replace function dashboard_por_template_hoje()
+returns table (
+  template text,
+  enviados bigint,
+  entregues bigint,
+  lidas bigint,
+  falhas bigint,
+  falha_pct numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(mensagem, 'null') as template,
+    count(*) filter (where meta = 'sent') as enviados,
+    count(*) filter (where meta = 'delivered') as entregues,
+    count(*) filter (where meta = 'read') as lidas,
+    count(*) filter (where meta = 'failed') as falhas,
+    case when count(*) filter (where meta in ('sent', 'delivered', 'read', 'failed')) > 0
+      then round(
+        100.0 * count(*) filter (where meta = 'failed') /
+        count(*) filter (where meta in ('sent', 'delivered', 'read', 'failed')), 1)
+      else 0 end as falha_pct
+  from disparochat
+  where status_atualizado is not null
+    and date(status_atualizado) = current_date
+    and meta in ('sent', 'delivered', 'read', 'failed')
+  group by 1
+  order by (
+    count(*) filter (where meta = 'sent') + count(*) filter (where meta = 'delivered') +
+    count(*) filter (where meta = 'read') + count(*) filter (where meta = 'failed')
+  ) desc;
+$$;
+
 -- 4) Valores distintos para popular os filtros (dropdowns)
 create or replace function dashboard_filtros()
 returns table (
@@ -307,4 +418,7 @@ grant execute on function dashboard_campanhas to anon;
 grant execute on function dashboard_por_conversa to anon;
 grant execute on function dashboard_por_meta to anon;
 grant execute on function dashboard_por_mensagem to anon;
+grant execute on function dashboard_hoje_kpis to anon;
+grant execute on function dashboard_falha_por_minuto to anon;
+grant execute on function dashboard_por_template_hoje to anon;
 grant execute on function dashboard_filtros to anon;
