@@ -8,11 +8,20 @@ const VIEWS = [
   { id: 'geral', label: 'Disparos' },
   { id: 'leilao', label: 'Meta \u2014 Detalhado' },
   { id: 'produtos', label: 'Entradas LP' },
+  { id: 'n8n', label: 'n8n \u2014 Execu\u00e7\u00f5es' },
 ]
 
 async function callApi(type, params) {
   const qs = new URLSearchParams({ type, ...params })
   const res = await fetch(`/api/dashboard?${qs.toString()}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `Erro ao buscar ${type}`)
+  return data
+}
+
+async function callN8nApi(type, params) {
+  const qs = new URLSearchParams({ type, ...params })
+  const res = await fetch(`/api/n8n?${qs.toString()}`)
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || `Erro ao buscar ${type}`)
   return data
@@ -733,6 +742,110 @@ function FunilProdutos({ onClose }) {
   )
 }
 
+function fmtDuracao(seg) {
+  const s = Number(seg) || 0
+  if (s < 60) return `${s.toFixed(0)}s`
+  if (s < 3600) return `${(s / 60).toFixed(1)} min`
+  return `${(s / 3600).toFixed(1)} h`
+}
+
+function N8nExecucoes() {
+  const [stats, setStats] = useState(null)
+  const [workflows, setWorkflows] = useState([])
+  const [workflowId, setWorkflowId] = useState('')
+  const [dataInicio, setDataInicio] = useState(todayISO())
+  const [dataFim, setDataFim] = useState(todayISO())
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [lastUpdate, setLastUpdate] = useState(null)
+
+  useEffect(() => {
+    callN8nApi('workflows', {})
+      .then((list) => setWorkflows((list || []).map((w) => w.name)))
+      .catch(() => {})
+  }, [])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const wfList = await callN8nApi('workflows', {})
+      const found = wfList.find((w) => w.name === workflowId)
+      const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
+      const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
+      const data = await callN8nApi('stats', {
+        date_from,
+        date_to,
+        ...(found ? { workflowId: found.id } : {}),
+      })
+      setStats(data)
+      setLastUpdate(new Date())
+    } catch (e) {
+      setError(e.message || 'Erro ao carregar dados do n8n.')
+    } finally {
+      setLoading(false)
+    }
+  }, [dataInicio, dataFim, workflowId])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const id = setInterval(load, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [load])
+
+  return (
+    <>
+      <div className="topbar">
+        <h1><span className="pulse" /> n8n &mdash; Execu&ccedil;&otilde;es</h1>
+        <div className="topbar-right">
+          <span className="status-line">
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+          </span>
+          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+            &#8635; Atualizar
+          </button>
+        </div>
+      </div>
+
+      <div className="filters">
+        <SearchSelect value={workflowId} onChange={setWorkflowId} options={workflows} label="workflow" allLabel="workflow — todos" />
+      </div>
+      <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+
+      {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Total</p><p className="kpi-value">{fmtInt(stats?.total)}</p></div>
+        <div className="kpi"><p className="kpi-label">Sucesso</p><p className="kpi-value accent">{fmtInt(stats?.success)}</p></div>
+        <div className="kpi"><p className="kpi-label">Erro</p><p className="kpi-value" style={{ color: '#d99089' }}>{fmtInt(stats?.error)}</p></div>
+        <div className="kpi"><p className="kpi-label">Pendentes</p><p className="kpi-value">{fmtInt(stats?.pending)}</p></div>
+      </div>
+      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Tempo m&eacute;dio de execu&ccedil;&atilde;o</p><p className="kpi-value">{fmtDuracao(stats?.avg_duration_sec)}</p></div>
+        <div className="kpi"><p className="kpi-label">Tempo m&eacute;dio pendente</p><p className="kpi-value">{fmtDuracao(stats?.avg_pending_sec)}</p></div>
+      </div>
+
+      <div className="panel table-panel">
+        <p className="section-label">Execu&ccedil;&otilde;es pendentes</p>
+        <p className="section-sub">em espera ou rodando no momento &mdash; h&aacute; quanto tempo</p>
+        <div className="template-row head" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+          <span>ID</span><span>Status</span><span>Pendente h&aacute;</span>
+        </div>
+        {(!stats?.pending_list || stats.pending_list.length === 0) && !loading && (
+          <div className="state-msg">Nenhuma execu&ccedil;&atilde;o pendente agora.</div>
+        )}
+        {(stats?.pending_list || []).map((p) => (
+          <div className="template-row" key={p.id} style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+            <span>{p.id}</span>
+            <span>{p.status}</span>
+            <span className={p.elapsedSec > 600 ? 'falha-alta' : ''}>{fmtDuracao(p.elapsedSec)}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function VisaoGeral() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [] })
   const [campanha, setCampanha] = useState('')
@@ -922,6 +1035,7 @@ export default function App() {
       {view === 'geral' && <VisaoGeral />}
       {view === 'leilao' && <LeilaoDetalhado />}
       {view === 'produtos' && <EntradasLP />}
+      {view === 'n8n' && <N8nExecucoes />}
     </div>
   )
 }
