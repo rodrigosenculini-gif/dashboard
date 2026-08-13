@@ -416,7 +416,7 @@ function EntradasLP() {
     campanha: campanha || '',
     produto: produto || '',
     origem: origem || '',
-    date_from: dataInicio ? new Date(dataInicio).toISOString() : '',
+    date_from: dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : '',
     date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : '',
   }), [campanha, produto, origem, dataInicio, dataFim])
 
@@ -694,7 +694,7 @@ function VisaoGeral() {
     campanha: campanha || '',
     origem: origem || '',
     meta: meta || '',
-    date_from: dataInicio ? new Date(dataInicio).toISOString() : '',
+    date_from: dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : '',
     date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : '',
   }), [campanha, origem, meta, dataInicio, dataFim])
 
