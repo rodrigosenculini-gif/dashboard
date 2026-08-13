@@ -65,13 +65,13 @@ export default async function handler(req, res) {
     sql = 'select count(*)::int as total from disparochat';
     params = [];
   } else if (type === 'kpis') {
-    sql = 'select * from dashboard_kpis($1,$2,$3,$4,$5)';
+    sql = 'select * from dashboard_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
   } else if (type === 'envios') {
-    sql = 'select * from dashboard_envios_por_dia($1,$2,$3,$4,$5)';
+    sql = 'select * from dashboard_envios_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
   } else if (type === 'campanhas') {
-    sql = 'select * from dashboard_campanhas($1,$2,$3,$4)';
+    sql = 'select * from dashboard_campanhas($1::text,$2::text,$3::timestamptz,$4::timestamptz)';
     params = [p_origem, p_meta, p_date_from, p_date_to];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
