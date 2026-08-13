@@ -291,11 +291,12 @@ $$;
 -- 5) KPIs do dia — mensagens, entregues/lidas %, falhas %, templates ativos
 -- IMPORTANTE: o servidor do Postgres roda em UTC (3h à frente de Brasília), então
 -- convertemos os timestamps para America/Sao_Paulo antes de comparar as datas.
--- p_data (opcional) permite escolher outro dia; padrão é hoje (em horário de Brasília).
-drop function if exists dashboard_hoje_kpis();
+-- p_date_from/p_date_to (opcionais) definem o intervalo; padrão é hoje (Brasília).
+drop function if exists dashboard_hoje_kpis(date, text);
 
 create or replace function dashboard_hoje_kpis(
-  p_data date default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null,
   p_campanha text default null
 )
 returns table (
@@ -312,7 +313,9 @@ set search_path = public
 stable
 as $$
   with alvo as (
-    select coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date) as dia
+    select
+      coalesce(p_date_from, (((now() at time zone 'America/Sao_Paulo')::date)::timestamp at time zone 'America/Sao_Paulo')) as de,
+      coalesce(p_date_to, (((now() at time zone 'America/Sao_Paulo')::date)::timestamp at time zone 'America/Sao_Paulo') + interval '1 day' - interval '1 second') as ate
   ),
   hoje as (
     select d.*
@@ -321,9 +324,9 @@ as $$
       and (p_campanha is null or d.campanha = p_campanha)
       and (
         (coalesce(d.reenvio, d.realizado) is not null
-          and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia)
+          and coalesce(d.reenvio, d.realizado) between alvo.de and alvo.ate)
         or (d.status_atualizado is not null
-          and (d.status_atualizado at time zone 'America/Sao_Paulo')::date = alvo.dia)
+          and d.status_atualizado between alvo.de and alvo.ate)
       )
   ),
   agg as (
@@ -381,10 +384,11 @@ $$;
 -- 7) Por template (mensagem) — enviados/entregues/lidas/falhas + falha %
 -- Só entram templates preenchidos de verdade (mensagem is not null) — a lista
 -- é dinâmica, baseada no que existir na base, nunca fixa.
-drop function if exists dashboard_por_template_hoje();
+drop function if exists dashboard_por_template_hoje(date, text);
 
 create or replace function dashboard_por_template_hoje(
-  p_data date default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null,
   p_campanha text default null
 )
 returns table (
@@ -401,7 +405,9 @@ set search_path = public
 stable
 as $$
   with alvo as (
-    select coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date) as dia
+    select
+      coalesce(p_date_from, (((now() at time zone 'America/Sao_Paulo')::date)::timestamp at time zone 'America/Sao_Paulo')) as de,
+      coalesce(p_date_to, (((now() at time zone 'America/Sao_Paulo')::date)::timestamp at time zone 'America/Sao_Paulo') + interval '1 day' - interval '1 second') as ate
   )
   select
     d.mensagem as template,
@@ -420,9 +426,9 @@ as $$
     and (p_campanha is null or d.campanha = p_campanha)
     and (
       (coalesce(d.reenvio, d.realizado) is not null
-        and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia)
+        and coalesce(d.reenvio, d.realizado) between alvo.de and alvo.ate)
       or (d.status_atualizado is not null
-        and (d.status_atualizado at time zone 'America/Sao_Paulo')::date = alvo.dia)
+        and d.status_atualizado between alvo.de and alvo.ate)
     )
   group by d.mensagem
   order by (
@@ -626,12 +632,13 @@ $$;
 -- Interagido (interacao preenchido) -> Simulações com saldo (valor
 -- preenchido OU conversa = 'ofertado') -> Pagas (pagas preenchido).
 -- Padrão: dia de hoje (horário de Brasília), com filtro opcional de
--- data e campanha.
+-- intervalo de datas e campanha/origem.
 -- =========================================================
-drop function if exists dashboard_funil(date, text);
+drop function if exists dashboard_funil(date, text, text);
 
 create or replace function dashboard_funil(
-  p_data date default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null,
   p_campanha text default null,
   p_origem text default null
 )
@@ -648,7 +655,9 @@ set search_path = public
 stable
 as $$
   with alvo as (
-    select coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date) as dia
+    select
+      coalesce(p_date_from, (((now() at time zone 'America/Sao_Paulo')::date)::timestamp at time zone 'America/Sao_Paulo')) as de,
+      coalesce(p_date_to, (((now() at time zone 'America/Sao_Paulo')::date)::timestamp at time zone 'America/Sao_Paulo') + interval '1 day' - interval '1 second') as ate
   ),
   base as (
     select d.*
@@ -656,7 +665,7 @@ as $$
     where (p_campanha is null or d.campanha = p_campanha)
       and (p_origem is null or d.origem = p_origem)
       and coalesce(d.reenvio, d.realizado) is not null
-      and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia
+      and coalesce(d.reenvio, d.realizado) between alvo.de and alvo.ate
   )
   select
     count(*) as leads,
@@ -671,12 +680,13 @@ $$;
 -- FUNIL — ENTRADAS LP (overlay dentro da visão Entradas LP)
 -- Etapas: Leads (tudo) -> Interagidos -> Aprovados -> Pagos.
 -- Padrão: dia de hoje (horário de Brasília), com filtro opcional de
--- data e campanha.
+-- intervalo de datas, campanha, origem e produto.
 -- =========================================================
-drop function if exists dashboard_funil_produtos(date, text);
+drop function if exists dashboard_funil_produtos(date, text, text, text);
 
 create or replace function dashboard_funil_produtos(
-  p_data date default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null,
   p_campanha text default null,
   p_origem text default null,
   p_produto text default null
@@ -693,7 +703,9 @@ set search_path = public
 stable
 as $$
   with alvo as (
-    select coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date) as dia
+    select
+      coalesce(p_date_from, (((now() at time zone 'America/Sao_Paulo')::date)::timestamp at time zone 'America/Sao_Paulo')) as de,
+      coalesce(p_date_to, (((now() at time zone 'America/Sao_Paulo')::date)::timestamp at time zone 'America/Sao_Paulo') + interval '1 day' - interval '1 second') as ate
   ),
   base as (
     select t.*
@@ -702,7 +714,7 @@ as $$
       and (p_origem is null or t.origem = p_origem)
       and (p_produto is null or t.produto = p_produto)
       and t.created_at is not null
-      and (t.created_at at time zone 'America/Sao_Paulo')::date = alvo.dia
+      and t.created_at between alvo.de and alvo.ate
   )
   select
     count(*) as leads,
