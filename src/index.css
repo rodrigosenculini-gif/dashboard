@@ -446,6 +446,33 @@ body {
 .refresh-btn:hover { color: var(--text); border-color: var(--rose); }
 .refresh-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* --- Filtro de intervalo de data com atalhos rápidos --- */
+.date-range-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.date-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.date-presets button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.date-presets button:hover { color: var(--text); border-color: var(--rose); }
+
 /* --- Overlay do Funil de Disparos --- */
 .funil-overlay {
   position: fixed;
