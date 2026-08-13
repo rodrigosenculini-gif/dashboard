@@ -206,6 +206,128 @@ body {
   border-color: var(--rose);
 }
 
+/* --- Seletor de visões (menu no topo) --- */
+.view-switcher {
+  position: relative;
+  margin-bottom: 14px;
+  display: inline-block;
+}
+
+.view-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.view-switcher-btn:hover { border-color: var(--rose); }
+
+.chevron {
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+.chevron.open { transform: rotate(180deg); }
+
+.view-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 20;
+  min-width: 220px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.view-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.view-menu-item:hover { background: var(--surface-1); }
+.view-menu-item.active { color: var(--rose); }
+
+/* --- Subtítulo do topbar / painéis --- */
+.subtitle {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.section-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin: -8px 0 12px;
+}
+
+.section-sub.small {
+  margin: 10px 0 0;
+  font-size: 10.5px;
+}
+
+/* --- KPI com subtítulo (painel Leilão) --- */
+.kpi-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin: 4px 0 0;
+  text-align: right;
+}
+
+.chart-panel.tall { height: 260px; }
+
+/* --- Tabela "Por template" --- */
+.template-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 1.2fr;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+}
+
+.template-row:last-child { border-bottom: none; }
+
+.template-row.head {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.falha-alta { color: var(--rose); }
+.falha-ok { color: var(--lime); }
+
+.comp-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.comp-fill-ok { background: var(--lime); }
+.comp-fill-fail { background: var(--rose); }
+
 .campanha-row {
   display: grid;
   grid-template-columns: 1fr 2fr 90px;
