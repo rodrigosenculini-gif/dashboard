@@ -94,6 +94,9 @@ as $$
 $$;
 
 -- 2) Envios por dia (gráfico de barras no topo) — inclui reenvios também
+-- (precisa dropar antes: mudamos o formato do retorno, adicionando a coluna reenvios)
+drop function if exists dashboard_envios_por_dia(text, text, text, timestamptz, timestamptz);
+
 create or replace function dashboard_envios_por_dia(
   p_campanha text default null,
   p_origem text default null,
