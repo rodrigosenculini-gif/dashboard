@@ -64,6 +64,9 @@ export default async function handler(req, res) {
     // Teste simples: só conta linhas da tabela, sem depender das funções SQL
     sql = 'select count(*)::int as total from disparochat';
     params = [];
+  } else if (type === 'debug') {
+    sql = "select proname, pg_get_function_identity_arguments(oid) as args from pg_proc where proname like 'dashboard_%' order by proname";
+    params = [];
   } else if (type === 'kpis') {
     sql = 'select * from dashboard_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
