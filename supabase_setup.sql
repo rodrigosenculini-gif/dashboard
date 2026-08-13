@@ -308,9 +308,11 @@ as $$
   with hoje as (
     select *
     from disparochat
-    where coalesce(reenvio, realizado) is not null
-      and date(coalesce(reenvio, realizado)) = current_date
-      and meta in ('sent', 'delivered', 'read', 'failed')
+    where meta in ('sent', 'delivered', 'read', 'failed')
+      and (
+        (coalesce(reenvio, realizado) is not null and date(coalesce(reenvio, realizado)) = current_date)
+        or (status_atualizado is not null and date(status_atualizado) = current_date)
+      )
   ),
   agg as (
     select
@@ -388,9 +390,11 @@ as $$
       else 0 end as falha_pct
   from disparochat
   where mensagem is not null
-    and coalesce(reenvio, realizado) is not null
-    and date(coalesce(reenvio, realizado)) = current_date
     and meta in ('sent', 'delivered', 'read', 'failed')
+    and (
+      (coalesce(reenvio, realizado) is not null and date(coalesce(reenvio, realizado)) = current_date)
+      or (status_atualizado is not null and date(status_atualizado) = current_date)
+    )
   group by mensagem
   order by (
     count(*) filter (where meta = 'sent') + count(*) filter (where meta = 'delivered') +
