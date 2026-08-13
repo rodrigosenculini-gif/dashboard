@@ -41,7 +41,7 @@ function todayISO() {
   return `${y}-${m}-${day}`
 }
 
-function CampanhaSearch({ value, onChange, options }) {
+function SearchSelect({ value, onChange, options, label, allLabel }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -61,7 +61,7 @@ function CampanhaSearch({ value, onChange, options }) {
       <input
         type="text"
         className="campanha-search-input"
-        placeholder="campanha \u2014 todas"
+        placeholder={`${label} \u2014 todas`}
         value={open ? query : (value || '')}
         onFocus={() => { setOpen(true); setQuery('') }}
         onChange={(e) => setQuery(e.target.value)}
@@ -72,7 +72,7 @@ function CampanhaSearch({ value, onChange, options }) {
             className="campanha-search-item"
             onMouseDown={() => { onChange(''); setOpen(false) }}
           >
-            campanha &mdash; todas
+            {allLabel || `${label} \u2014 todas`}
           </button>
           {filtered.map((o) => (
             <button
@@ -84,12 +84,16 @@ function CampanhaSearch({ value, onChange, options }) {
             </button>
           ))}
           {filtered.length === 0 && (
-            <div className="campanha-search-empty">Nenhuma campanha encontrada</div>
+            <div className="campanha-search-empty">Nenhum valor encontrado</div>
           )}
         </div>
       )}
     </div>
   )
+}
+
+function CampanhaSearch({ value, onChange, options }) {
+  return <SearchSelect value={value} onChange={onChange} options={options} label="campanha" />
 }
 
 function ExpandToggle({ expanded, onToggle, hiddenCount }) {
@@ -487,14 +491,8 @@ function EntradasLP() {
 
       <div className="filters">
         <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
-        <select value={produto} onChange={(e) => setProduto(e.target.value)}>
-          <option value="">produto &mdash; todos</option>
-          {filtros.produtos.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select value={origem} onChange={(e) => setOrigem(e.target.value)}>
-          <option value="">origem &mdash; todas</option>
-          {filtros.origens.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto \u2014 todos" />
+        <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem \u2014 todas" />
         <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
         <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
       </div>
@@ -560,28 +558,34 @@ const FUNIL_PRODUTOS_ETAPAS = [
   { key: 'pagos', label: 'Pagos' },
 ]
 
-function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, onClose }) {
+function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, showProduto, onClose }) {
   const [dados, setDados] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [campanhas, setCampanhas] = useState([])
+  const [filtros, setFiltros] = useState({ campanhas: [], origens: [], produtos: [] })
   const [data, setData] = useState(todayISO())
   const [campanha, setCampanha] = useState('')
+  const [origem, setOrigem] = useState('')
+  const [produto, setProduto] = useState('')
 
   useEffect(() => {
     callApi(campanhaFiltroType, {})
-      .then((d) => setCampanhas(d?.[0]?.campanhas || []))
+      .then((d) => setFiltros({
+        campanhas: d?.[0]?.campanhas || [],
+        origens: d?.[0]?.origens || [],
+        produtos: d?.[0]?.produtos || [],
+      }))
       .catch(() => {})
   }, [campanhaFiltroType])
 
   useEffect(() => {
     setLoading(true)
     setError(null)
-    callApi(apiType, { data, campanha })
+    callApi(apiType, { data, campanha, origem, ...(showProduto ? { produto } : {}) })
       .then((d) => setDados(d?.[0] ?? null))
       .catch((e) => setError(e.message || 'Erro ao carregar funil.'))
       .finally(() => setLoading(false))
-  }, [apiType, data, campanha])
+  }, [apiType, data, campanha, origem, produto, showProduto])
 
   const top = dados ? Number(dados[etapas[0].key]) || 1 : 1
 
@@ -598,7 +602,11 @@ function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, 
 
         <div className="filters">
           <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
-          <CampanhaSearch value={campanha} onChange={setCampanha} options={campanhas} />
+          <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
+          <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem \u2014 todas" />
+          {showProduto && (
+            <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto \u2014 todos" />
+          )}
         </div>
 
         {error && <div className="state-msg error">Erro: {error}</div>}
@@ -657,6 +665,7 @@ function FunilProdutos({ onClose }) {
       apiType="funil_produtos"
       campanhaFiltroType="produtos_filtros"
       etapas={FUNIL_PRODUTOS_ETAPAS}
+      showProduto
       onClose={onClose}
     />
   )
