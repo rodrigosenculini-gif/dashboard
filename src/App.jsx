@@ -537,6 +537,90 @@ function EntradasLP() {
   )
 }
 
+const FUNIL_ETAPAS = [
+  { key: 'leads', label: 'Disparado' },
+  { key: 'entregues', label: 'Entregue' },
+  { key: 'interagidos', label: 'Interagido' },
+  { key: 'simulacoes_saldo', label: 'Simula\u00e7\u00f5es com saldo' },
+  { key: 'pagas', label: 'Pagas' },
+]
+
+function FunilDisparos({ onClose }) {
+  const [dados, setDados] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [campanhas, setCampanhas] = useState([])
+  const [data, setData] = useState(todayISO())
+  const [campanha, setCampanha] = useState('')
+
+  useEffect(() => {
+    callApi('filtros', {})
+      .then((d) => setCampanhas(d?.[0]?.campanhas || []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    callApi('funil', { data, campanha })
+      .then((d) => setDados(d?.[0] ?? null))
+      .catch((e) => setError(e.message || 'Erro ao carregar funil.'))
+      .finally(() => setLoading(false))
+  }, [data, campanha])
+
+  const top = dados ? Number(dados[FUNIL_ETAPAS[0].key]) || 1 : 1
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="funil-header">
+          <div>
+            <h2>Funil &mdash; Disparos</h2>
+            <p className="subtitle">Do disparochat &middot; somente leitura</p>
+          </div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <div className="filters">
+          <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+          <CampanhaSearch value={campanha} onChange={setCampanha} options={campanhas} />
+        </div>
+
+        {error && <div className="state-msg error">Erro: {error}</div>}
+        {loading && !dados && <div className="state-msg">Carregando...</div>}
+
+        {dados && (
+          <div className="funil-body">
+            {FUNIL_ETAPAS.map((etapa, i) => {
+              const valor = Number(dados[etapa.key]) || 0
+              const pctTopo = top > 0 ? (valor / top) * 100 : 0
+              const anterior = i > 0 ? Number(dados[FUNIL_ETAPAS[i - 1].key]) || 0 : null
+              const pctEtapa = anterior && anterior > 0 ? (valor / anterior) * 100 : null
+              return (
+                <div className="funil-etapa" key={etapa.key}>
+                  <div className="funil-etapa-top">
+                    <span className="funil-etapa-label">{etapa.label}</span>
+                    <span className="funil-etapa-valor">{fmtInt(valor)}</span>
+                    <span className="funil-etapa-pct-topo">{pctTopo.toFixed(0)}% do topo</span>
+                  </div>
+                  <div className="funil-bar-track">
+                    <div className="funil-bar-fill" style={{ width: `${Math.max(pctTopo, 2)}%` }} />
+                  </div>
+                  {pctEtapa !== null && (
+                    <div className="funil-conv">
+                      Conv. etapa: <strong>{pctEtapa.toFixed(1)}%</strong>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function VisaoGeral() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [] })
   const [campanha, setCampanha] = useState('')
@@ -544,6 +628,7 @@ function VisaoGeral() {
   const [meta, setMeta] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
+  const [showFunil, setShowFunil] = useState(false)
 
   const [kpis, setKpis] = useState(null)
   const [envios, setEnvios] = useState([])
@@ -622,9 +707,14 @@ function VisaoGeral() {
     <>
       <div className="topbar">
         <h1><span className="pulse" /> Disparos &mdash; Dashboard</h1>
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <div className="topbar-right">
+          <span className="status-line">
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+          </span>
+          <button className="dots-btn" onClick={() => setShowFunil(true)} title="Funil de Disparos">
+            &#8942;
+          </button>
+        </div>
       </div>
 
       <div className="filters">
@@ -689,6 +779,8 @@ function VisaoGeral() {
         <BreakdownList title="Por Meta" items={porMeta} loading={loading} />
         <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} />
       </div>
+
+      {showFunil && <FunilDisparos onClose={() => setShowFunil(false)} />}
     </>
   )
 }
