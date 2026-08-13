@@ -76,6 +76,15 @@ export default async function handler(req, res) {
   } else if (type === 'campanhas') {
     sql = 'select * from dashboard_campanhas($1::text,$2::text,$3::timestamptz,$4::timestamptz)';
     params = [p_origem, p_meta, p_date_from, p_date_to];
+  } else if (type === 'por_conversa') {
+    sql = 'select * from dashboard_por_conversa($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
+  } else if (type === 'por_meta') {
+    sql = 'select * from dashboard_por_meta($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
+  } else if (type === 'por_mensagem') {
+    sql = 'select * from dashboard_por_mensagem($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
