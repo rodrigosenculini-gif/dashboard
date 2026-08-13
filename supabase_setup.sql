@@ -620,6 +620,53 @@ as $$
     (select array_agg(distinct origem) from total_produtos where origem is not null);
 $$;
 
+-- =========================================================
+-- FUNIL — DISPAROS (overlay dentro da visão Disparos)
+-- Etapas: Disparado (tudo) -> Entregue (meta preenchido e != failed) ->
+-- Interagido (interacao preenchido) -> Simulações com saldo (valor
+-- preenchido OU conversa = 'ofertado') -> Pagas (pagas preenchido).
+-- Padrão: dia de hoje (horário de Brasília), com filtro opcional de
+-- data e campanha.
+-- =========================================================
+create or replace function dashboard_funil(
+  p_data date default null,
+  p_campanha text default null
+)
+returns table (
+  leads bigint,
+  entregues bigint,
+  interagidos bigint,
+  simulacoes_saldo bigint,
+  pagas bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with alvo as (
+    select coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date) as dia
+  ),
+  base as (
+    select d.*
+    from disparochat d, alvo
+    where (p_campanha is null or d.campanha = p_campanha)
+      and (
+        (coalesce(d.reenvio, d.realizado) is not null
+          and (coalesce(d.reenvio, d.realizado) at time zone 'America/Sao_Paulo')::date = alvo.dia)
+        or (d.status_atualizado is not null
+          and (d.status_atualizado at time zone 'America/Sao_Paulo')::date = alvo.dia)
+      )
+  )
+  select
+    count(*) as leads,
+    count(*) filter (where meta is not null and meta <> 'failed') as entregues,
+    count(*) filter (where interacao is not null) as interagidos,
+    count(*) filter (where safe_numeric(valor) is not null or conversa = 'ofertado') as simulacoes_saldo,
+    count(*) filter (where pagas is not null) as pagas
+  from base;
+$$;
+
 -- 4) Valores distintos para popular os filtros (dropdowns)
 create or replace function dashboard_filtros()
 returns table (
@@ -653,4 +700,5 @@ grant execute on function dashboard_produtos_entradas_por_dia to anon;
 grant execute on function dashboard_produtos_aprovadas_por_dia to anon;
 grant execute on function dashboard_produtos_campanhas to anon;
 grant execute on function dashboard_produtos_filtros to anon;
+grant execute on function dashboard_funil to anon;
 grant execute on function dashboard_filtros to anon;
