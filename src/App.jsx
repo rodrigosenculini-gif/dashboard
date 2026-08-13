@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, Legend } from 'recharts'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 const VISIBLE_DEFAULT = 6
+
+const VIEWS = [
+  { id: 'geral', label: 'Vis\u00e3o Geral' },
+  { id: 'leilao', label: 'Leil\u00e3o \u2014 Detalhado' },
+]
 
 async function callApi(type, params) {
   const qs = new URLSearchParams({ type, ...params })
@@ -23,6 +28,9 @@ function fmtPct(n) {
 }
 function fmtMin(n) {
   return `${(n ?? 0).toString().replace('.', ',')} min`
+}
+function fmtHora(d) {
+  return d.toLocaleTimeString('pt-BR')
 }
 
 function ExpandToggle({ expanded, onToggle, hiddenCount }) {
@@ -107,7 +115,176 @@ function CampanhasList({ items, loading }) {
   )
 }
 
-export default function App() {
+function ViewSwitcher({ view, setView }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const current = VIEWS.find((v) => v.id === view)
+
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  return (
+    <div className="view-switcher" ref={ref}>
+      <button className="view-switcher-btn" onClick={() => setOpen((v) => !v)}>
+        {current?.label}
+        <span className={`chevron ${open ? 'open' : ''}`}>&#9662;</span>
+      </button>
+      {open && (
+        <div className="view-menu">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              className={`view-menu-item ${v.id === view ? 'active' : ''}`}
+              onClick={() => { setView(v.id); setOpen(false) }}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function KpiCardWithSub({ label, value, sub, accent }) {
+  return (
+    <div className="kpi">
+      <p className="kpi-label">{label}</p>
+      <p className={`kpi-value ${accent ? 'accent' : ''}`}>{value}</p>
+      {sub && <p className="kpi-sub">{sub}</p>}
+    </div>
+  )
+}
+
+function LeilaoDetalhado() {
+  const [kpis, setKpis] = useState(null)
+  const [falhaMin, setFalhaMin] = useState([])
+  const [templates, setTemplates] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [lastUpdate, setLastUpdate] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [kpiData, falhaData, templateData] = await Promise.all([
+        callApi('hoje_kpis', {}),
+        callApi('falha_por_minuto', { minutos: '60' }),
+        callApi('por_template_hoje', {}),
+      ])
+      setKpis(kpiData?.[0] ?? null)
+      setFalhaMin(
+        (falhaData ?? []).map((d) => ({
+          ...d,
+          horaLabel: new Date(d.minuto).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        }))
+      )
+      setTemplates(templateData ?? [])
+      setLastUpdate(new Date())
+    } catch (e) {
+      setError(e.message || 'Erro ao carregar dados.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const id = setInterval(load, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [load])
+
+  return (
+    <>
+      <div className="topbar">
+        <div>
+          <h1><span className="pulse" /> Leil&atilde;o &middot; Painel de Disparos</h1>
+          <p className="subtitle">Envio de leads e disparo de WhatsApp via API Meta &mdash; Hotline</p>
+        </div>
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+        </span>
+      </div>
+
+      {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <div className="kpi-grid">
+        <KpiCardWithSub
+          label="Mensagens hoje"
+          value={fmtInt(kpis?.mensagens_hoje)}
+          sub="sent + delivered + read + failed"
+        />
+        <KpiCardWithSub
+          label="Entregues / lidas"
+          value={fmtPct(kpis?.entregues_lidas_pct)}
+          sub={`${fmtInt(kpis?.entregues_lidas_qtd)} mensagens`}
+          accent
+        />
+        <KpiCardWithSub
+          label="Falhas"
+          value={fmtPct(kpis?.falhas_pct)}
+          sub={`${fmtInt(kpis?.falhas_qtd)} mensagens`}
+        />
+        <KpiCardWithSub
+          label="Templates ativos"
+          value={fmtInt(kpis?.templates_ativos)}
+          sub="com disparo hoje"
+        />
+      </div>
+
+      <div className="panel chart-panel tall">
+        <p className="section-label">Taxa de falha por minuto</p>
+        <p className="section-sub">&uacute;ltimos 60 minutos</p>
+        <ResponsiveContainer width="100%" height="78%">
+          <AreaChart data={falhaMin}>
+            <XAxis dataKey="horaLabel" tick={{ fontSize: 10, fill: '#8a978f' }} interval="preserveStartEnd" />
+            <YAxis tick={{ fontSize: 10, fill: '#8a978f' }} width={34} unit="%" />
+            <Tooltip
+              contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
+              labelStyle={{ color: '#8a978f' }}
+              formatter={(value, name) => [name === 'falha_pct' ? `${value}%` : value, name === 'falha_pct' ? 'falha' : name]}
+            />
+            <Area type="monotone" dataKey="falha_pct" stroke="#d99089" fill="#d99089" fillOpacity={0.25} strokeWidth={2} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="panel table-panel">
+        <p className="section-label">Por template &mdash; hoje</p>
+        <p className="section-sub">enviados, entregues, lidas e falhas desde 00:00</p>
+        <div className="template-row head">
+          <span>Template</span><span>Enviados</span><span>Entregues</span><span>Lidas</span><span>Falhas</span><span>Falha %</span><span>Composi&ccedil;&atilde;o</span>
+        </div>
+        {templates.length === 0 && !loading && (
+          <div className="state-msg">Sem disparos hoje ainda.</div>
+        )}
+        {templates.map((t) => (
+          <div className="template-row" key={t.template}>
+            <span className="campanha-nome">{t.template}</span>
+            <span>{fmtInt(t.enviados)}</span>
+            <span>{fmtInt(t.entregues)}</span>
+            <span>{fmtInt(t.lidas)}</span>
+            <span>{fmtInt(t.falhas)}</span>
+            <span className={Number(t.falha_pct) > 15 ? 'falha-alta' : 'falha-ok'}>{fmtPct(t.falha_pct)}</span>
+            <span className="comp-bar">
+              <span className="comp-fill-ok" style={{ width: `${100 - Number(t.falha_pct)}%` }} />
+              <span className="comp-fill-fail" style={{ width: `${Number(t.falha_pct)}%` }} />
+            </span>
+          </div>
+        ))}
+        <p className="section-sub small">Falha % = falhas &divide; total de mensagens naquele status hoje. Atualizado a cada minuto.</p>
+      </div>
+    </>
+  )
+}
+
+function VisaoGeral() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [] })
   const [campanha, setCampanha] = useState('')
   const [origem, setOrigem] = useState('')
@@ -189,11 +366,11 @@ export default function App() {
   }, [loadDados])
 
   return (
-    <div className="app">
+    <>
       <div className="topbar">
         <h1><span className="pulse" /> Disparos &mdash; Dashboard</h1>
         <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${lastUpdate.toLocaleTimeString('pt-BR')}` : ''}
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
         </span>
       </div>
 
@@ -259,6 +436,17 @@ export default function App() {
         <BreakdownList title="Por Meta" items={porMeta} loading={loading} />
         <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} />
       </div>
+    </>
+  )
+}
+
+export default function App() {
+  const [view, setView] = useState('geral')
+
+  return (
+    <div className="app">
+      <ViewSwitcher view={view} setView={setView} />
+      {view === 'geral' ? <VisaoGeral /> : <LeilaoDetalhado />}
     </div>
   )
 }
