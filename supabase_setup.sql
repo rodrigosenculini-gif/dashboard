@@ -72,7 +72,7 @@ as $$
         then round(100.0 * count(*) filter (where interacao is not null) / count(*), 2)
         else 0 end as interacao_pct,
       count(*) filter (where pagas is not null) as pagas_count,
-      coalesce(sum(safe_numeric(pagas)), 0) as pagas_valor,
+      coalesce(sum(pagas), 0) as pagas_valor,
       coalesce(sum(safe_numeric(valor)), 0) as valor_total
     from base
   )
