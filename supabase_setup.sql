@@ -431,6 +431,195 @@ as $$
   ) desc;
 $$;
 
+-- =========================================================
+-- PAINEL "ENTRADAS LP" (tabela total_produtos)
+-- =========================================================
+
+-- 8) KPIs da visão Entradas LP
+create or replace function dashboard_produtos_kpis(
+  p_campanha text default null,
+  p_produto text default null,
+  p_origem text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  total bigint,
+  interacao_qtd bigint,
+  interacao_pct numeric,
+  aprovados_qtd bigint,
+  aprovados_pct numeric,
+  reprovados_qtd bigint,
+  pagas_qtd bigint,
+  valor numeric,
+  conversao_total_pct numeric,
+  conversao_aprovados_pct numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with base as (
+    select *
+    from total_produtos
+    where (p_campanha is null or campanha = p_campanha)
+      and (p_produto is null or produto = p_produto)
+      and (p_origem is null or origem = p_origem)
+      and (p_date_from is null or created_at >= p_date_from)
+      and (p_date_to is null or created_at <= p_date_to)
+  ),
+  agg as (
+    select
+      count(*) as total,
+      count(*) filter (where interacao is not null) as interacao_qtd,
+      count(*) filter (where aprovadas is not null) as aprovados_qtd,
+      count(*) filter (where reprovadas is not null) as reprovados_qtd,
+      count(*) filter (where pagas is not null) as pagas_qtd,
+      coalesce(sum(valor), 0) as valor
+    from base
+  )
+  select
+    total,
+    interacao_qtd,
+    case when total > 0 then round(100.0 * interacao_qtd / total, 2) else 0 end,
+    aprovados_qtd,
+    case when total > 0 then round(100.0 * aprovados_qtd / total, 2) else 0 end,
+    reprovados_qtd,
+    pagas_qtd,
+    round(valor, 2),
+    case when total > 0 then round(100.0 * pagas_qtd / total, 2) else 0 end,
+    case when aprovados_qtd > 0 then round(100.0 * pagas_qtd / aprovados_qtd, 2) else 0 end
+  from agg;
+$$;
+
+-- 9) Entradas por dia e produto (formato longo — o front-end pivota pra empilhar)
+create or replace function dashboard_produtos_entradas_por_dia(
+  p_campanha text default null,
+  p_produto text default null,
+  p_origem text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  dia date,
+  produto text,
+  entradas bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    (created_at at time zone 'America/Sao_Paulo')::date as dia,
+    coalesce(produto, '(vazio)') as produto,
+    count(*) as entradas
+  from total_produtos
+  where created_at is not null
+    and (p_campanha is null or campanha = p_campanha)
+    and (p_produto is null or produto = p_produto)
+    and (p_origem is null or origem = p_origem)
+    and (p_date_from is null or created_at >= p_date_from)
+    and (p_date_to is null or created_at <= p_date_to)
+  group by 1, 2
+  order by 1;
+$$;
+
+-- 10) Aprovadas por dia (linha do gráfico)
+create or replace function dashboard_produtos_aprovadas_por_dia(
+  p_campanha text default null,
+  p_produto text default null,
+  p_origem text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  dia date,
+  aprovadas bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    (created_at at time zone 'America/Sao_Paulo')::date as dia,
+    count(*) filter (where aprovadas is not null) as aprovadas
+  from total_produtos
+  where created_at is not null
+    and (p_campanha is null or campanha = p_campanha)
+    and (p_produto is null or produto = p_produto)
+    and (p_origem is null or origem = p_origem)
+    and (p_date_from is null or created_at >= p_date_from)
+    and (p_date_to is null or created_at <= p_date_to)
+  group by 1
+  order by 1;
+$$;
+
+-- 11) Tabela por campanha + produto
+create or replace function dashboard_produtos_campanhas(
+  p_produto text default null,
+  p_origem text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  campanha text,
+  produto text,
+  leads bigint,
+  interacao_pct numeric,
+  aprovadas bigint,
+  conversao_aprovados_pct numeric,
+  pagas bigint,
+  valor_liberado numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(campanha, '(vazio)') as campanha,
+    coalesce(produto, '(vazio)') as produto,
+    count(*) as leads,
+    case when count(*) > 0
+      then round(100.0 * count(*) filter (where interacao is not null) / count(*), 2)
+      else 0 end as interacao_pct,
+    count(*) filter (where aprovadas is not null) as aprovadas,
+    case when count(*) filter (where aprovadas is not null) > 0
+      then round(100.0 * count(*) filter (where pagas is not null) / count(*) filter (where aprovadas is not null), 2)
+      else 0 end as conversao_aprovados_pct,
+    count(*) filter (where pagas is not null) as pagas,
+    coalesce(sum(valor), 0) as valor_liberado
+  from total_produtos
+  where (p_produto is null or produto = p_produto)
+    and (p_origem is null or origem = p_origem)
+    and (p_date_from is null or created_at >= p_date_from)
+    and (p_date_to is null or created_at <= p_date_to)
+  group by campanha, produto
+  order by leads desc
+  limit 60;
+$$;
+
+-- 12) Valores distintos para os filtros da visão Entradas LP
+create or replace function dashboard_produtos_filtros()
+returns table (
+  campanhas text[],
+  produtos text[],
+  origens text[]
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    (select array_agg(distinct campanha) from total_produtos where campanha is not null),
+    (select array_agg(distinct produto) from total_produtos where produto is not null),
+    (select array_agg(distinct origem) from total_produtos where origem is not null);
+$$;
+
 -- 4) Valores distintos para popular os filtros (dropdowns)
 create or replace function dashboard_filtros()
 returns table (
@@ -459,4 +648,9 @@ grant execute on function dashboard_por_mensagem to anon;
 grant execute on function dashboard_hoje_kpis to anon;
 grant execute on function dashboard_falha_por_minuto to anon;
 grant execute on function dashboard_por_template_hoje to anon;
+grant execute on function dashboard_produtos_kpis to anon;
+grant execute on function dashboard_produtos_entradas_por_dia to anon;
+grant execute on function dashboard_produtos_aprovadas_por_dia to anon;
+grant execute on function dashboard_produtos_campanhas to anon;
+grant execute on function dashboard_produtos_filtros to anon;
 grant execute on function dashboard_filtros to anon;
