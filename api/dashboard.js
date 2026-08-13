@@ -64,6 +64,14 @@ export default async function handler(req, res) {
     // Teste simples: só conta linhas da tabela, sem depender das funções SQL
     sql = 'select count(*)::int as total from disparochat';
     params = [];
+  } else if (type === 'debug_distinct') {
+    const table = req.query.table || 'total_produtos';
+    const column = req.query.column || 'pagas';
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table) || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column)) {
+      return res.status(400).json({ error: 'nome inválido' });
+    }
+    sql = `select ${column}, count(*) from ${table} group by 1 order by 2 desc limit 20`;
+    params = [];
   } else if (type === 'debug_table') {
     const table = req.query.table || 'total_produtos';
     sql = 'select column_name, data_type from information_schema.columns where table_name = $1 order by ordinal_position';
