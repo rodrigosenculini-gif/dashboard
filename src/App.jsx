@@ -279,9 +279,14 @@ function LeilaoDetalhado() {
           <h1><span className="pulse" /> Meta &middot; Painel de Disparos</h1>
           <p className="subtitle">Envio de leads e disparo de WhatsApp via API Meta &mdash; Hotline</p>
         </div>
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <div className="topbar-right">
+          <span className="status-line">
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+          </span>
+          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+            &#8635; Atualizar
+          </button>
+        </div>
       </div>
 
       <div className="filters">
@@ -483,6 +488,9 @@ function EntradasLP() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
+          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+            &#8635; Atualizar
+          </button>
           <button className="dots-btn" onClick={() => setShowFunil(true)} title="Funil de Entradas LP">
             &#8942;
           </button>
@@ -761,6 +769,9 @@ function VisaoGeral() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
+          <button className="refresh-btn" onClick={loadDados} disabled={loading} title="Atualizar agora">
+            &#8635; Atualizar
+          </button>
           <button className="dots-btn" onClick={() => setShowFunil(true)} title="Funil de Disparos">
             &#8942;
           </button>
@@ -835,12 +846,25 @@ function VisaoGeral() {
   )
 }
 
+const VIEW_STORAGE_KEY = 'disparos_dashboard_view'
+
 export default function App() {
-  const [view, setView] = useState('geral')
+  const [view, setView] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_STORAGE_KEY) || 'geral'
+    } catch {
+      return 'geral'
+    }
+  })
+
+  const changeView = (v) => {
+    setView(v)
+    try { localStorage.setItem(VIEW_STORAGE_KEY, v) } catch { /* ignora */ }
+  }
 
   return (
     <div className="app">
-      <ViewSwitcher view={view} setView={setView} />
+      <ViewSwitcher view={view} setView={changeView} />
       {view === 'geral' && <VisaoGeral />}
       {view === 'leilao' && <LeilaoDetalhado />}
       {view === 'produtos' && <EntradasLP />}
