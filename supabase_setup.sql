@@ -33,6 +33,9 @@ as $$
 $$;
 
 -- 1) KPIs principais (cards do topo)
+-- (precisa dropar antes: mudamos o formato do retorno, adicionando interacao_qtd e tempo_resposta_min)
+drop function if exists dashboard_kpis(text, text, text, timestamptz, timestamptz);
+
 create or replace function dashboard_kpis(
   p_campanha text default null,
   p_origem text default null,
@@ -44,11 +47,13 @@ returns table (
   total_leads bigint,
   gastado numeric,
   interacao_pct numeric,
+  interacao_qtd bigint,
   pagas bigint,
   faturado numeric,
   roi numeric,
   conversao_pct numeric,
-  valor numeric
+  valor numeric,
+  tempo_resposta_min numeric
 )
 language sql
 security definer
@@ -69,18 +74,26 @@ as $$
       count(*) as total_leads,
       coalesce(sum(gasto), 0) as gasto_bruto,
       round(coalesce(sum(gasto), 0) * 5.15 * 1.10, 2) as gastado,
-      case when count(*) > 0
-        then round(100.0 * count(*) filter (where interacao is not null) / count(*), 2)
-        else 0 end as interacao_pct,
+      count(*) filter (where interacao is not null) as interacao_qtd,
       count(*) filter (where pagas is not null) as pagas_count,
       coalesce(sum(pagas), 0) as pagas_valor,
-      coalesce(sum(safe_numeric(valor)), 0) as valor_total
+      coalesce(sum(safe_numeric(valor)), 0) as valor_total,
+      avg(
+        extract(epoch from (data_ultima_interacao - coalesce(reenvio, realizado))) / 60.0
+      ) filter (
+        where data_ultima_interacao is not null
+          and coalesce(reenvio, realizado) is not null
+          and data_ultima_interacao >= coalesce(reenvio, realizado)
+      ) as tempo_resposta_min
     from base
   )
   select
     total_leads,
     gastado,
-    interacao_pct,
+    case when total_leads > 0
+      then round(100.0 * interacao_qtd / total_leads, 2)
+      else 0 end as interacao_pct,
+    interacao_qtd,
     pagas_count as pagas,
     round(pagas_valor - gastado, 2) as faturado,
     case when gasto_bruto > 0
@@ -89,7 +102,8 @@ as $$
     case when total_leads > 0
       then round(100.0 * pagas_count / total_leads, 2)
       else 0 end as conversao_pct,
-    round(valor_total, 2) as valor
+    round(valor_total, 2) as valor,
+    round(tempo_resposta_min, 1) as tempo_resposta_min
   from agg;
 $$;
 
@@ -176,6 +190,98 @@ as $$
   order by leads desc;
 $$;
 
+-- 3b) Distribuição de leads por valor de "conversa"
+create or replace function dashboard_por_conversa(
+  p_campanha text default null,
+  p_origem text default null,
+  p_meta text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  valor text,
+  leads bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(conversa, '(vazio)') as valor,
+    count(*) as leads
+  from disparochat
+  where (p_campanha is null or campanha = p_campanha)
+    and (p_origem is null or origem = p_origem)
+    and (p_meta is null or meta = p_meta)
+    and (p_date_from is null or realizado >= p_date_from)
+    and (p_date_to is null or realizado <= p_date_to)
+  group by 1
+  order by leads desc
+  limit 20;
+$$;
+
+-- 3c) Distribuição de leads por valor de "meta" (status de entrega da Meta/WhatsApp)
+create or replace function dashboard_por_meta(
+  p_campanha text default null,
+  p_origem text default null,
+  p_meta text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  valor text,
+  leads bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(meta, '(vazio)') as valor,
+    count(*) as leads
+  from disparochat
+  where (p_campanha is null or campanha = p_campanha)
+    and (p_origem is null or origem = p_origem)
+    and (p_date_from is null or realizado >= p_date_from)
+    and (p_date_to is null or realizado <= p_date_to)
+  group by 1
+  order by leads desc
+  limit 20;
+$$;
+
+-- 3d) Distribuição de leads por valor de "mensagem"
+create or replace function dashboard_por_mensagem(
+  p_campanha text default null,
+  p_origem text default null,
+  p_meta text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  valor text,
+  leads bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(mensagem, '(vazio)') as valor,
+    count(*) as leads
+  from disparochat
+  where (p_campanha is null or campanha = p_campanha)
+    and (p_origem is null or origem = p_origem)
+    and (p_meta is null or meta = p_meta)
+    and (p_date_from is null or realizado >= p_date_from)
+    and (p_date_to is null or realizado <= p_date_to)
+  group by 1
+  order by leads desc
+  limit 20;
+$$;
+
 -- 4) Valores distintos para popular os filtros (dropdowns)
 create or replace function dashboard_filtros()
 returns table (
@@ -198,4 +304,7 @@ $$;
 grant execute on function dashboard_kpis to anon;
 grant execute on function dashboard_envios_por_dia to anon;
 grant execute on function dashboard_campanhas to anon;
+grant execute on function dashboard_por_conversa to anon;
+grant execute on function dashboard_por_meta to anon;
+grant execute on function dashboard_por_mensagem to anon;
 grant execute on function dashboard_filtros to anon;
