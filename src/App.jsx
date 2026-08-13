@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
+import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, Legend } from 'recharts'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 
@@ -125,7 +125,7 @@ export default function App() {
       {error && <div className="state-msg error">Erro: {error}</div>}
 
       <div className="panel chart-panel">
-        <p className="section-label">Envios</p>
+        <p className="section-label">Envios &amp; Reenvios</p>
         <ResponsiveContainer width="100%" height="80%">
           <BarChart data={envios}>
             <XAxis dataKey="dia" hide />
@@ -133,7 +133,12 @@ export default function App() {
               contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
               labelStyle={{ color: '#8a978f' }}
             />
-            <Bar dataKey="envios" fill="#d99089" radius={[3, 3, 0, 0]} />
+            <Legend
+              wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }}
+              formatter={(value) => (value === 'envios' ? 'Envios' : 'Reenvios')}
+            />
+            <Bar dataKey="envios" stackId="a" fill="#d99089" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="reenvios" stackId="a" fill="#d9b877" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
