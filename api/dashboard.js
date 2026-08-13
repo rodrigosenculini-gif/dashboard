@@ -85,6 +85,16 @@ export default async function handler(req, res) {
   } else if (type === 'por_mensagem') {
     sql = 'select * from dashboard_por_mensagem($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
+  } else if (type === 'hoje_kpis') {
+    sql = 'select * from dashboard_hoje_kpis()';
+    params = [];
+  } else if (type === 'falha_por_minuto') {
+    const minutos = parseInt(req.query.minutos, 10) || 60;
+    sql = 'select * from dashboard_falha_por_minuto($1::int)';
+    params = [minutos];
+  } else if (type === 'por_template_hoje') {
+    sql = 'select * from dashboard_por_template_hoje()';
+    params = [];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
