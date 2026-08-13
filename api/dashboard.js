@@ -106,17 +106,15 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_por_mensagem($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
   } else if (type === 'hoje_kpis') {
-    const p_data = req.query.data || null;
-    sql = 'select * from dashboard_hoje_kpis($1::date,$2::text)';
-    params = [p_data, p_campanha];
+    sql = 'select * from dashboard_hoje_kpis($1::timestamptz,$2::timestamptz,$3::text)';
+    params = [p_date_from, p_date_to, p_campanha];
   } else if (type === 'falha_por_minuto') {
     const minutos = parseInt(req.query.minutos, 10) || 60;
     sql = 'select * from dashboard_falha_por_minuto($1::int,$2::text)';
     params = [minutos, p_campanha];
   } else if (type === 'por_template_hoje') {
-    const p_data = req.query.data || null;
-    sql = 'select * from dashboard_por_template_hoje($1::date,$2::text)';
-    params = [p_data, p_campanha];
+    sql = 'select * from dashboard_por_template_hoje($1::timestamptz,$2::timestamptz,$3::text)';
+    params = [p_date_from, p_date_to, p_campanha];
   } else if (type === 'produtos_kpis') {
     sql = 'select * from dashboard_produtos_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
@@ -133,13 +131,11 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_produtos_filtros()';
     params = [];
   } else if (type === 'funil') {
-    const p_data = req.query.data || null;
-    sql = 'select * from dashboard_funil($1::date,$2::text,$3::text)';
-    params = [p_data, p_campanha, p_origem];
+    sql = 'select * from dashboard_funil($1::timestamptz,$2::timestamptz,$3::text,$4::text)';
+    params = [p_date_from, p_date_to, p_campanha, p_origem];
   } else if (type === 'funil_produtos') {
-    const p_data = req.query.data || null;
-    sql = 'select * from dashboard_funil_produtos($1::date,$2::text,$3::text,$4::text)';
-    params = [p_data, p_campanha, p_origem, req.query.produto || null];
+    sql = 'select * from dashboard_funil_produtos($1::timestamptz,$2::timestamptz,$3::text,$4::text,$5::text)';
+    params = [p_date_from, p_date_to, p_campanha, p_origem, req.query.produto || null];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
