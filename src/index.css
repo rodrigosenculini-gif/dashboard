@@ -386,6 +386,27 @@ body {
   color: var(--muted);
 }
 
+/* --- Tabela "Campanha x Produto" (Entradas LP) --- */
+.produtos-row {
+  display: grid;
+  grid-template-columns: 1.3fr 0.8fr 0.6fr 0.8fr 0.8fr 0.8fr 0.6fr 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.produtos-row:last-child { border-bottom: none; }
+
+.produtos-row.head {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
 .campanha-row {
   display: grid;
   grid-template-columns: 1fr 2fr 90px;
