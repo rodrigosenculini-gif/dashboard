@@ -64,6 +64,18 @@ export default async function handler(req, res) {
     // Teste simples: só conta linhas da tabela, sem depender das funções SQL
     sql = 'select count(*)::int as total from disparochat';
     params = [];
+  } else if (type === 'debug_table') {
+    const table = req.query.table || 'total_produtos';
+    sql = 'select column_name, data_type from information_schema.columns where table_name = $1 order by ordinal_position';
+    params = [table];
+  } else if (type === 'debug_sample') {
+    const table = req.query.table || 'total_produtos';
+    // nomes de tabela não podem ser parametrizados; validamos que só tem letras/underscore
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table)) {
+      return res.status(400).json({ error: 'nome de tabela inválido' });
+    }
+    sql = `select * from ${table} limit 5`;
+    params = [];
   } else if (type === 'debug') {
     sql = "select proname, pg_get_function_identity_arguments(oid) as args from pg_proc where proname like 'dashboard_%' order by proname";
     params = [];
