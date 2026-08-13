@@ -5,8 +5,8 @@ const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 const VISIBLE_DEFAULT = 6
 
 const VIEWS = [
-  { id: 'geral', label: 'Vis\u00e3o Geral' },
-  { id: 'leilao', label: 'Leil\u00e3o \u2014 Detalhado' },
+  { id: 'geral', label: 'Disparos' },
+  { id: 'leilao', label: 'Meta \u2014 Detalhado' },
 ]
 
 async function callApi(type, params) {
