@@ -289,6 +289,8 @@ $$;
 -- =========================================================
 
 -- 5) KPIs do dia (hoje) — mensagens, entregues/lidas %, falhas %, templates ativos
+-- "Hoje" = coalesce(reenvio, realizado) caiu na data de hoje (reenvio e realizado
+-- não são somados separadamente — é a mesma linha, só pega qual estiver preenchido)
 create or replace function dashboard_hoje_kpis()
 returns table (
   mensagens_hoje bigint,
@@ -306,8 +308,8 @@ as $$
   with hoje as (
     select *
     from disparochat
-    where status_atualizado is not null
-      and date(status_atualizado) = current_date
+    where coalesce(reenvio, realizado) is not null
+      and date(coalesce(reenvio, realizado)) = current_date
       and meta in ('sent', 'delivered', 'read', 'failed')
   ),
   agg as (
@@ -357,6 +359,8 @@ as $$
 $$;
 
 -- 7) Por template (mensagem) — hoje: enviados/entregues/lidas/falhas + falha %
+-- Só entram templates preenchidos de verdade (mensagem is not null) — a lista
+-- é dinâmica, baseada no que existir na base, nunca fixa.
 create or replace function dashboard_por_template_hoje()
 returns table (
   template text,
@@ -372,7 +376,7 @@ set search_path = public
 stable
 as $$
   select
-    coalesce(mensagem, 'null') as template,
+    mensagem as template,
     count(*) filter (where meta = 'sent') as enviados,
     count(*) filter (where meta = 'delivered') as entregues,
     count(*) filter (where meta = 'read') as lidas,
@@ -383,10 +387,11 @@ as $$
         count(*) filter (where meta in ('sent', 'delivered', 'read', 'failed')), 1)
       else 0 end as falha_pct
   from disparochat
-  where status_atualizado is not null
-    and date(status_atualizado) = current_date
+  where mensagem is not null
+    and coalesce(reenvio, realizado) is not null
+    and date(coalesce(reenvio, realizado)) = current_date
     and meta in ('sent', 'delivered', 'read', 'failed')
-  group by 1
+  group by mensagem
   order by (
     count(*) filter (where meta = 'sent') + count(*) filter (where meta = 'delivered') +
     count(*) filter (where meta = 'read') + count(*) filter (where meta = 'failed')
