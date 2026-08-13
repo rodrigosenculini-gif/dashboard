@@ -6,16 +6,16 @@
 --   - "Envio"     = linha cujo campo `realizado` não é nulo
 --   - "Leads"     = total de linhas no filtro
 --   - "Interação" = linhas em que `interacao` não é nulo
---   - "Pagas"     = linhas em que `pagas` não é nulo
---   - "Faturado"  = soma de `valor` apenas nas linhas pagas
+--   - "Pagas"     = linhas em que `pagas` não é nulo (contagem)
+--   - "Gastado"   = soma de `gasto` * 5.15 * 1.10 (conforme campo personalizado do Data Studio)
+--   - "Faturado"  = soma de `pagas` (valor monetário) - Gastado
 --   - "Valor"     = soma de `valor` em todas as linhas do filtro
---   - "Gastado"   = soma de `gasto`
 --   - "ROI"       = Faturado / Gastado
 --   - "Conversão" = Pagas / Leads
 --
--- OBS: a coluna `valor` é do tipo texto no banco (às vezes vem
--- como "erro" em vez de número), então uso uma conversão segura
--- que ignora qualquer valor que não seja um número válido.
+-- OBS: as colunas `valor` e `pagas` são do tipo texto no banco (às vezes vêm
+-- como "erro" em vez de número), então uso uma conversão segura que ignora
+-- qualquer valor que não seja um número válido.
 -- =========================================================
 
 -- função auxiliar: converte texto para numeric com segurança
@@ -55,27 +55,41 @@ security definer
 set search_path = public
 stable
 as $$
+  with base as (
+    select *
+    from disparochat
+    where (p_campanha is null or campanha = p_campanha)
+      and (p_origem is null or origem = p_origem)
+      and (p_meta is null or meta = p_meta)
+      and (p_date_from is null or realizado >= p_date_from)
+      and (p_date_to is null or realizado <= p_date_to)
+  ),
+  agg as (
+    select
+      count(*) as total_leads,
+      round(coalesce(sum(gasto), 0) * 5.15 * 1.10, 2) as gastado,
+      case when count(*) > 0
+        then round(100.0 * count(*) filter (where interacao is not null) / count(*), 2)
+        else 0 end as interacao_pct,
+      count(*) filter (where pagas is not null) as pagas_count,
+      coalesce(sum(safe_numeric(pagas)), 0) as pagas_valor,
+      coalesce(sum(safe_numeric(valor)), 0) as valor_total
+    from base
+  )
   select
-    count(*) as total_leads,
-    coalesce(sum(gasto), 0) as gastado,
-    case when count(*) > 0
-      then round(100.0 * count(*) filter (where interacao is not null) / count(*), 2)
-      else 0 end as interacao_pct,
-    count(*) filter (where pagas is not null) as pagas,
-    coalesce(sum(safe_numeric(valor)) filter (where pagas is not null), 0) as faturado,
-    case when coalesce(sum(gasto), 0) > 0
-      then round(coalesce(sum(safe_numeric(valor)) filter (where pagas is not null), 0) / sum(gasto), 2)
+    total_leads,
+    gastado,
+    interacao_pct,
+    pagas_count as pagas,
+    round(pagas_valor - gastado, 2) as faturado,
+    case when gastado > 0
+      then round((pagas_valor - gastado) / gastado, 2)
       else 0 end as roi,
-    case when count(*) > 0
-      then round(100.0 * count(*) filter (where pagas is not null) / count(*), 2)
+    case when total_leads > 0
+      then round(100.0 * pagas_count / total_leads, 2)
       else 0 end as conversao_pct,
-    coalesce(sum(safe_numeric(valor)), 0) as valor
-  from disparochat
-  where (p_campanha is null or campanha = p_campanha)
-    and (p_origem is null or origem = p_origem)
-    and (p_meta is null or meta = p_meta)
-    and (p_date_from is null or realizado >= p_date_from)
-    and (p_date_to is null or realizado <= p_date_to);
+    round(valor_total, 2) as valor
+  from agg;
 $$;
 
 -- 2) Envios por dia (gráfico de barras no topo)
