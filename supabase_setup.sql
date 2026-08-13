@@ -472,10 +472,10 @@ as $$
   agg as (
     select
       count(*) as total,
-      count(*) filter (where interacao is not null) as interacao_qtd,
-      count(*) filter (where aprovadas is not null) as aprovados_qtd,
-      count(*) filter (where reprovadas is not null) as reprovados_qtd,
-      count(*) filter (where pagas is not null) as pagas_qtd,
+      count(*) filter (where interacao = 1) as interacao_qtd,
+      count(*) filter (where aprovadas = 1) as aprovados_qtd,
+      count(*) filter (where reprovadas = 1) as reprovados_qtd,
+      count(*) filter (where pagas = 1) as pagas_qtd,
       coalesce(sum(valor), 0) as valor
     from base
   )
@@ -545,7 +545,7 @@ stable
 as $$
   select
     (created_at at time zone 'America/Sao_Paulo')::date as dia,
-    count(*) filter (where aprovadas is not null) as aprovadas
+    count(*) filter (where aprovadas = 1) as aprovadas
   from total_produtos
   where created_at is not null
     and (p_campanha is null or campanha = p_campanha)
@@ -584,13 +584,13 @@ as $$
     coalesce(produto, '(vazio)') as produto,
     count(*) as leads,
     case when count(*) > 0
-      then round(100.0 * count(*) filter (where interacao is not null) / count(*), 2)
+      then round(100.0 * count(*) filter (where interacao = 1) / count(*), 2)
       else 0 end as interacao_pct,
-    count(*) filter (where aprovadas is not null) as aprovadas,
-    case when count(*) filter (where aprovadas is not null) > 0
-      then round(100.0 * count(*) filter (where pagas is not null) / count(*) filter (where aprovadas is not null), 2)
+    count(*) filter (where aprovadas = 1) as aprovadas,
+    case when count(*) filter (where aprovadas = 1) > 0
+      then round(100.0 * count(*) filter (where pagas = 1) / count(*) filter (where aprovadas = 1), 2)
       else 0 end as conversao_aprovados_pct,
-    count(*) filter (where pagas is not null) as pagas,
+    count(*) filter (where pagas = 1) as pagas,
     coalesce(sum(valor), 0) as valor_liberado
   from total_produtos
   where (p_produto is null or produto = p_produto)
