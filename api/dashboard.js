@@ -109,6 +109,21 @@ export default async function handler(req, res) {
     const p_data = req.query.data || null;
     sql = 'select * from dashboard_por_template_hoje($1::date,$2::text)';
     params = [p_data, p_campanha];
+  } else if (type === 'produtos_kpis') {
+    sql = 'select * from dashboard_produtos_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
+    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
+  } else if (type === 'produtos_entradas_por_dia') {
+    sql = 'select * from dashboard_produtos_entradas_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
+    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
+  } else if (type === 'produtos_aprovadas_por_dia') {
+    sql = 'select * from dashboard_produtos_aprovadas_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
+    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
+  } else if (type === 'produtos_campanhas') {
+    sql = 'select * from dashboard_produtos_campanhas($1::text,$2::text,$3::timestamptz,$4::timestamptz)';
+    params = [req.query.produto || null, p_origem, p_date_from, p_date_to];
+  } else if (type === 'produtos_filtros') {
+    sql = 'select * from dashboard_produtos_filtros()';
+    params = [];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
