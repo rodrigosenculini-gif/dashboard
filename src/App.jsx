@@ -20,6 +20,35 @@ function fmtMoney(n) {
 function fmtPct(n) {
   return `${(n ?? 0).toString().replace('.', ',')}%`
 }
+function fmtMin(n) {
+  return `${(n ?? 0).toString().replace('.', ',')} min`
+}
+
+function BreakdownList({ title, items, loading }) {
+  const max = Math.max(1, ...items.map((i) => Number(i.leads) || 0))
+  return (
+    <div className="panel table-panel breakdown">
+      <p className="section-label">{title}</p>
+      <div className="breakdown-row head">
+        <span>Valor</span><span>Leads</span>
+      </div>
+      {items.length === 0 && !loading && (
+        <div className="state-msg">Sem dados para os filtros selecionados.</div>
+      )}
+      {items.map((i) => (
+        <div className="breakdown-row" key={i.valor}>
+          <span className="campanha-nome">{i.valor}</span>
+          <span className="bar-cell">
+            <span className="bar-track">
+              <span className="bar-fill" style={{ width: `${(Number(i.leads) / max) * 100}%` }} />
+            </span>
+            <span className="bar-value">{fmtInt(i.leads)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function App() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [] })
@@ -32,6 +61,9 @@ export default function App() {
   const [kpis, setKpis] = useState(null)
   const [envios, setEnvios] = useState([])
   const [campanhas, setCampanhas] = useState([])
+  const [porConversa, setPorConversa] = useState([])
+  const [porMeta, setPorMeta] = useState([])
+  const [porMensagem, setPorMensagem] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
@@ -63,7 +95,7 @@ export default function App() {
     setLoading(true)
     setError(null)
     try {
-      const [kpiData, enviosData, campanhasData] = await Promise.all([
+      const [kpiData, enviosData, campanhasData, conversaData, metaData, mensagemData] = await Promise.all([
         callApi('kpis', apiArgsBase),
         callApi('envios', apiArgsBase),
         callApi('campanhas', {
@@ -72,11 +104,17 @@ export default function App() {
           date_from: apiArgsBase.date_from,
           date_to: apiArgsBase.date_to,
         }),
+        callApi('por_conversa', apiArgsBase),
+        callApi('por_meta', apiArgsBase),
+        callApi('por_mensagem', apiArgsBase),
       ])
 
       setKpis(kpiData?.[0] ?? null)
       setEnvios(enviosData ?? [])
       setCampanhas(campanhasData ?? [])
+      setPorConversa(conversaData ?? [])
+      setPorMeta(metaData ?? [])
+      setPorMensagem(mensagemData ?? [])
       setLastUpdate(new Date())
     } catch (e) {
       setError(e.message || 'Erro ao carregar dados.')
@@ -147,13 +185,17 @@ export default function App() {
         <div className="kpi"><p className="kpi-label">Total Leads</p><p className="kpi-value">{fmtInt(kpis?.total_leads)}</p></div>
         <div className="kpi"><p className="kpi-label">Gastado</p><p className="kpi-value">{fmtMoney(kpis?.gastado)}</p></div>
         <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o %</p><p className="kpi-value">{fmtPct(kpis?.interacao_pct)}</p></div>
-        <div className="kpi"><p className="kpi-label">Pagas</p><p className="kpi-value">{fmtInt(kpis?.pagas)}</p></div>
+        <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o (qtd)</p><p className="kpi-value">{fmtInt(kpis?.interacao_qtd)}</p></div>
       </div>
       <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Pagas</p><p className="kpi-value">{fmtInt(kpis?.pagas)}</p></div>
         <div className="kpi"><p className="kpi-label">Faturado</p><p className="kpi-value">{fmtMoney(kpis?.faturado)}</p></div>
         <div className="kpi"><p className="kpi-label">ROI</p><p className="kpi-value accent">{(kpis?.roi ?? 0).toString().replace('.', ',')}</p></div>
         <div className="kpi"><p className="kpi-label">Convers&atilde;o</p><p className="kpi-value">{fmtPct(kpis?.conversao_pct)}</p></div>
+      </div>
+      <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Valor</p><p className="kpi-value">{fmtMoney(kpis?.valor)}</p></div>
+        <div className="kpi"><p className="kpi-label">Tempo m&eacute;dio resposta</p><p className="kpi-value">{fmtMin(kpis?.tempo_resposta_min)}</p></div>
       </div>
 
       <div className="panel table-panel">
@@ -181,6 +223,12 @@ export default function App() {
             </span>
           </div>
         ))}
+      </div>
+
+      <div className="breakdown-grid">
+        <BreakdownList title="Por Conversa" items={porConversa} loading={loading} />
+        <BreakdownList title="Por Meta" items={porMeta} loading={loading} />
+        <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} />
       </div>
     </div>
   )
