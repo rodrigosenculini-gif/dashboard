@@ -49,6 +49,7 @@ returns table (
   interacao_pct numeric,
   interacao_qtd bigint,
   pagas bigint,
+  valor_pago numeric,
   faturado numeric,
   roi numeric,
   conversao_pct numeric,
@@ -95,6 +96,7 @@ as $$
       else 0 end as interacao_pct,
     interacao_qtd,
     pagas_count as pagas,
+    round(pagas_valor, 2) as valor_pago,
     round(pagas_valor - gastado, 2) as faturado,
     case when gasto_bruto > 0
       then round((pagas_valor - gastado) / gasto_bruto, 2)
