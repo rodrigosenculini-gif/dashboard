@@ -29,22 +29,25 @@ async function n8nFetch(path) {
   return data;
 }
 
-// Busca várias páginas de execuções (mais recentes primeiro), parando cedo
-// quando já passou da data mais antiga que precisamos.
-async function fetchExecutions({ workflowId, oldestNeeded, maxPages = 8 }) {
+// Busca execuções de UM status específico, paginando até sair do intervalo
+// de datas pedido (ou até um teto de segurança). Statuses "waiting"/"running"
+// não usam corte por data — são sempre poucos, então buscamos todos.
+async function fetchByStatus({ status, workflowId, from, useDateCutoff, maxPages }) {
   let all = [];
   let cursor = null;
   for (let page = 0; page < maxPages; page++) {
-    const params = new URLSearchParams({ limit: '250' });
+    const params = new URLSearchParams({ limit: '250', status });
     if (workflowId) params.set('workflowId', workflowId);
     if (cursor) params.set('cursor', cursor);
     const data = await n8nFetch(`/api/v1/executions?${params.toString()}`);
     const items = data.data || [];
     all = all.concat(items);
     cursor = data.nextCursor || null;
-    const oldestInPage = items[items.length - 1];
     if (!cursor) break;
-    if (oldestNeeded && oldestInPage && new Date(oldestInPage.startedAt) < oldestNeeded) break;
+    if (useDateCutoff) {
+      const oldest = items[items.length - 1];
+      if (oldest && new Date(oldest.startedAt) < from) break;
+    }
   }
   return all;
 }
@@ -76,24 +79,30 @@ export default async function handler(req, res) {
       const from = date_from ? new Date(date_from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
       const to = date_to ? new Date(date_to) : new Date();
       const now = new Date();
+      const wf = workflowId || null;
 
-      const executions = await fetchExecutions({ workflowId: workflowId || null, oldestNeeded: from });
+      // busca os 4 status em paralelo (bem mais rápido que sequencial)
+      const [successRaw, errorRaw, waitingRaw, runningRaw] = await Promise.all([
+        fetchByStatus({ status: 'success', workflowId: wf, from, useDateCutoff: true, maxPages: 12 }),
+        fetchByStatus({ status: 'error', workflowId: wf, from, useDateCutoff: true, maxPages: 12 }),
+        fetchByStatus({ status: 'waiting', workflowId: wf, from, useDateCutoff: false, maxPages: 4 }),
+        fetchByStatus({ status: 'running', workflowId: wf, from, useDateCutoff: false, maxPages: 4 }),
+      ]);
 
-      const inRange = executions.filter((e) => {
+      const inRange = (list) => list.filter((e) => {
         const t = new Date(e.startedAt);
         return t >= from && t <= to;
       });
 
-      const counts = { success: 0, error: 0, waiting: 0, running: 0, other: 0 };
+      const success = inRange(successRaw);
+      const error = inRange(errorRaw);
+      // pendentes: não filtramos por data (elas ainda não terminaram, então
+      // "startedAt" pode ser de antes do intervalo, mas seguem pendentes agora)
+      const pendingRaw = [...waitingRaw, ...runningRaw];
+
       let durationSum = 0;
       let durationCount = 0;
-      const pending = [];
-
-      for (const e of inRange) {
-        const status = e.status || 'other';
-        if (counts[status] !== undefined) counts[status]++;
-        else counts.other++;
-
+      for (const e of [...success, ...error]) {
         if (e.stoppedAt && e.startedAt) {
           const dur = (new Date(e.stoppedAt) - new Date(e.startedAt)) / 1000;
           if (dur >= 0) {
@@ -101,30 +110,25 @@ export default async function handler(req, res) {
             durationCount++;
           }
         }
-
-        if (status === 'waiting' || status === 'running') {
-          const elapsedSec = (now - new Date(e.startedAt)) / 1000;
-          pending.push({
-            id: e.id,
-            workflowId: e.workflowId,
-            status,
-            startedAt: e.startedAt,
-            elapsedSec,
-          });
-        }
       }
 
-      pending.sort((a, b) => b.elapsedSec - a.elapsedSec);
+      const pending = pendingRaw.map((e) => ({
+        id: e.id,
+        workflowId: e.workflowId,
+        status: e.status,
+        startedAt: e.startedAt,
+        elapsedSec: (now - new Date(e.startedAt)) / 1000,
+      })).sort((a, b) => b.elapsedSec - a.elapsedSec);
+
       const avgPendingSec = pending.length
         ? pending.reduce((s, p) => s + p.elapsedSec, 0) / pending.length
         : 0;
 
       return res.status(200).json({
-        total: inRange.length,
-        success: counts.success,
-        error: counts.error,
-        pending: counts.waiting + counts.running,
-        other: counts.other,
+        total: success.length + error.length + pending.length,
+        success: success.length,
+        error: error.length,
+        pending: pending.length,
         avg_duration_sec: durationCount ? durationSum / durationCount : 0,
         avg_pending_sec: avgPendingSec,
         pending_list: pending.slice(0, 50),
