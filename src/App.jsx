@@ -406,6 +406,7 @@ function EntradasLP() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [showFunil, setShowFunil] = useState(false)
 
   const args = useMemo(() => ({
     campanha: campanha || '',
@@ -474,9 +475,14 @@ function EntradasLP() {
     <>
       <div className="topbar">
         <h1><span className="pulse" /> Entradas LP</h1>
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <div className="topbar-right">
+          <span className="status-line">
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+          </span>
+          <button className="dots-btn" onClick={() => setShowFunil(true)} title="Funil de Entradas LP">
+            &#8942;
+          </button>
+        </div>
       </div>
 
       <div className="filters">
@@ -533,11 +539,13 @@ function EntradasLP() {
       </div>
 
       <ProdutosCampanhasList items={campanhasProdutos} loading={loading} />
+
+      {showFunil && <FunilProdutos onClose={() => setShowFunil(false)} />}
     </>
   )
 }
 
-const FUNIL_ETAPAS = [
+const FUNIL_DISPAROS_ETAPAS = [
   { key: 'leads', label: 'Disparado' },
   { key: 'entregues', label: 'Entregue' },
   { key: 'interagidos', label: 'Interagido' },
@@ -545,7 +553,14 @@ const FUNIL_ETAPAS = [
   { key: 'pagas', label: 'Pagas' },
 ]
 
-function FunilDisparos({ onClose }) {
+const FUNIL_PRODUTOS_ETAPAS = [
+  { key: 'leads', label: 'Leads' },
+  { key: 'interagidos', label: 'Interagidos' },
+  { key: 'aprovados', label: 'Aprovados' },
+  { key: 'pagos', label: 'Pagos' },
+]
+
+function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, onClose }) {
   const [dados, setDados] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -554,29 +569,29 @@ function FunilDisparos({ onClose }) {
   const [campanha, setCampanha] = useState('')
 
   useEffect(() => {
-    callApi('filtros', {})
+    callApi(campanhaFiltroType, {})
       .then((d) => setCampanhas(d?.[0]?.campanhas || []))
       .catch(() => {})
-  }, [])
+  }, [campanhaFiltroType])
 
   useEffect(() => {
     setLoading(true)
     setError(null)
-    callApi('funil', { data, campanha })
+    callApi(apiType, { data, campanha })
       .then((d) => setDados(d?.[0] ?? null))
       .catch((e) => setError(e.message || 'Erro ao carregar funil.'))
       .finally(() => setLoading(false))
-  }, [data, campanha])
+  }, [apiType, data, campanha])
 
-  const top = dados ? Number(dados[FUNIL_ETAPAS[0].key]) || 1 : 1
+  const top = dados ? Number(dados[etapas[0].key]) || 1 : 1
 
   return (
     <div className="funil-overlay" onClick={onClose}>
       <div className="funil-panel" onClick={(e) => e.stopPropagation()}>
         <div className="funil-header">
           <div>
-            <h2>Funil &mdash; Disparos</h2>
-            <p className="subtitle">Do disparochat &middot; somente leitura</p>
+            <h2>{titulo}</h2>
+            <p className="subtitle">{subtitulo}</p>
           </div>
           <button className="funil-close" onClick={onClose}>&times;</button>
         </div>
@@ -591,10 +606,10 @@ function FunilDisparos({ onClose }) {
 
         {dados && (
           <div className="funil-body">
-            {FUNIL_ETAPAS.map((etapa, i) => {
+            {etapas.map((etapa, i) => {
               const valor = Number(dados[etapa.key]) || 0
               const pctTopo = top > 0 ? (valor / top) * 100 : 0
-              const anterior = i > 0 ? Number(dados[FUNIL_ETAPAS[i - 1].key]) || 0 : null
+              const anterior = i > 0 ? Number(dados[etapas[i - 1].key]) || 0 : null
               const pctEtapa = anterior && anterior > 0 ? (valor / anterior) * 100 : null
               return (
                 <div className="funil-etapa" key={etapa.key}>
@@ -618,6 +633,32 @@ function FunilDisparos({ onClose }) {
         )}
       </div>
     </div>
+  )
+}
+
+function FunilDisparos({ onClose }) {
+  return (
+    <FunilOverlay
+      titulo="Funil — Disparos"
+      subtitulo="Do disparochat · somente leitura"
+      apiType="funil"
+      campanhaFiltroType="filtros"
+      etapas={FUNIL_DISPAROS_ETAPAS}
+      onClose={onClose}
+    />
+  )
+}
+
+function FunilProdutos({ onClose }) {
+  return (
+    <FunilOverlay
+      titulo="Funil — Entradas LP"
+      subtitulo="Do total_produtos · somente leitura"
+      apiType="funil_produtos"
+      campanhaFiltroType="produtos_filtros"
+      etapas={FUNIL_PRODUTOS_ETAPAS}
+      onClose={onClose}
+    />
   )
 }
 
