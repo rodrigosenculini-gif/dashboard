@@ -124,6 +124,10 @@ export default async function handler(req, res) {
   } else if (type === 'produtos_filtros') {
     sql = 'select * from dashboard_produtos_filtros()';
     params = [];
+  } else if (type === 'funil') {
+    const p_data = req.query.data || null;
+    sql = 'select * from dashboard_funil($1::date,$2::text)';
+    params = [p_data, p_campanha];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
