@@ -663,6 +663,45 @@ as $$
   from base;
 $$;
 
+-- =========================================================
+-- FUNIL — ENTRADAS LP (overlay dentro da visão Entradas LP)
+-- Etapas: Leads (tudo) -> Interagidos -> Aprovados -> Pagos.
+-- Padrão: dia de hoje (horário de Brasília), com filtro opcional de
+-- data e campanha.
+-- =========================================================
+create or replace function dashboard_funil_produtos(
+  p_data date default null,
+  p_campanha text default null
+)
+returns table (
+  leads bigint,
+  interagidos bigint,
+  aprovados bigint,
+  pagos bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with alvo as (
+    select coalesce(p_data, (now() at time zone 'America/Sao_Paulo')::date) as dia
+  ),
+  base as (
+    select t.*
+    from total_produtos t, alvo
+    where (p_campanha is null or t.campanha = p_campanha)
+      and t.created_at is not null
+      and (t.created_at at time zone 'America/Sao_Paulo')::date = alvo.dia
+  )
+  select
+    count(*) as leads,
+    count(*) filter (where interacao = 1) as interagidos,
+    count(*) filter (where aprovadas = 1) as aprovados,
+    count(*) filter (where pagas = 1) as pagos
+  from base;
+$$;
+
 -- 4) Valores distintos para popular os filtros (dropdowns)
 create or replace function dashboard_filtros()
 returns table (
@@ -697,4 +736,5 @@ grant execute on function dashboard_produtos_aprovadas_por_dia to anon;
 grant execute on function dashboard_produtos_campanhas to anon;
 grant execute on function dashboard_produtos_filtros to anon;
 grant execute on function dashboard_funil to anon;
+grant execute on function dashboard_funil_produtos to anon;
 grant execute on function dashboard_filtros to anon;
