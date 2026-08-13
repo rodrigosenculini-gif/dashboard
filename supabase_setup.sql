@@ -476,7 +476,7 @@ as $$
       count(*) filter (where aprovadas = 1) as aprovados_qtd,
       count(*) filter (where reprovadas = 1) as reprovados_qtd,
       count(*) filter (where pagas = 1) as pagas_qtd,
-      coalesce(sum(valor), 0) as valor
+      coalesce(sum(valor) filter (where pagas = 1), 0) as valor
     from base
   )
   select
@@ -591,7 +591,7 @@ as $$
       then round(100.0 * count(*) filter (where pagas = 1) / count(*) filter (where aprovadas = 1), 2)
       else 0 end as conversao_aprovados_pct,
     count(*) filter (where pagas = 1) as pagas,
-    coalesce(sum(valor), 0) as valor_liberado
+    coalesce(sum(valor) filter (where pagas = 1), 0) as valor_liberado
   from total_produtos
   where (p_produto is null or produto = p_produto)
     and (p_origem is null or origem = p_origem)
