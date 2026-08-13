@@ -32,6 +32,64 @@ function fmtMin(n) {
 function fmtHora(d) {
   return d.toLocaleTimeString('pt-BR')
 }
+function todayISO() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function CampanhaSearch({ value, onChange, options }) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase())).slice(0, 50)
+
+  return (
+    <div className="campanha-search" ref={ref}>
+      <input
+        type="text"
+        className="campanha-search-input"
+        placeholder="campanha \u2014 todas"
+        value={open ? query : (value || '')}
+        onFocus={() => { setOpen(true); setQuery('') }}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {open && (
+        <div className="campanha-search-menu">
+          <button
+            className="campanha-search-item"
+            onMouseDown={() => { onChange(''); setOpen(false) }}
+          >
+            campanha &mdash; todas
+          </button>
+          {filtered.map((o) => (
+            <button
+              key={o}
+              className="campanha-search-item"
+              onMouseDown={() => { onChange(o); setOpen(false) }}
+            >
+              {o}
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <div className="campanha-search-empty">Nenhuma campanha encontrada</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ExpandToggle({ expanded, onToggle, hiddenCount }) {
   if (hiddenCount <= 0 && !expanded) return null
@@ -168,15 +226,24 @@ function LeilaoDetalhado() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [campanhas, setCampanhas] = useState([])
+  const [data, setData] = useState(todayISO())
+  const [campanha, setCampanha] = useState('')
+
+  useEffect(() => {
+    callApi('filtros', {})
+      .then((d) => setCampanhas(d?.[0]?.campanhas || []))
+      .catch(() => {})
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const [kpiData, falhaData, templateData] = await Promise.all([
-        callApi('hoje_kpis', {}),
-        callApi('falha_por_minuto', { minutos: '60' }),
-        callApi('por_template_hoje', {}),
+        callApi('hoje_kpis', { data, campanha }),
+        callApi('falha_por_minuto', { minutos: '60', campanha }),
+        callApi('por_template_hoje', { data, campanha }),
       ])
       setKpis(kpiData?.[0] ?? null)
       setFalhaMin(
@@ -192,7 +259,7 @@ function LeilaoDetalhado() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [data, campanha])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -204,12 +271,17 @@ function LeilaoDetalhado() {
     <>
       <div className="topbar">
         <div>
-          <h1><span className="pulse" /> Leil&atilde;o &middot; Painel de Disparos</h1>
+          <h1><span className="pulse" /> Meta &middot; Painel de Disparos</h1>
           <p className="subtitle">Envio de leads e disparo de WhatsApp via API Meta &mdash; Hotline</p>
         </div>
         <span className="status-line">
           {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
         </span>
+      </div>
+
+      <div className="filters">
+        <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+        <CampanhaSearch value={campanha} onChange={setCampanha} options={campanhas} />
       </div>
 
       {error && <div className="state-msg error">Erro: {error}</div>}
