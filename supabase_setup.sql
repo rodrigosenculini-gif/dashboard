@@ -67,6 +67,7 @@ as $$
   agg as (
     select
       count(*) as total_leads,
+      coalesce(sum(gasto), 0) as gasto_bruto,
       round(coalesce(sum(gasto), 0) * 5.15 * 1.10, 2) as gastado,
       case when count(*) > 0
         then round(100.0 * count(*) filter (where interacao is not null) / count(*), 2)
@@ -82,8 +83,8 @@ as $$
     interacao_pct,
     pagas_count as pagas,
     round(pagas_valor - gastado, 2) as faturado,
-    case when gastado > 0
-      then round((pagas_valor - gastado) / gastado, 2)
+    case when gasto_bruto > 0
+      then round((pagas_valor - gastado) / gasto_bruto, 2)
       else 0 end as roi,
     case when total_leads > 0
       then round(100.0 * pagas_count / total_leads, 2)
