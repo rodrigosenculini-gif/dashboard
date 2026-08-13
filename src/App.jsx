@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
+import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 const VISIBLE_DEFAULT = 6
@@ -7,6 +7,7 @@ const VISIBLE_DEFAULT = 6
 const VIEWS = [
   { id: 'geral', label: 'Disparos' },
   { id: 'leilao', label: 'Meta \u2014 Detalhado' },
+  { id: 'produtos', label: 'Entradas LP' },
 ]
 
 async function callApi(type, params) {
@@ -356,6 +357,186 @@ function LeilaoDetalhado() {
   )
 }
 
+const PRODUTO_CORES = ['#d9b877', '#7fa8d9', '#d99089', '#8fd97f', '#c17fd9', '#d9d17f']
+
+function ProdutosCampanhasList({ items, loading }) {
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
+  return (
+    <div className="panel table-panel">
+      <p className="section-label">Campanha &times; Produto</p>
+      <div className="produtos-row head">
+        <span>Campanha</span><span>Produto</span><span>Leads</span><span>Intera&ccedil;&atilde;o %</span>
+        <span>Aprovadas</span><span>Conv. Aprov.</span><span>Pagas</span><span>Valor Liberado</span>
+      </div>
+      {items.length === 0 && !loading && (
+        <div className="state-msg">Nenhum dado para os filtros selecionados.</div>
+      )}
+      {visible.map((c, i) => (
+        <div className="produtos-row" key={`${c.campanha}-${c.produto}-${i}`}>
+          <span className="campanha-nome">{c.campanha}</span>
+          <span className="campanha-nome">{c.produto}</span>
+          <span>{fmtInt(c.leads)}</span>
+          <span>{fmtPct(c.interacao_pct)}</span>
+          <span>{fmtInt(c.aprovadas)}</span>
+          <span>{fmtPct(c.conversao_aprovados_pct)}</span>
+          <span>{fmtInt(c.pagas)}</span>
+          <span>{fmtMoney(c.valor_liberado)}</span>
+        </div>
+      ))}
+      <ExpandToggle
+        expanded={expanded}
+        onToggle={() => setExpanded((v) => !v)}
+        hiddenCount={items.length - VISIBLE_DEFAULT}
+      />
+    </div>
+  )
+}
+
+function EntradasLP() {
+  const [kpis, setKpis] = useState(null)
+  const [entradas, setEntradas] = useState([])
+  const [campanhasProdutos, setCampanhasProdutos] = useState([])
+  const [filtros, setFiltros] = useState({ campanhas: [], produtos: [], origens: [] })
+  const [campanha, setCampanha] = useState('')
+  const [produto, setProduto] = useState('')
+  const [origem, setOrigem] = useState('')
+  const [dataInicio, setDataInicio] = useState('')
+  const [dataFim, setDataFim] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [lastUpdate, setLastUpdate] = useState(null)
+
+  const args = useMemo(() => ({
+    campanha: campanha || '',
+    produto: produto || '',
+    origem: origem || '',
+    date_from: dataInicio ? new Date(dataInicio).toISOString() : '',
+    date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : '',
+  }), [campanha, produto, origem, dataInicio, dataFim])
+
+  useEffect(() => {
+    callApi('produtos_filtros', {})
+      .then((d) => setFiltros({
+        campanhas: d?.[0]?.campanhas || [],
+        produtos: d?.[0]?.produtos || [],
+        origens: d?.[0]?.origens || [],
+      }))
+      .catch(() => {})
+  }, [])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [kpiData, entradasData, aprovadasData, campanhasData] = await Promise.all([
+        callApi('produtos_kpis', args),
+        callApi('produtos_entradas_por_dia', args),
+        callApi('produtos_aprovadas_por_dia', args),
+        callApi('produtos_campanhas', { produto: args.produto, origem: args.origem, date_from: args.date_from, date_to: args.date_to }),
+      ])
+      setKpis(kpiData?.[0] ?? null)
+
+      // pivota o formato longo (dia, produto, entradas) em linhas por dia com uma coluna por produto
+      const porDia = {}
+      const produtosVistos = new Set()
+      for (const row of entradasData ?? []) {
+        produtosVistos.add(row.produto)
+        if (!porDia[row.dia]) porDia[row.dia] = { dia: row.dia }
+        porDia[row.dia][row.produto] = Number(row.entradas)
+      }
+      for (const row of aprovadasData ?? []) {
+        if (!porDia[row.dia]) porDia[row.dia] = { dia: row.dia }
+        porDia[row.dia].aprovadas = Number(row.aprovadas)
+      }
+      const pivotado = Object.values(porDia).sort((a, b) => (a.dia > b.dia ? 1 : -1))
+      setEntradas({ rows: pivotado, produtos: Array.from(produtosVistos) })
+
+      setCampanhasProdutos(campanhasData ?? [])
+      setLastUpdate(new Date())
+    } catch (e) {
+      setError(e.message || 'Erro ao carregar dados.')
+    } finally {
+      setLoading(false)
+    }
+  }, [args])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const id = setInterval(load, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [load])
+
+  const chartRows = entradas.rows || []
+  const chartProdutos = entradas.produtos || []
+
+  return (
+    <>
+      <div className="topbar">
+        <h1><span className="pulse" /> Entradas LP</h1>
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+        </span>
+      </div>
+
+      <div className="filters">
+        <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
+        <select value={produto} onChange={(e) => setProduto(e.target.value)}>
+          <option value="">produto &mdash; todos</option>
+          {filtros.produtos.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={origem} onChange={(e) => setOrigem(e.target.value)}>
+          <option value="">origem &mdash; todas</option>
+          {filtros.origens.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+        <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+      </div>
+
+      {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <div className="panel chart-panel tall">
+        <p className="section-label">Entradas</p>
+        <ResponsiveContainer width="100%" height="82%">
+          <ComposedChart data={chartRows}>
+            <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} interval="preserveStartEnd" />
+            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#8a978f' }} width={34} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#8a978f' }} width={34} />
+            <Tooltip
+              contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
+              labelStyle={{ color: '#8a978f' }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
+            {chartProdutos.map((p, i) => (
+              <Bar key={p} yAxisId="left" dataKey={p} stackId="a" fill={PRODUTO_CORES[i % PRODUTO_CORES.length]} />
+            ))}
+            <Line yAxisId="right" type="monotone" dataKey="aprovadas" stroke="#a9d97f" strokeWidth={2} dot={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Total</p><p className="kpi-value">{fmtInt(kpis?.total)}</p></div>
+        <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o</p><p className="kpi-value">{fmtInt(kpis?.interacao_qtd)}</p></div>
+        <div className="kpi"><p className="kpi-label">Aprovados</p><p className="kpi-value">{fmtInt(kpis?.aprovados_qtd)}</p></div>
+        <div className="kpi"><p className="kpi-label">Reprovado</p><p className="kpi-value">{fmtInt(kpis?.reprovados_qtd)}</p></div>
+      </div>
+      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Pagas</p><p className="kpi-value">{fmtInt(kpis?.pagas_qtd)}</p></div>
+        <div className="kpi"><p className="kpi-label">Valor</p><p className="kpi-value">{fmtMoney(kpis?.valor)}</p></div>
+        <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o %</p><p className="kpi-value">{fmtPct(kpis?.interacao_pct)}</p></div>
+        <div className="kpi"><p className="kpi-label">Aprovados %</p><p className="kpi-value">{fmtPct(kpis?.aprovados_pct)}</p></div>
+      </div>
+      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Convers&atilde;o Total</p><p className="kpi-value accent">{fmtPct(kpis?.conversao_total_pct)}</p></div>
+        <div className="kpi"><p className="kpi-label">Convers&atilde;o Aprovados</p><p className="kpi-value accent">{fmtPct(kpis?.conversao_aprovados_pct)}</p></div>
+      </div>
+
+      <ProdutosCampanhasList items={campanhasProdutos} loading={loading} />
+    </>
+  )
+}
+
 function VisaoGeral() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [] })
   const [campanha, setCampanha] = useState('')
@@ -518,7 +699,9 @@ export default function App() {
   return (
     <div className="app">
       <ViewSwitcher view={view} setView={setView} />
-      {view === 'geral' ? <VisaoGeral /> : <LeilaoDetalhado />}
+      {view === 'geral' && <VisaoGeral />}
+      {view === 'leilao' && <LeilaoDetalhado />}
+      {view === 'produtos' && <EntradasLP />}
     </div>
   )
 }
