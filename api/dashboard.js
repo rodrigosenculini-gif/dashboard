@@ -136,6 +136,10 @@ export default async function handler(req, res) {
     const p_data = req.query.data || null;
     sql = 'select * from dashboard_funil($1::date,$2::text)';
     params = [p_data, p_campanha];
+  } else if (type === 'funil_produtos') {
+    const p_data = req.query.data || null;
+    sql = 'select * from dashboard_funil_produtos($1::date,$2::text)';
+    params = [p_data, p_campanha];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
