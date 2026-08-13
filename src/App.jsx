@@ -41,6 +41,55 @@ function todayISO() {
   return `${y}-${m}-${day}`
 }
 
+function fmtDateISO(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function presetRange(preset) {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const d = now.getDate()
+  if (preset === 'hoje') {
+    const t = fmtDateISO(now)
+    return { from: t, to: t }
+  }
+  if (preset === 'ontem') {
+    const t = fmtDateISO(new Date(y, m, d - 1))
+    return { from: t, to: t }
+  }
+  if (preset === 'este_mes') {
+    return { from: fmtDateISO(new Date(y, m, 1)), to: fmtDateISO(now) }
+  }
+  if (preset === 'mes_passado') {
+    return { from: fmtDateISO(new Date(y, m - 1, 1)), to: fmtDateISO(new Date(y, m, 0)) }
+  }
+  return { from: '', to: '' }
+}
+
+function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
+  const applyPreset = (preset) => {
+    const { from, to } = presetRange(preset)
+    setDataInicio(from)
+    setDataFim(to)
+  }
+  return (
+    <div className="date-range-filter">
+      <div className="date-presets">
+        <button type="button" onClick={() => applyPreset('hoje')}>Hoje</button>
+        <button type="button" onClick={() => applyPreset('ontem')}>Ontem</button>
+        <button type="button" onClick={() => applyPreset('este_mes')}>Este m\u00eas</button>
+        <button type="button" onClick={() => applyPreset('mes_passado')}>M\u00eas passado</button>
+      </div>
+      <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+      <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+    </div>
+  )
+}
+
 function SearchSelect({ value, onChange, options, label, allLabel }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -232,7 +281,8 @@ function LeilaoDetalhado() {
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
   const [campanhas, setCampanhas] = useState([])
-  const [data, setData] = useState(todayISO())
+  const [dataInicio, setDataInicio] = useState(todayISO())
+  const [dataFim, setDataFim] = useState(todayISO())
   const [campanha, setCampanha] = useState('')
 
   useEffect(() => {
@@ -244,11 +294,13 @@ function LeilaoDetalhado() {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
+    const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
+    const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
     try {
       const [kpiData, falhaData, templateData] = await Promise.all([
-        callApi('hoje_kpis', { data, campanha }),
+        callApi('hoje_kpis', { date_from, date_to, campanha }),
         callApi('falha_por_minuto', { minutos: '60', campanha }),
-        callApi('por_template_hoje', { data, campanha }),
+        callApi('por_template_hoje', { date_from, date_to, campanha }),
       ])
       setKpis(kpiData?.[0] ?? null)
       setFalhaMin(
@@ -264,7 +316,7 @@ function LeilaoDetalhado() {
     } finally {
       setLoading(false)
     }
-  }, [data, campanha])
+  }, [dataInicio, dataFim, campanha])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -290,9 +342,9 @@ function LeilaoDetalhado() {
       </div>
 
       <div className="filters">
-        <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
         <CampanhaSearch value={campanha} onChange={setCampanha} options={campanhas} />
       </div>
+      <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
@@ -501,9 +553,8 @@ function EntradasLP() {
         <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
         <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto — todos" />
         <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
-        <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
-        <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
       </div>
+      <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
@@ -571,7 +622,8 @@ function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], produtos: [] })
-  const [data, setData] = useState(todayISO())
+  const [dataInicio, setDataInicio] = useState(todayISO())
+  const [dataFim, setDataFim] = useState(todayISO())
   const [campanha, setCampanha] = useState('')
   const [origem, setOrigem] = useState('')
   const [produto, setProduto] = useState('')
@@ -589,11 +641,13 @@ function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, 
   useEffect(() => {
     setLoading(true)
     setError(null)
-    callApi(apiType, { data, campanha, origem, ...(showProduto ? { produto } : {}) })
+    const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
+    const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
+    callApi(apiType, { date_from, date_to, campanha, origem, ...(showProduto ? { produto } : {}) })
       .then((d) => setDados(d?.[0] ?? null))
       .catch((e) => setError(e.message || 'Erro ao carregar funil.'))
       .finally(() => setLoading(false))
-  }, [apiType, data, campanha, origem, produto, showProduto])
+  }, [apiType, dataInicio, dataFim, campanha, origem, produto, showProduto])
 
   const top = dados ? Number(dados[etapas[0].key]) || 1 : 1
 
@@ -609,13 +663,13 @@ function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, 
         </div>
 
         <div className="filters">
-          <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
           <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
           <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
           {showProduto && (
             <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto — todos" />
           )}
         </div>
+        <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
         {error && <div className="state-msg error">Erro: {error}</div>}
         {loading && !dados && <div className="state-msg">Carregando...</div>}
@@ -791,9 +845,8 @@ function VisaoGeral() {
           <option value="">meta &mdash; todos</option>
           {filtros.metas.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
-        <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
-        <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
       </div>
+      <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
