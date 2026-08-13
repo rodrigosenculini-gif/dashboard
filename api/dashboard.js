@@ -86,15 +86,17 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_por_mensagem($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
   } else if (type === 'hoje_kpis') {
-    sql = 'select * from dashboard_hoje_kpis()';
-    params = [];
+    const p_data = req.query.data || null;
+    sql = 'select * from dashboard_hoje_kpis($1::date,$2::text)';
+    params = [p_data, p_campanha];
   } else if (type === 'falha_por_minuto') {
     const minutos = parseInt(req.query.minutos, 10) || 60;
-    sql = 'select * from dashboard_falha_por_minuto($1::int)';
-    params = [minutos];
+    sql = 'select * from dashboard_falha_por_minuto($1::int,$2::text)';
+    params = [minutos, p_campanha];
   } else if (type === 'por_template_hoje') {
-    sql = 'select * from dashboard_por_template_hoje()';
-    params = [];
+    const p_data = req.query.data || null;
+    sql = 'select * from dashboard_por_template_hoje($1::date,$2::text)';
+    params = [p_data, p_campanha];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
