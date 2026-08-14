@@ -895,6 +895,64 @@ function fmtDataBR(d) {
   return dt.toLocaleDateString('pt-BR')
 }
 
+function RankingOverlay({ onClose }) {
+  const week = weekRange()
+  const [dataInicio, setDataInicio] = useState(week.from)
+  const [dataFim, setDataFim] = useState(week.to)
+  const [ranking, setRanking] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
+    const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
+    callApi('vendedoras_ranking', { date_from, date_to })
+      .then((d) => setRanking(d ?? []))
+      .catch((e) => setError(e.message || 'Erro ao carregar ranking.'))
+      .finally(() => setLoading(false))
+  }, [dataInicio, dataFim])
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+        <div className="funil-header">
+          <div>
+            <h2>Ranking de Vendedoras</h2>
+            <p className="subtitle">Ordenado por valor total &middot; somente leitura</p>
+          </div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+
+        {error && <div className="state-msg error">Erro: {error}</div>}
+        {loading && ranking.length === 0 && <div className="state-msg">Carregando...</div>}
+        {!loading && ranking.length === 0 && !error && (
+          <div className="state-msg">Nenhuma venda no per&iacute;odo selecionado.</div>
+        )}
+
+        <div className="ranking-list">
+          {ranking.map((r, i) => (
+            <div className="ranking-card" key={r.vendedor}>
+              <span className="ranking-pos">{i + 1}&ordm;</span>
+              <div className="ranking-info">
+                <p className="ranking-nome">{r.vendedor}</p>
+                <div className="ranking-stats">
+                  <span><strong>{fmtMoeda(r.valor_total)}</strong> total</span>
+                  <span>{fmtInt(r.qtd_total)} propostas</span>
+                  <span>{r.banco_top || '-'} (banco mais usado)</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function VendedorasView() {
   const week = weekRange()
   const [vendedores, setVendedores] = useState([])
@@ -913,6 +971,7 @@ function VendedorasView() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const [showRanking, setShowRanking] = useState(false)
 
   useEffect(() => {
     callApi('vendedoras_filtros', {})
@@ -945,6 +1004,7 @@ function VendedorasView() {
         vendedoresVistos.add(row.vendedor)
         if (!porDiaMap[row.dia]) porDiaMap[row.dia] = { dia: row.dia }
         porDiaMap[row.dia][row.vendedor] = Number(row.vendas)
+        porDiaMap[row.dia][`${row.vendedor}__valor`] = Number(row.valor_total)
       }
       setPorDia({
         rows: Object.values(porDiaMap).sort((a, b) => (a.dia > b.dia ? 1 : -1)),
@@ -1012,6 +1072,9 @@ function VendedorasView() {
           <button className="reset-btn" onClick={() => { setVendedor(''); setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
+          <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras">
+            &#8942;
+          </button>
           <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
             {syncing ? 'Sincronizando...' : '\u21bb Sincronizar'}
           </button>
@@ -1037,8 +1100,12 @@ function VendedorasView() {
             <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} tickFormatter={fmtDataBR} />
             <Tooltip
               contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
-              labelStyle={{ color: '#8a978f' }}
+              labelStyle={{ color: '#8a978f', marginBottom: 4 }}
               labelFormatter={fmtDataBR}
+              formatter={(value, name, item) => {
+                const valor = item?.payload?.[`${name}__valor`]
+                return [`${fmtInt(value)} vendas${valor != null ? ` (${fmtMoeda(valor)})` : ''}`, name]
+              }}
             />
             <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
             {porDia.vendedoresVistos.map((v, i) => (
@@ -1053,6 +1120,7 @@ function VendedorasView() {
           <div className="kpi"><p className="kpi-label">Vendedora com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_qtd_vendedor || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.top_qtd_valor)} vendas</p></div>
           <div className="kpi"><p className="kpi-label">Vendedora com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_valor_vendedor || '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.top_valor_valor)}</p></div>
           <div className="kpi"><p className="kpi-label">Banco mais utilizado</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.banco_top_qtd)} vendas</p></div>
+          <div className="kpi"><p className="kpi-label">Dia com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.dia_maior_valor ? fmtDataBR(kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.dia_maior_valor_total)}</p></div>
         </div>
       )}
       {vendedor && (
@@ -1111,6 +1179,8 @@ function VendedorasView() {
           )}
         </div>
       </div>
+
+      {showRanking && <RankingOverlay onClose={() => setShowRanking(false)} />}
     </>
   )
 }
