@@ -762,3 +762,309 @@ grant execute on function dashboard_produtos_filtros to anon;
 grant execute on function dashboard_funil to anon;
 grant execute on function dashboard_funil_produtos to anon;
 grant execute on function dashboard_filtros to anon;
+
+-- =========================================================
+-- VENDEDORAS (tabela vendedoras_analise + cruzamento com
+-- disparochat / total_produtos / leads_chatwoot)
+-- =========================================================
+
+-- Normaliza CPF pra sempre 11 dígitos (remove pontuação, completa com
+-- zero à esquerda se vier mais curto)
+create or replace function norm_cpf(txt text)
+returns text
+language sql
+immutable
+as $$
+  select lpad(regexp_replace(coalesce(txt, ''), '[^0-9]', '', 'g'), 11, '0');
+$$;
+
+-- Converte texto "DD/MM/AAAA" em date, com segurança (retorna null se o
+-- formato não bater, em vez de dar erro)
+create or replace function safe_date_br(txt text)
+returns date
+language sql
+immutable
+as $$
+  select case
+    when txt ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$' then to_date(txt, 'DD/MM/YYYY')
+    else null
+  end;
+$$;
+
+-- Sincronização manual (botão "Sincronizar" na tela) — NÃO roda sozinha:
+-- 1) Preenche whatsapp/covnersation_id na vendedoras_analise, buscando por
+--    CPF (normalizado) recente (últimos 7 dias) em disparochat, depois
+--    leads_chatwoot, depois total_produtos (só whatsapp, essa não tem
+--    conversation_id).
+-- 2) Marca como paga (usando o valor da vendedoras_analise) qualquer
+--    registro correspondente nessas 3 tabelas que ainda não estivesse pago.
+create or replace function dashboard_vendedoras_sync()
+returns table (
+  atualizados_vendedoras int,
+  atualizados_disparochat int,
+  atualizados_total_produtos int,
+  atualizados_leads_chatwoot int
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v1 int := 0;
+  v2 int := 0;
+  v3 int := 0;
+  v4 int := 0;
+begin
+  -- 1) enriquece com disparochat
+  with match_d as (
+    select distinct on (norm_cpf(d.cpf))
+      norm_cpf(d.cpf) as cpf_norm, d.whatsapp, d.conversation_id
+    from disparochat d
+    where coalesce(d.reenvio, d.realizado, d.status_atualizado) >= now() - interval '7 days'
+      and d.cpf is not null
+    order by norm_cpf(d.cpf), coalesce(d.reenvio, d.realizado, d.status_atualizado) desc
+  )
+  update vendedoras_analise v
+  set covnersation_id = coalesce(v.covnersation_id, m.conversation_id),
+      whatsapp = coalesce(v.whatsapp, m.whatsapp)
+  from match_d m
+  where norm_cpf(v.cpf) = m.cpf_norm
+    and (v.covnersation_id is null or v.whatsapp is null);
+  get diagnostics v1 = row_count;
+
+  -- 1b) completa o que faltou com leads_chatwoot
+  with match_l as (
+    select distinct on (norm_cpf(l.cpf))
+      norm_cpf(l.cpf) as cpf_norm, l.whatsapp, l.conversation_id
+    from leads_chatwoot l
+    where coalesce(l.atualizacao, l.entrada_tabela) >= now() - interval '7 days'
+      and l.cpf is not null
+    order by norm_cpf(l.cpf), coalesce(l.atualizacao, l.entrada_tabela) desc
+  )
+  update vendedoras_analise v
+  set covnersation_id = coalesce(v.covnersation_id, m.conversation_id),
+      whatsapp = coalesce(v.whatsapp, m.whatsapp)
+  from match_l m
+  where norm_cpf(v.cpf) = m.cpf_norm
+    and (v.covnersation_id is null or v.whatsapp is null);
+
+  -- 1c) completa o whatsapp que ainda faltar com total_produtos (não tem conversation_id)
+  with match_t as (
+    select distinct on (norm_cpf(t.cpf))
+      norm_cpf(t.cpf) as cpf_norm, t.whatsapp
+    from total_produtos t
+    where t.created_at >= now() - interval '7 days'
+      and t.cpf is not null
+    order by norm_cpf(t.cpf), t.created_at desc
+  )
+  update vendedoras_analise v
+  set whatsapp = coalesce(v.whatsapp, m.whatsapp)
+  from match_t m
+  where norm_cpf(v.cpf) = m.cpf_norm
+    and v.whatsapp is null;
+
+  select count(*) into v1 from vendedoras_analise where covnersation_id is not null or whatsapp is not null;
+
+  -- 2) reconcilia pagamento nas tabelas de origem
+  with vs as (
+    select norm_cpf(cpf) as cpf_norm, valor
+    from vendedoras_analise
+    where valor is not null and cpf is not null
+  )
+  update disparochat d
+  set pagas = vs.valor
+  from vs
+  where norm_cpf(d.cpf) = vs.cpf_norm
+    and coalesce(d.reenvio, d.realizado, d.status_atualizado) >= now() - interval '7 days'
+    and d.pagas is null;
+  get diagnostics v2 = row_count;
+
+  with vs as (
+    select norm_cpf(cpf) as cpf_norm, valor
+    from vendedoras_analise
+    where valor is not null and cpf is not null
+  )
+  update total_produtos t
+  set valor = vs.valor, pagas = 1
+  from vs
+  where norm_cpf(t.cpf) = vs.cpf_norm
+    and t.created_at >= now() - interval '7 days'
+    and (t.pagas is null or t.pagas <> 1);
+  get diagnostics v3 = row_count;
+
+  with vs as (
+    select norm_cpf(cpf) as cpf_norm, valor
+    from vendedoras_analise
+    where valor is not null and cpf is not null
+  )
+  update leads_chatwoot l
+  set valor = vs.valor, pagas = 1
+  from vs
+  where norm_cpf(l.cpf) = vs.cpf_norm
+    and coalesce(l.atualizacao, l.entrada_tabela) >= now() - interval '7 days'
+    and (l.pagas is null or l.pagas <> 1);
+  get diagnostics v4 = row_count;
+
+  return query select v1, v2, v3, v4;
+end;
+$$;
+
+-- KPIs gerais (sem filtro de vendedor)
+create or replace function dashboard_vendedoras_kpis_geral(
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  top_qtd_vendedor text,
+  top_qtd_valor bigint,
+  top_valor_vendedor text,
+  top_valor_valor numeric,
+  banco_top text,
+  banco_top_qtd bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with base as (
+    select vendedor, banco, valor
+    from vendedoras_analise
+    where (p_date_from is null or safe_date_br(data_status) >= p_date_from::date)
+      and (p_date_to is null or safe_date_br(data_status) <= p_date_to::date)
+  ),
+  por_vendedor as (
+    select vendedor, count(*) as qtd, coalesce(sum(valor), 0) as total
+    from base
+    where vendedor is not null
+    group by vendedor
+  ),
+  por_banco as (
+    select banco, count(*) as qtd
+    from base
+    where banco is not null
+    group by banco
+  )
+  select
+    (select vendedor from por_vendedor order by qtd desc limit 1),
+    (select qtd from por_vendedor order by qtd desc limit 1),
+    (select vendedor from por_vendedor order by total desc limit 1),
+    (select total from por_vendedor order by total desc limit 1),
+    (select banco from por_banco order by qtd desc limit 1),
+    (select qtd from por_banco order by qtd desc limit 1);
+$$;
+
+-- KPIs de um vendedor específico
+create or replace function dashboard_vendedoras_kpis_vendedor(
+  p_vendedor text,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  maior_venda numeric,
+  dia_mais_vendas date,
+  dia_mais_vendas_qtd bigint,
+  valor_total numeric,
+  qtd_total bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with base as (
+    select valor, safe_date_br(data_status) as dia
+    from vendedoras_analise
+    where vendedor = p_vendedor
+      and (p_date_from is null or safe_date_br(data_status) >= p_date_from::date)
+      and (p_date_to is null or safe_date_br(data_status) <= p_date_to::date)
+  ),
+  por_dia as (
+    select dia, count(*) as qtd from base where dia is not null group by dia
+  )
+  select
+    (select coalesce(max(valor), 0) from base),
+    (select dia from por_dia order by qtd desc limit 1),
+    (select qtd from por_dia order by qtd desc limit 1),
+    (select coalesce(sum(valor), 0) from base),
+    (select count(*) from base);
+$$;
+
+-- Vendas por dia e por vendedora (gráfico) — formato longo
+create or replace function dashboard_vendedoras_por_dia(
+  p_vendedor text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  dia date,
+  vendedor text,
+  vendas bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select safe_date_br(data_status) as dia, vendedor, count(*) as vendas
+  from vendedoras_analise
+  where safe_date_br(data_status) is not null
+    and (p_vendedor is null or vendedor = p_vendedor)
+    and (p_date_from is null or safe_date_br(data_status) >= p_date_from::date)
+    and (p_date_to is null or safe_date_br(data_status) <= p_date_to::date)
+  group by 1, 2
+  order by 1;
+$$;
+
+-- Tabela de vendas paginada
+create or replace function dashboard_vendedoras_tabela(
+  p_vendedor text default null,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null,
+  p_limit int default 10,
+  p_offset int default 0
+)
+returns table (
+  vendedor text,
+  valor numeric,
+  cpf text,
+  banco text,
+  dia date,
+  covnersation_id bigint,
+  total_count bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    vendedor, valor, cpf, banco, safe_date_br(data_status) as dia, covnersation_id,
+    count(*) over() as total_count
+  from vendedoras_analise
+  where (p_vendedor is null or vendedor = p_vendedor)
+    and (p_date_from is null or safe_date_br(data_status) >= p_date_from::date)
+    and (p_date_to is null or safe_date_br(data_status) <= p_date_to::date)
+  order by safe_date_br(data_status) desc nulls last, id desc
+  limit p_limit offset p_offset;
+$$;
+
+-- Lista de vendedoras pro filtro
+create or replace function dashboard_vendedoras_filtros()
+returns table (vendedores text[])
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select array_agg(distinct vendedor) from vendedoras_analise where vendedor is not null;
+$$;
+
+grant execute on function norm_cpf to anon;
+grant execute on function safe_date_br to anon;
+grant execute on function dashboard_vendedoras_sync to anon;
+grant execute on function dashboard_vendedoras_kpis_geral to anon;
+grant execute on function dashboard_vendedoras_kpis_vendedor to anon;
+grant execute on function dashboard_vendedoras_por_dia to anon;
+grant execute on function dashboard_vendedoras_tabela to anon;
+grant execute on function dashboard_vendedoras_filtros to anon;
