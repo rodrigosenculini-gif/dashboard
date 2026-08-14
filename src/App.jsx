@@ -9,6 +9,7 @@ const VIEWS = [
   { id: 'leilao', label: 'Meta \u2014 Detalhado' },
   { id: 'produtos', label: 'Entradas LP' },
   { id: 'n8n', label: 'n8n \u2014 Execu\u00e7\u00f5es' },
+  { id: 'vendedoras', label: 'Vendedoras' },
 ]
 
 async function callApi(type, params) {
@@ -55,6 +56,13 @@ function fmtDateISO(d) {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+function weekRange() {
+  const to = new Date()
+  const from = new Date()
+  from.setDate(from.getDate() - 6)
+  return { from: fmtDateISO(from), to: fmtDateISO(to) }
 }
 
 function presetRange(preset) {
@@ -864,6 +872,235 @@ function N8nExecucoes() {
   )
 }
 
+const VENDEDOR_CORES = ['#d99089', '#d9b877', '#7fa8d9', '#8fd97f', '#c17fd9', '#d9d17f', '#7fd9c1', '#d97fa8']
+
+function fmtMoeda(n) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0)
+}
+
+function fmtDataBR(d) {
+  if (!d) return '-'
+  const dt = new Date(d + 'T00:00:00')
+  return dt.toLocaleDateString('pt-BR')
+}
+
+function VendedorasView() {
+  const week = weekRange()
+  const [vendedores, setVendedores] = useState([])
+  const [vendedor, setVendedor] = useState('')
+  const [dataInicio, setDataInicio] = useState(week.from)
+  const [dataFim, setDataFim] = useState(week.to)
+
+  const [kpisGeral, setKpisGeral] = useState(null)
+  const [kpisVendedor, setKpisVendedor] = useState(null)
+  const [porDia, setPorDia] = useState({ rows: [], vendedoresVistos: [] })
+  const [tabela, setTabela] = useState({ rows: [], total: 0 })
+  const [page, setPage] = useState(0) // 0 = 10 itens, 1 = 40 itens, 2+ = pagina de 30 depois dos 40
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [lastUpdate, setLastUpdate] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+
+  useEffect(() => {
+    callApi('vendedoras_filtros', {})
+      .then((d) => setVendedores(d?.[0]?.vendedores || []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { setPage(0) }, [vendedor, dataInicio, dataFim])
+
+  const { limit, offset } = useMemo(() => {
+    if (page === 0) return { limit: 10, offset: 0 }
+    if (page === 1) return { limit: 40, offset: 0 }
+    return { limit: 30, offset: 40 + (page - 2) * 30 }
+  }, [page])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
+    const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
+    try {
+      const [dia, tab] = await Promise.all([
+        callApi('vendedoras_por_dia', { vendedor, date_from, date_to }),
+        callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }),
+      ])
+
+      const porDiaMap = {}
+      const vendedoresVistos = new Set()
+      for (const row of dia ?? []) {
+        vendedoresVistos.add(row.vendedor)
+        if (!porDiaMap[row.dia]) porDiaMap[row.dia] = { dia: row.dia }
+        porDiaMap[row.dia][row.vendedor] = Number(row.vendas)
+      }
+      setPorDia({
+        rows: Object.values(porDiaMap).sort((a, b) => (a.dia > b.dia ? 1 : -1)),
+        vendedoresVistos: Array.from(vendedoresVistos),
+      })
+
+      setTabela({ rows: tab ?? [], total: tab?.[0]?.total_count ? Number(tab[0].total_count) : 0 })
+
+      if (vendedor) {
+        const kv = await callApi('vendedoras_kpis_vendedor', { vendedor, date_from, date_to })
+        setKpisVendedor(kv?.[0] ?? null)
+        setKpisGeral(null)
+      } else {
+        const kg = await callApi('vendedoras_kpis_geral', { date_from, date_to })
+        setKpisGeral(kg?.[0] ?? null)
+        setKpisVendedor(null)
+      }
+
+      setLastUpdate(new Date())
+    } catch (e) {
+      setError(e.message || 'Erro ao carregar dados.')
+    } finally {
+      setLoading(false)
+    }
+  }, [vendedor, dataInicio, dataFim, limit, offset])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const id = setInterval(load, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [load])
+
+  const handleSync = async () => {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const r = await callApi('vendedoras_sync', {})
+      const s = r?.[0]
+      setSyncMsg(
+        s
+          ? `Conclu\u00eddo \u2014 ${fmtInt(s.atualizados_vendedoras)} vendedoras com dados completos, ${fmtInt(s.atualizados_disparochat)} atualizadas em disparochat, ${fmtInt(s.atualizados_total_produtos)} em total_produtos, ${fmtInt(s.atualizados_leads_chatwoot)} em leads_chatwoot.`
+          : 'Sincroniza\u00e7\u00e3o conclu\u00edda.'
+      )
+      load()
+    } catch (e) {
+      setSyncMsg('Erro ao sincronizar: ' + (e.message || ''))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const totalPaginas = tabela.total > 40 ? 2 + Math.ceil((tabela.total - 40) / 30) - 1 : 1
+  const podeExpandir = page === 0 && tabela.total > 10
+  const podeProximaPagina = page >= 1 && offset + limit < tabela.total
+  const podePaginaAnterior = page >= 2
+
+  return (
+    <>
+      <div className="topbar">
+        <h1><span className="pulse" /> Vendedoras</h1>
+        <div className="topbar-right">
+          <span className="status-line">
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+          </span>
+          <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
+            {syncing ? 'Sincronizando...' : '\u21bb Sincronizar'}
+          </button>
+          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+            &#8635; Atualizar
+          </button>
+        </div>
+      </div>
+
+      {syncMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{syncMsg}</div>}
+
+      <div className="filters">
+        <SearchSelect value={vendedor} onChange={setVendedor} options={vendedores} label="vendedor" allLabel="vendedor — todas" />
+      </div>
+      <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+
+      {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <div className="panel chart-panel">
+        <p className="section-label">Vendas por dia</p>
+        <ResponsiveContainer width="100%" height="80%">
+          <BarChart data={porDia.rows}>
+            <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} tickFormatter={fmtDataBR} />
+            <Tooltip
+              contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
+              labelStyle={{ color: '#8a978f' }}
+              labelFormatter={fmtDataBR}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
+            {porDia.vendedoresVistos.map((v, i) => (
+              <Bar key={v} dataKey={v} stackId="a" fill={VENDEDOR_CORES[i % VENDEDOR_CORES.length]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {!vendedor && (
+        <div className="kpi-grid">
+          <div className="kpi"><p className="kpi-label">Vendedora com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_qtd_vendedor || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.top_qtd_valor)} vendas</p></div>
+          <div className="kpi"><p className="kpi-label">Vendedora com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_valor_vendedor || '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.top_valor_valor)}</p></div>
+          <div className="kpi"><p className="kpi-label">Banco mais utilizado</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.banco_top_qtd)} vendas</p></div>
+        </div>
+      )}
+      {vendedor && (
+        <div className="kpi-grid">
+          <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpisVendedor?.maior_venda)}</p></div>
+          <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisVendedor?.dia_mais_vendas ? fmtDataBR(kpisVendedor.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpisVendedor?.dia_mais_vendas_qtd)} vendas</p></div>
+          <div className="kpi"><p className="kpi-label">Valor total vendido</p><p className="kpi-value">{fmtMoeda(kpisVendedor?.valor_total)}</p></div>
+          <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpisVendedor?.qtd_total)}</p></div>
+        </div>
+      )}
+
+      <div className="panel table-panel">
+        <p className="section-label">Vendas ({fmtInt(tabela.total)})</p>
+        <div className="template-row head" style={{ gridTemplateColumns: '1.2fr 0.9fr 1fr 1fr 0.8fr 0.6fr' }}>
+          <span>Vendedor</span><span>Valor</span><span>CPF</span><span>Banco</span><span>Data</span><span>Conversa</span>
+        </div>
+        {tabela.rows.length === 0 && !loading && (
+          <div className="state-msg">Nenhuma venda encontrada para os filtros selecionados.</div>
+        )}
+        {tabela.rows.map((r, i) => (
+          <div className="template-row" key={i} style={{ gridTemplateColumns: '1.2fr 0.9fr 1fr 1fr 0.8fr 0.6fr' }}>
+            <span className="campanha-nome">{r.vendedor}</span>
+            <span>{fmtMoeda(r.valor)}</span>
+            <span>{r.cpf}</span>
+            <span>{r.banco || '-'}</span>
+            <span>{fmtDataBR(r.dia)}</span>
+            <span>
+              {r.covnersation_id ? (
+                <a
+                  href={`https://crm.vendeaitecnologia.com.br/app/accounts/75/conversations/${r.covnersation_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="conversa-link"
+                >
+                  Abrir &#8599;
+                </a>
+              ) : '-'}
+            </span>
+          </div>
+        ))}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          {podeExpandir && (
+            <button className="expand-btn" onClick={() => setPage(1)}>Mostrar mais (+30)</button>
+          )}
+          {page >= 1 && (
+            <>
+              <button className="expand-btn" onClick={() => setPage(0)}>Recolher</button>
+              {podePaginaAnterior && (
+                <button className="expand-btn" onClick={() => setPage((p) => p - 1)}>&larr; P\u00e1gina anterior</button>
+              )}
+              {podeProximaPagina && (
+                <button className="expand-btn" onClick={() => setPage((p) => p + 1)}>Pr\u00f3xima p\u00e1gina &rarr;</button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
 function VisaoGeral() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [] })
   const [campanha, setCampanha] = useState('')
@@ -1054,6 +1291,7 @@ export default function App() {
       {view === 'leilao' && <LeilaoDetalhado />}
       {view === 'produtos' && <EntradasLP />}
       {view === 'n8n' && <N8nExecucoes />}
+      {view === 'vendedoras' && <VendedorasView />}
     </div>
   )
 }
