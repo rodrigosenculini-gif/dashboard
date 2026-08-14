@@ -186,8 +186,17 @@ as $$
   where campanha is not null
     and (p_origem is null or origem = p_origem)
     and (p_meta is null or meta = p_meta)
-    and (p_date_from is null or realizado >= p_date_from)
-    and (p_date_to is null or realizado <= p_date_to)
+    and (
+      p_date_from is null and p_date_to is null
+      or (
+        (p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to)
+      )
+      or (
+        reenvio is not null
+        and (p_date_from is null or reenvio >= p_date_from)
+        and (p_date_to is null or reenvio <= p_date_to)
+      )
+    )
   group by campanha
   order by leads desc;
 $$;
@@ -210,10 +219,11 @@ set search_path = public
 stable
 as $$
   select
-    coalesce(conversa, '(vazio)') as valor,
+    conversa as valor,
     count(*) as leads
   from disparochat
-  where (p_campanha is null or campanha = p_campanha)
+  where conversa is not null
+    and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
     and (p_meta is null or meta = p_meta)
     and (p_date_from is null or realizado >= p_date_from)
@@ -241,10 +251,11 @@ set search_path = public
 stable
 as $$
   select
-    coalesce(meta, '(vazio)') as valor,
+    meta as valor,
     count(*) as leads
   from disparochat
-  where (p_campanha is null or campanha = p_campanha)
+  where meta is not null
+    and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
     and (p_date_from is null or realizado >= p_date_from)
     and (p_date_to is null or realizado <= p_date_to)
@@ -271,10 +282,11 @@ set search_path = public
 stable
 as $$
   select
-    coalesce(mensagem, '(vazio)') as valor,
+    mensagem as valor,
     count(*) as leads
   from disparochat
-  where (p_campanha is null or campanha = p_campanha)
+  where mensagem is not null
+    and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
     and (p_meta is null or meta = p_meta)
     and (p_date_from is null or realizado >= p_date_from)
@@ -325,8 +337,8 @@ as $$
     where d.meta in ('sent', 'delivered', 'read', 'failed')
       and (p_campanha is null or d.campanha = p_campanha)
       and (
-        (coalesce(d.reenvio, d.realizado) is not null
-          and coalesce(d.reenvio, d.realizado) between alvo.de and alvo.ate)
+        (d.realizado is not null and d.realizado between alvo.de and alvo.ate)
+        or (d.reenvio is not null and d.reenvio between alvo.de and alvo.ate)
         or (d.status_atualizado is not null
           and d.status_atualizado between alvo.de and alvo.ate)
       )
@@ -427,8 +439,8 @@ as $$
     and d.meta in ('sent', 'delivered', 'read', 'failed')
     and (p_campanha is null or d.campanha = p_campanha)
     and (
-      (coalesce(d.reenvio, d.realizado) is not null
-        and coalesce(d.reenvio, d.realizado) between alvo.de and alvo.ate)
+      (d.realizado is not null and d.realizado between alvo.de and alvo.ate)
+      or (d.reenvio is not null and d.reenvio between alvo.de and alvo.ate)
       or (d.status_atualizado is not null
         and d.status_atualizado between alvo.de and alvo.ate)
     )
