@@ -492,6 +492,53 @@ body {
 }
 .conversa-link:hover { text-decoration: underline; }
 
+/* --- Ranking de Vendedoras --- */
+.ranking-list {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.ranking-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.ranking-pos {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gold);
+  min-width: 34px;
+  text-align: center;
+}
+
+.ranking-info { flex: 1; }
+
+.ranking-nome {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.ranking-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+.ranking-stats strong { color: var(--lime); font-size: 13px; }
+
 /* --- Overlay do Funil de Disparos --- */
 .funil-overlay {
   position: fixed;
