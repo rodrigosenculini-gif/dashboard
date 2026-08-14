@@ -98,8 +98,8 @@ function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
       <div className="date-presets">
         <button type="button" onClick={() => applyPreset('hoje')}>Hoje</button>
         <button type="button" onClick={() => applyPreset('ontem')}>Ontem</button>
-        <button type="button" onClick={() => applyPreset('este_mes')}>Este m\u00eas</button>
-        <button type="button" onClick={() => applyPreset('mes_passado')}>M\u00eas passado</button>
+        <button type="button" onClick={() => applyPreset('este_mes')}>Este m&ecirc;s</button>
+        <button type="button" onClick={() => applyPreset('mes_passado')}>M&ecirc;s passado</button>
       </div>
       <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
       <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
@@ -352,6 +352,9 @@ function LeilaoDetalhado() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
+          <button className="reset-btn" onClick={() => { setCampanha(''); setDataInicio(todayISO()); setDataFim(todayISO()) }} title="Redefinir filtros">
+            &#10226; Redefinir filtros
+          </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
@@ -557,6 +560,9 @@ function EntradasLP() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
+          <button className="reset-btn" onClick={() => { setCampanha(''); setProduto(''); setOrigem(''); setDataInicio(''); setDataFim('') }} title="Redefinir filtros">
+            &#10226; Redefinir filtros
+          </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
@@ -809,6 +815,9 @@ function N8nExecucoes() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
+          <button className="reset-btn" onClick={() => { setWorkflowId(''); setDataInicio(todayISO()); setDataFim(todayISO()) }} title="Redefinir filtros">
+            &#10226; Redefinir filtros
+          </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
@@ -880,7 +889,9 @@ function fmtMoeda(n) {
 
 function fmtDataBR(d) {
   if (!d) return '-'
-  const dt = new Date(d + 'T00:00:00')
+  const datePart = String(d).slice(0, 10) // sempre pega só "AAAA-MM-DD", mesmo se vier com hora
+  const dt = new Date(datePart + 'T00:00:00')
+  if (isNaN(dt.getTime())) return '-'
   return dt.toLocaleDateString('pt-BR')
 }
 
@@ -998,6 +1009,9 @@ function VendedorasView() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
+          <button className="reset-btn" onClick={() => { setVendedor(''); setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
+            &#10226; Redefinir filtros
+          </button>
           <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
             {syncing ? 'Sincronizando...' : '\u21bb Sincronizar'}
           </button>
@@ -1088,10 +1102,10 @@ function VendedorasView() {
             <>
               <button className="expand-btn" onClick={() => setPage(0)}>Recolher</button>
               {podePaginaAnterior && (
-                <button className="expand-btn" onClick={() => setPage((p) => p - 1)}>&larr; P\u00e1gina anterior</button>
+                <button className="expand-btn" onClick={() => setPage((p) => p - 1)}>&larr; P&aacute;gina anterior</button>
               )}
               {podeProximaPagina && (
-                <button className="expand-btn" onClick={() => setPage((p) => p + 1)}>Pr\u00f3xima p\u00e1gina &rarr;</button>
+                <button className="expand-btn" onClick={() => setPage((p) => p + 1)}>Pr&oacute;xima p&aacute;gina &rarr;</button>
               )}
             </>
           )}
@@ -1191,6 +1205,9 @@ function VisaoGeral() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
+          <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setDataInicio(''); setDataFim('') }} title="Redefinir filtros">
+            &#10226; Redefinir filtros
+          </button>
           <button className="refresh-btn" onClick={loadDados} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
