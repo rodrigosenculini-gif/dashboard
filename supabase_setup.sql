@@ -930,8 +930,8 @@ as $$
   with base as (
     select vendedor, banco, valor
     from vendedoras_analise
-    where (p_date_from is null or safe_date_br(data_status) >= p_date_from::date)
-      and (p_date_to is null or safe_date_br(data_status) <= p_date_to::date)
+    where (p_date_from is null or data_status >= p_date_from::date)
+      and (p_date_to is null or data_status <= p_date_to::date)
   ),
   por_vendedor as (
     select vendedor, count(*) as qtd, coalesce(sum(valor), 0) as total
@@ -973,11 +973,11 @@ set search_path = public
 stable
 as $$
   with base as (
-    select valor, safe_date_br(data_status) as dia
+    select valor, data_status as dia
     from vendedoras_analise
     where vendedor = p_vendedor
-      and (p_date_from is null or safe_date_br(data_status) >= p_date_from::date)
-      and (p_date_to is null or safe_date_br(data_status) <= p_date_to::date)
+      and (p_date_from is null or data_status >= p_date_from::date)
+      and (p_date_to is null or data_status <= p_date_to::date)
   ),
   por_dia as (
     select dia, count(*) as qtd from base where dia is not null group by dia
@@ -1006,12 +1006,12 @@ security definer
 set search_path = public
 stable
 as $$
-  select safe_date_br(data_status) as dia, vendedor, count(*) as vendas
+  select data_status as dia, vendedor, count(*) as vendas
   from vendedoras_analise
-  where safe_date_br(data_status) is not null
+  where data_status is not null
     and (p_vendedor is null or vendedor = p_vendedor)
-    and (p_date_from is null or safe_date_br(data_status) >= p_date_from::date)
-    and (p_date_to is null or safe_date_br(data_status) <= p_date_to::date)
+    and (p_date_from is null or data_status >= p_date_from::date)
+    and (p_date_to is null or data_status <= p_date_to::date)
   group by 1, 2
   order by 1;
 $$;
@@ -1039,13 +1039,13 @@ set search_path = public
 stable
 as $$
   select
-    vendedor, valor, cpf, banco, safe_date_br(data_status) as dia, covnersation_id,
+    vendedor, valor, cpf, banco, data_status as dia, covnersation_id,
     count(*) over() as total_count
   from vendedoras_analise
   where (p_vendedor is null or vendedor = p_vendedor)
-    and (p_date_from is null or safe_date_br(data_status) >= p_date_from::date)
-    and (p_date_to is null or safe_date_br(data_status) <= p_date_to::date)
-  order by safe_date_br(data_status) desc nulls last, id desc
+    and (p_date_from is null or data_status >= p_date_from::date)
+    and (p_date_to is null or data_status <= p_date_to::date)
+  order by data_status desc nulls last, id desc
   limit p_limit offset p_offset;
 $$;
 
