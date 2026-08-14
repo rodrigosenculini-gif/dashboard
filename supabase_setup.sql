@@ -922,6 +922,8 @@ end;
 $$;
 
 -- KPIs gerais (sem filtro de vendedor)
+drop function if exists dashboard_vendedoras_kpis_geral(timestamptz, timestamptz);
+
 create or replace function dashboard_vendedoras_kpis_geral(
   p_date_from timestamptz default null,
   p_date_to timestamptz default null
@@ -932,7 +934,9 @@ returns table (
   top_valor_vendedor text,
   top_valor_valor numeric,
   banco_top text,
-  banco_top_qtd bigint
+  banco_top_qtd bigint,
+  dia_maior_valor date,
+  dia_maior_valor_total numeric
 )
 language sql
 security definer
@@ -940,7 +944,7 @@ set search_path = public
 stable
 as $$
   with base as (
-    select vendedor, banco, valor
+    select vendedor, banco, valor, data_status as dia
     from vendedoras_analise
     where (p_date_from is null or data_status >= p_date_from::date)
       and (p_date_to is null or data_status <= p_date_to::date)
@@ -956,6 +960,12 @@ as $$
     from base
     where banco is not null
     group by banco
+  ),
+  por_dia as (
+    select dia, coalesce(sum(valor), 0) as total
+    from base
+    where dia is not null
+    group by dia
   )
   select
     (select vendedor from por_vendedor order by qtd desc limit 1),
@@ -963,7 +973,9 @@ as $$
     (select vendedor from por_vendedor order by total desc limit 1),
     (select total from por_vendedor order by total desc limit 1),
     (select banco from por_banco order by qtd desc limit 1),
-    (select qtd from por_banco order by qtd desc limit 1);
+    (select qtd from por_banco order by qtd desc limit 1),
+    (select dia from por_dia order by total desc limit 1),
+    (select total from por_dia order by total desc limit 1);
 $$;
 
 -- KPIs de um vendedor específico
@@ -1003,6 +1015,8 @@ as $$
 $$;
 
 -- Vendas por dia e por vendedora (gráfico) — formato longo
+drop function if exists dashboard_vendedoras_por_dia(text, timestamptz, timestamptz);
+
 create or replace function dashboard_vendedoras_por_dia(
   p_vendedor text default null,
   p_date_from timestamptz default null,
@@ -1011,14 +1025,15 @@ create or replace function dashboard_vendedoras_por_dia(
 returns table (
   dia date,
   vendedor text,
-  vendas bigint
+  vendas bigint,
+  valor_total numeric
 )
 language sql
 security definer
 set search_path = public
 stable
 as $$
-  select data_status as dia, vendedor, count(*) as vendas
+  select data_status as dia, vendedor, count(*) as vendas, coalesce(sum(valor), 0) as valor_total
   from vendedoras_analise
   where data_status is not null
     and (p_vendedor is null or vendedor = p_vendedor)
@@ -1061,6 +1076,48 @@ as $$
   limit p_limit offset p_offset;
 $$;
 
+-- Ranking de vendedoras (valor total, qtd total, banco mais vendido),
+-- em ordem decrescente de valor total
+create or replace function dashboard_vendedoras_ranking(
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null
+)
+returns table (
+  vendedor text,
+  valor_total numeric,
+  qtd_total bigint,
+  banco_top text
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with base as (
+    select vendedor, banco, valor
+    from vendedoras_analise
+    where vendedor is not null
+      and (p_date_from is null or data_status >= p_date_from::date)
+      and (p_date_to is null or data_status <= p_date_to::date)
+  ),
+  agg as (
+    select vendedor, coalesce(sum(valor), 0) as valor_total, count(*) as qtd_total
+    from base
+    group by vendedor
+  ),
+  banco_rank as (
+    select vendedor, banco, count(*) as qtd,
+      row_number() over (partition by vendedor order by count(*) desc) as rn
+    from base
+    where banco is not null
+    group by vendedor, banco
+  )
+  select a.vendedor, a.valor_total, a.qtd_total, br.banco
+  from agg a
+  left join banco_rank br on br.vendedor = a.vendedor and br.rn = 1
+  order by a.valor_total desc;
+$$;
+
 -- Lista de vendedoras pro filtro
 create or replace function dashboard_vendedoras_filtros()
 returns table (vendedores text[])
@@ -1078,5 +1135,6 @@ grant execute on function dashboard_vendedoras_sync to anon;
 grant execute on function dashboard_vendedoras_kpis_geral to anon;
 grant execute on function dashboard_vendedoras_kpis_vendedor to anon;
 grant execute on function dashboard_vendedoras_por_dia to anon;
+grant execute on function dashboard_vendedoras_ranking to anon;
 grant execute on function dashboard_vendedoras_tabela to anon;
 grant execute on function dashboard_vendedoras_filtros to anon;
