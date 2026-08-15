@@ -967,8 +967,8 @@ $$;
 drop function if exists dashboard_vendedoras_kpis_geral(timestamptz, timestamptz);
 
 create or replace function dashboard_vendedoras_kpis_geral(
-  p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_from date default null,
+  p_date_to date default null
 )
 returns table (
   top_qtd_vendedor text,
@@ -988,8 +988,8 @@ as $$
   with base as (
     select vendedor, banco, valor, data_status as dia
     from vendedoras_analise
-    where (p_date_from is null or data_status >= p_date_from::date)
-      and (p_date_to is null or data_status <= p_date_to::date)
+    where (p_date_from is null or data_status >= p_date_from)
+      and (p_date_to is null or data_status <= p_date_to)
   ),
   por_vendedor as (
     select vendedor, count(*) as qtd, coalesce(sum(valor), 0) as total
@@ -1021,10 +1021,12 @@ as $$
 $$;
 
 -- KPIs de um vendedor específico
+drop function if exists dashboard_vendedoras_kpis_vendedor(text, timestamptz, timestamptz);
+
 create or replace function dashboard_vendedoras_kpis_vendedor(
   p_vendedor text,
-  p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_from date default null,
+  p_date_to date default null
 )
 returns table (
   maior_venda numeric,
@@ -1042,8 +1044,8 @@ as $$
     select valor, data_status as dia
     from vendedoras_analise
     where vendedor = p_vendedor
-      and (p_date_from is null or data_status >= p_date_from::date)
-      and (p_date_to is null or data_status <= p_date_to::date)
+      and (p_date_from is null or data_status >= p_date_from)
+      and (p_date_to is null or data_status <= p_date_to)
   ),
   por_dia as (
     select dia, count(*) as qtd from base where dia is not null group by dia
@@ -1061,8 +1063,8 @@ drop function if exists dashboard_vendedoras_por_dia(text, timestamptz, timestam
 
 create or replace function dashboard_vendedoras_por_dia(
   p_vendedor text default null,
-  p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_from date default null,
+  p_date_to date default null
 )
 returns table (
   dia date,
@@ -1079,8 +1081,8 @@ as $$
   from vendedoras_analise
   where data_status is not null
     and (p_vendedor is null or vendedor = p_vendedor)
-    and (p_date_from is null or data_status >= p_date_from::date)
-    and (p_date_to is null or data_status <= p_date_to::date)
+    and (p_date_from is null or data_status >= p_date_from)
+    and (p_date_to is null or data_status <= p_date_to)
   group by 1, 2
   order by 1;
 $$;
@@ -1090,8 +1092,8 @@ drop function if exists dashboard_vendedoras_tabela(text, timestamptz, timestamp
 
 create or replace function dashboard_vendedoras_tabela(
   p_vendedor text default null,
-  p_date_from timestamptz default null,
-  p_date_to timestamptz default null,
+  p_date_from date default null,
+  p_date_to date default null,
   p_limit int default 10,
   p_offset int default 0
 )
@@ -1115,17 +1117,19 @@ as $$
     count(*) over() as total_count
   from vendedoras_analise
   where (p_vendedor is null or vendedor = p_vendedor)
-    and (p_date_from is null or data_status >= p_date_from::date)
-    and (p_date_to is null or data_status <= p_date_to::date)
+    and (p_date_from is null or data_status >= p_date_from)
+    and (p_date_to is null or data_status <= p_date_to)
   order by data_status desc nulls last, id desc
   limit p_limit offset p_offset;
 $$;
 
 -- Ranking de vendedoras (valor total, qtd total, banco mais vendido),
 -- em ordem decrescente de valor total
+drop function if exists dashboard_vendedoras_ranking(timestamptz, timestamptz);
+
 create or replace function dashboard_vendedoras_ranking(
-  p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_from date default null,
+  p_date_to date default null
 )
 returns table (
   vendedor text,
@@ -1142,8 +1146,8 @@ as $$
     select vendedor, banco, valor
     from vendedoras_analise
     where vendedor is not null
-      and (p_date_from is null or data_status >= p_date_from::date)
-      and (p_date_to is null or data_status <= p_date_to::date)
+      and (p_date_from is null or data_status >= p_date_from)
+      and (p_date_to is null or data_status <= p_date_to)
   ),
   agg as (
     select vendedor, coalesce(sum(valor), 0) as valor_total, count(*) as qtd_total
