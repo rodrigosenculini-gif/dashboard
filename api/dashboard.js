@@ -41,13 +41,35 @@ function getPool() {
 function setCors(res) {
   // Libera para o site publicado e para artifacts do claude.ai testarem a API
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (req.method === 'POST') {
+    const { type } = req.query;
+    if (type !== 'vendedoras_import') {
+      return res.status(400).json({ error: `type inválido para POST: ${type}` });
+    }
+    try {
+      const rows = req.body?.rows;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ error: 'Nenhuma linha para importar.' });
+      }
+      const client = getPool();
+      const result = await client.query(
+        'select * from dashboard_vendedoras_import($1::jsonb)',
+        [JSON.stringify(rows)]
+      );
+      return res.status(200).json(result.rows);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
 
   const { type = 'kpis', campanha, origem, meta, date_from, date_to } = req.query;
