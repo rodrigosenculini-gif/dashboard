@@ -1488,7 +1488,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <ViewSwitcher view={view} setView={changeView} />
+      <div className="app-header">
+        <img src="/tiger-icon.svg" alt="" className="app-logo" />
+        <ViewSwitcher view={view} setView={changeView} />
+      </div>
       {view === 'geral' && <VisaoGeral />}
       {view === 'leilao' && <LeilaoDetalhado />}
       {view === 'produtos' && <EntradasLP />}
