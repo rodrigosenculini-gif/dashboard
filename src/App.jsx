@@ -20,6 +20,66 @@ async function callApi(type, params) {
   return data
 }
 
+async function postApi(type, body) {
+  const res = await fetch(`/api/dashboard?type=${type}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `Erro ao enviar ${type}`)
+  return data
+}
+
+// L\u00ea o CSV de vendedoras (arquivo exportado em Latin-1, separado por ";"),
+// corta s\u00f3 as colunas necess\u00e1rias e normaliza cpf/data/valor.
+async function parseVendedorasCsv(file) {
+  const buf = await file.arrayBuffer()
+  const text = new TextDecoder('iso-8859-1').decode(buf)
+  const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0)
+  if (lines.length < 2) return []
+
+  const header = lines[0].split(';').map((h) => h.trim())
+  const idx = (name) => header.indexOf(name)
+  const iData = idx('Data Status')
+  const iBanco = idx('Banco')
+  const iAde = idx('ADE')
+  const iCpf = idx('Cpf')
+  const iNome = idx('Nome')
+  const iVendedor = idx('Vendedor')
+  const iTabela = idx('Tabela')
+  const iValor = idx('Valor')
+
+  const rows = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(';')
+    if (cols.length < header.length) continue
+
+    const cpfDigits = (cols[iCpf] || '').replace(/\D/g, '')
+    if (!cpfDigits) continue
+    const cpf = cpfDigits.padStart(11, '0')
+
+    const dataRaw = (cols[iData] || '').trim() // vem como DD/MM/AAAA
+    const [dd, mm, yyyy] = dataRaw.split('/')
+    const dataIso = dd && mm && yyyy ? `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}` : ''
+
+    const valorRaw = (cols[iValor] || '').trim().replace(/\./g, '').replace(',', '.')
+    const valor = valorRaw && !isNaN(Number(valorRaw)) ? valorRaw : ''
+
+    rows.push({
+      data_status: dataIso,
+      banco: (cols[iBanco] || '').trim(),
+      adesao: (cols[iAde] || '').trim(),
+      cpf,
+      nome: (cols[iNome] || '').trim(),
+      vendedor: (cols[iVendedor] || '').trim(),
+      tabela: (cols[iTabela] || '').trim(),
+      valor,
+    })
+  }
+  return rows
+}
+
 async function callN8nApi(type, params) {
   const qs = new URLSearchParams({ type, ...params })
   const res = await fetch(`/api/n8n?${qs.toString()}`)
@@ -980,6 +1040,9 @@ function VendedorasView() {
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
   const [showRanking, setShowRanking] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     callApi('vendedoras_filtros', {})
@@ -1066,6 +1129,33 @@ function VendedorasView() {
     }
   }
 
+  const handleImportClick = () => fileInputRef.current?.click()
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite selecionar o mesmo arquivo de novo depois
+    if (!file) return
+    setImporting(true)
+    setImportMsg('')
+    try {
+      const rows = await parseVendedorasCsv(file)
+      if (rows.length === 0) {
+        setImportMsg('Nenhuma linha v\u00e1lida encontrada no arquivo.')
+        return
+      }
+      const result = await postApi('vendedoras_import', { rows })
+      const r = result?.[0]
+      setImportMsg(
+        `Importa\u00e7\u00e3o conclu\u00edda \u2014 ${fmtInt(r?.inseridos)} vendas novas adicionadas, ${fmtInt(r?.ignorados)} j\u00e1 existiam (mesmo CPF + ades\u00e3o) e foram ignoradas. Sincronizando...`
+      )
+      await handleSync()
+    } catch (err) {
+      setImportMsg('Erro ao importar: ' + (err.message || ''))
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const totalPaginas = tabela.total > 40 ? 2 + Math.ceil((tabela.total - 40) / 30) - 1 : 1
   const podeExpandir = page === 0 && tabela.total > 10
   const podeProximaPagina = page >= 1 && offset + limit < tabela.total
@@ -1085,6 +1175,16 @@ function VendedorasView() {
           <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras">
             &#8942;
           </button>
+          <input
+            type="file"
+            accept=".csv"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+          <button className="refresh-btn" onClick={handleImportClick} disabled={importing} title="Importar vendas de um arquivo CSV">
+            {importing ? 'Importando...' : '\u2191 Importar'}
+          </button>
           <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
             {syncing ? 'Sincronizando...' : '\u21bb Sincronizar'}
           </button>
@@ -1094,6 +1194,7 @@ function VendedorasView() {
         </div>
       </div>
 
+      {importMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{importMsg}</div>}
       {syncMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{syncMsg}</div>}
 
       <div className="filters">
