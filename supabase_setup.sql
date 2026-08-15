@@ -803,11 +803,18 @@ as $$
   end;
 $$;
 
+-- Coluna extra pra saber a qual sistema de conversas o covnersation_id
+-- pertence ("vendeai" ou "chatwoot"), já que os dois têm links diferentes
+alter table vendedoras_analise add column if not exists conversa_sistema text;
+
 -- Sincronização manual (botão "Sincronizar" na tela) — NÃO roda sozinha:
--- 1) Preenche whatsapp/covnersation_id na vendedoras_analise, buscando por
---    CPF (normalizado) recente (últimos 7 dias) em disparochat, depois
---    leads_chatwoot, depois total_produtos (só whatsapp, essa não tem
---    conversation_id).
+-- 1) Preenche whatsapp/covnersation_id/conversa_sistema na vendedoras_analise,
+--    buscando por CPF (normalizado) recente (últimos 7 dias):
+--      - disparochat -> sistema "vendeai" (crm.vendeaitecnologia.com.br)
+--      - leads_chatwoot, só quando conta = 'chatwoot' -> sistema "chatwoot"
+--        (chatwoot.querosacarfgts.com.br). Se conta for outra coisa, o
+--        conversation_id dessa tabela não é usado (não sabemos o link certo).
+--      - total_produtos: só whatsapp (essa tabela não tem conversation_id).
 -- 2) Marca como paga (usando o valor da vendedoras_analise) qualquer
 --    registro correspondente nessas 3 tabelas que ainda não estivesse pago.
 create or replace function dashboard_vendedoras_sync()
@@ -827,7 +834,7 @@ declare
   v3 int := 0;
   v4 int := 0;
 begin
-  -- 1) enriquece com disparochat
+  -- 1) enriquece com disparochat (sistema "vendeai")
   with match_d as (
     select distinct on (norm_cpf(d.cpf))
       norm_cpf(d.cpf) as cpf_norm, d.whatsapp, d.conversation_id
@@ -838,16 +845,20 @@ begin
   )
   update vendedoras_analise v
   set covnersation_id = coalesce(v.covnersation_id, m.conversation_id),
+      conversa_sistema = coalesce(v.conversa_sistema, case when m.conversation_id is not null then 'vendeai' end),
       whatsapp = coalesce(v.whatsapp, m.whatsapp)
   from match_d m
   where norm_cpf(v.cpf) = m.cpf_norm
     and (v.covnersation_id is null or v.whatsapp is null);
   get diagnostics v1 = row_count;
 
-  -- 1b) completa o que faltou com leads_chatwoot
+  -- 1b) completa o que faltou com leads_chatwoot (sempre busca, independente
+  -- de "conta" — a diferença é só o link: conta='chatwoot' usa o domínio
+  -- chatwoot.querosacarfgts.com.br, qualquer outro valor usa o vendeai)
   with match_l as (
     select distinct on (norm_cpf(l.cpf))
-      norm_cpf(l.cpf) as cpf_norm, l.whatsapp, l.conversation_id
+      norm_cpf(l.cpf) as cpf_norm, l.whatsapp, l.conversation_id,
+      case when l.conta = 'chatwoot' then 'chatwoot' else 'vendeai' end as sistema
     from leads_chatwoot l
     where coalesce(l.atualizacao, l.entrada_tabela) >= now() - interval '7 days'
       and l.cpf is not null
@@ -855,6 +866,7 @@ begin
   )
   update vendedoras_analise v
   set covnersation_id = coalesce(v.covnersation_id, m.conversation_id),
+      conversa_sistema = coalesce(v.conversa_sistema, case when m.conversation_id is not null then m.sistema end),
       whatsapp = coalesce(v.whatsapp, m.whatsapp)
   from match_l m
   where norm_cpf(v.cpf) = m.cpf_norm
@@ -874,6 +886,26 @@ begin
   from match_t m
   where norm_cpf(v.cpf) = m.cpf_norm
     and v.whatsapp is null;
+
+  -- 1d) backfill de conversa_sistema pra quem já tinha covnersation_id
+  -- preenchido (ex: veio assim no arquivo original) mas nunca soube de qual
+  -- sistema é — tenta casar direto pelo id, sem depender de cpf/recência
+  update vendedoras_analise v
+  set conversa_sistema = 'vendeai'
+  where v.covnersation_id is not null
+    and v.conversa_sistema is null
+    and exists (select 1 from disparochat d where d.conversation_id = v.covnersation_id);
+
+  update vendedoras_analise v
+  set conversa_sistema = coalesce(l.sistema, 'vendeai')
+  from (
+    select conversation_id, case when conta = 'chatwoot' then 'chatwoot' else 'vendeai' end as sistema
+    from leads_chatwoot
+    where conversation_id is not null
+  ) l
+  where v.covnersation_id is not null
+    and v.conversa_sistema is null
+    and v.covnersation_id = l.conversation_id;
 
   select count(*) into v1 from vendedoras_analise where covnersation_id is not null or whatsapp is not null;
 
@@ -1044,6 +1076,8 @@ as $$
 $$;
 
 -- Tabela de vendas paginada
+drop function if exists dashboard_vendedoras_tabela(text, timestamptz, timestamptz, int, int);
+
 create or replace function dashboard_vendedoras_tabela(
   p_vendedor text default null,
   p_date_from timestamptz default null,
@@ -1058,6 +1092,7 @@ returns table (
   banco text,
   dia date,
   covnersation_id bigint,
+  conversa_sistema text,
   total_count bigint
 )
 language sql
@@ -1066,7 +1101,7 @@ set search_path = public
 stable
 as $$
   select
-    vendedor, valor, cpf, banco, data_status as dia, covnersation_id,
+    vendedor, valor, cpf, banco, data_status as dia, covnersation_id, conversa_sistema,
     count(*) over() as total_count
   from vendedoras_analise
   where (p_vendedor is null or vendedor = p_vendedor)
