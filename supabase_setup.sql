@@ -1167,6 +1167,57 @@ as $$
   order by a.valor_total desc;
 $$;
 
+-- Importação de vendas via CSV (botão "Importar" na tela). Recebe um array
+-- jsonb já normalizado pelo front-end (cpf com 11 dígitos, data em
+-- AAAA-MM-DD, valor com ponto decimal). Duplicata = mesmo cpf + adesao já
+-- existente na tabela; nesse caso a linha é ignorada. CPF igual com adesao
+-- diferente entra como uma nova venda (linha nova).
+create or replace function dashboard_vendedoras_import(p_rows jsonb)
+returns table (inseridos int, ignorados int, total int)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_inseridos int := 0;
+  v_total int := 0;
+begin
+  select count(*) into v_total from jsonb_array_elements(p_rows);
+
+  with novos as (
+    select
+      nullif(r->>'data_status', '')::date as data_status,
+      nullif(r->>'banco', '') as banco,
+      nullif(r->>'adesao', '')::bigint as adesao,
+      norm_cpf(r->>'cpf') as cpf,
+      nullif(r->>'nome', '') as nome,
+      nullif(r->>'vendedor', '') as vendedor,
+      nullif(r->>'tabela', '') as tabela,
+      nullif(r->>'valor', '')::numeric as valor
+    from jsonb_array_elements(p_rows) r
+  ),
+  dedup_input as (
+    -- remove duplicatas dentro do próprio arquivo (mesmo cpf+adesao repetido no CSV)
+    select distinct on (cpf, coalesce(adesao, -1)) *
+    from novos
+  ),
+  a_inserir as (
+    select n.* from dedup_input n
+    where not exists (
+      select 1 from vendedoras_analise v
+      where norm_cpf(v.cpf) = n.cpf
+        and coalesce(v.adesao, -1) = coalesce(n.adesao, -1)
+    )
+  )
+  insert into vendedoras_analise (data_status, banco, adesao, cpf, nome, vendedor, tabela, valor)
+  select data_status, banco, adesao, cpf, nome, vendedor, tabela, valor from a_inserir;
+
+  get diagnostics v_inseridos = row_count;
+
+  return query select v_inseridos, (v_total - v_inseridos), v_total;
+end;
+$$;
+
 -- Lista de vendedoras pro filtro
 create or replace function dashboard_vendedoras_filtros()
 returns table (vendedores text[])
@@ -1181,6 +1232,7 @@ $$;
 grant execute on function norm_cpf to anon;
 grant execute on function safe_date_br to anon;
 grant execute on function dashboard_vendedoras_sync to anon;
+grant execute on function dashboard_vendedoras_import to anon;
 grant execute on function dashboard_vendedoras_kpis_geral to anon;
 grant execute on function dashboard_vendedoras_kpis_vendedor to anon;
 grant execute on function dashboard_vendedoras_por_dia to anon;
