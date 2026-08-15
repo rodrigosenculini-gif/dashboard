@@ -59,10 +59,18 @@ function fmtDateISO(d) {
 }
 
 function weekRange() {
-  const to = new Date()
-  const from = new Date()
-  from.setDate(from.getDate() - 6)
-  return { from: fmtDateISO(from), to: fmtDateISO(to) }
+  const now = new Date()
+  const dow = now.getDay() // 0=domingo, 1=segunda, ... 6=s\u00e1bado
+  const diffToMonday = (dow + 6) % 7 // 0 se hoje j\u00e1 \u00e9 segunda
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - diffToMonday)
+  const friday = new Date(monday)
+  friday.setDate(monday.getDate() + 4)
+  const hojeStr = fmtDateISO(now)
+  const sextaStr = fmtDateISO(friday)
+  // nunca passa da sexta-feira dessa semana, mesmo se hoje for s\u00e1bado/domingo
+  const to = hojeStr < sextaStr ? hojeStr : sextaStr
+  return { from: fmtDateISO(monday), to }
 }
 
 function presetRange(preset) {
@@ -1150,7 +1158,11 @@ function VendedorasView() {
             <span>
               {r.covnersation_id ? (
                 <a
-                  href={`https://crm.vendeaitecnologia.com.br/app/accounts/75/conversations/${r.covnersation_id}`}
+                  href={
+                    r.conversa_sistema === 'chatwoot'
+                      ? `https://chatwoot.querosacarfgts.com.br/app/accounts/1/conversations/${r.covnersation_id}`
+                      : `https://crm.vendeaitecnologia.com.br/app/accounts/75/conversations/${r.covnersation_id}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="conversa-link"
