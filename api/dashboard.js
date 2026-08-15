@@ -143,21 +143,21 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_vendedoras_sync()';
     params = [];
   } else if (type === 'vendedoras_kpis_geral') {
-    sql = 'select * from dashboard_vendedoras_kpis_geral($1::timestamptz,$2::timestamptz)';
+    sql = 'select * from dashboard_vendedoras_kpis_geral($1::date,$2::date)';
     params = [p_date_from, p_date_to];
   } else if (type === 'vendedoras_kpis_vendedor') {
-    sql = 'select * from dashboard_vendedoras_kpis_vendedor($1::text,$2::timestamptz,$3::timestamptz)';
+    sql = 'select * from dashboard_vendedoras_kpis_vendedor($1::text,$2::date,$3::date)';
     params = [req.query.vendedor || null, p_date_from, p_date_to];
   } else if (type === 'vendedoras_por_dia') {
-    sql = 'select * from dashboard_vendedoras_por_dia($1::text,$2::timestamptz,$3::timestamptz)';
+    sql = 'select * from dashboard_vendedoras_por_dia($1::text,$2::date,$3::date)';
     params = [req.query.vendedor || null, p_date_from, p_date_to];
   } else if (type === 'vendedoras_ranking') {
-    sql = 'select * from dashboard_vendedoras_ranking($1::timestamptz,$2::timestamptz)';
+    sql = 'select * from dashboard_vendedoras_ranking($1::date,$2::date)';
     params = [p_date_from, p_date_to];
   } else if (type === 'vendedoras_tabela') {
     const limit = parseInt(req.query.limit, 10) || 10;
     const offset = parseInt(req.query.offset, 10) || 0;
-    sql = 'select * from dashboard_vendedoras_tabela($1::text,$2::timestamptz,$3::timestamptz,$4::int,$5::int)';
+    sql = 'select * from dashboard_vendedoras_tabela($1::text,$2::date,$3::date,$4::int,$5::int)';
     params = [req.query.vendedor || null, p_date_from, p_date_to, limit, offset];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
