@@ -207,9 +207,22 @@ body {
 }
 
 /* --- Seletor de visões (menu no topo) --- */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.app-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
 .view-switcher {
   position: relative;
-  margin-bottom: 14px;
   display: inline-block;
 }
 
