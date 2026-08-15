@@ -914,9 +914,9 @@ function RankingOverlay({ onClose }) {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
-    const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
-    callApi('vendedoras_ranking', { date_from, date_to })
+    // data_status é uma coluna "date" pura, sem hora/fuso — manda o texto
+    // exatamente como está no campo (AAAA-MM-DD), sem converter pra ISO/UTC
+    callApi('vendedoras_ranking', { date_from: dataInicio || '', date_to: dataFim || '' })
       .then((d) => setRanking(d ?? []))
       .catch((e) => setError(e.message || 'Erro ao carregar ranking.'))
       .finally(() => setLoading(false))
@@ -998,8 +998,10 @@ function VendedorasView() {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
-    const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
+    // data_status é uma coluna "date" pura, sem hora/fuso — manda o texto
+    // exatamente como está no campo (AAAA-MM-DD), sem converter pra ISO/UTC
+    const date_from = dataInicio || ''
+    const date_to = dataFim || ''
     try {
       const [dia, tab] = await Promise.all([
         callApi('vendedoras_por_dia', { vendedor, date_from, date_to }),
