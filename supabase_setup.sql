@@ -872,20 +872,24 @@ begin
   where norm_cpf(v.cpf) = m.cpf_norm
     and (v.covnersation_id is null or v.whatsapp is null);
 
-  -- 1c) completa o whatsapp que ainda faltar com total_produtos (não tem conversation_id)
+  -- 1c) completa com total_produtos (agora também tem conversation_id,
+  -- sistema "vendeai" — não tem coluna "conta" pra diferenciar como o
+  -- leads_chatwoot tem)
   with match_t as (
     select distinct on (norm_cpf(t.cpf))
-      norm_cpf(t.cpf) as cpf_norm, t.whatsapp
+      norm_cpf(t.cpf) as cpf_norm, t.whatsapp, t.conversation_id
     from total_produtos t
     where t.created_at >= now() - interval '7 days'
       and t.cpf is not null
     order by norm_cpf(t.cpf), t.created_at desc
   )
   update vendedoras_analise v
-  set whatsapp = coalesce(v.whatsapp, m.whatsapp)
+  set covnersation_id = coalesce(v.covnersation_id, m.conversation_id),
+      conversa_sistema = coalesce(v.conversa_sistema, case when m.conversation_id is not null then 'vendeai' end),
+      whatsapp = coalesce(v.whatsapp, m.whatsapp)
   from match_t m
   where norm_cpf(v.cpf) = m.cpf_norm
-    and v.whatsapp is null;
+    and (v.covnersation_id is null or v.whatsapp is null);
 
   -- 1d) backfill de conversa_sistema pra quem já tinha covnersation_id
   -- preenchido (ex: veio assim no arquivo original) mas nunca soube de qual
@@ -895,6 +899,12 @@ begin
   where v.covnersation_id is not null
     and v.conversa_sistema is null
     and exists (select 1 from disparochat d where d.conversation_id = v.covnersation_id);
+
+  update vendedoras_analise v
+  set conversa_sistema = 'vendeai'
+  where v.covnersation_id is not null
+    and v.conversa_sistema is null
+    and exists (select 1 from total_produtos t where t.conversation_id = v.covnersation_id);
 
   update vendedoras_analise v
   set conversa_sistema = coalesce(l.sistema, 'vendeai')
