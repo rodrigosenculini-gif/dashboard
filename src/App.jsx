@@ -1253,8 +1253,8 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <button className="reset-btn" onClick={() => { setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
-          <button className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar ades\u00e3o">
-            + Adicionar ades\u00e3o
+          <button className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão">
+            + Adicionar adesão
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -1266,10 +1266,10 @@ function VendedoraPortal({ vendedor, onLogout }) {
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
-      <div className="panel chart-panel">
+      <div className="panel chart-panel extra-tall">
         <p className="section-label">Vendas por semana &mdash; meta e proje&ccedil;&atilde;o</p>
         <p className="section-sub">meta de {fmtMoeda(META_SEMANA)}/semana &middot; linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s</p>
-        <ResponsiveContainer width="100%" height="72%">
+        <ResponsiveContainer width="100%" height="65%">
           <ComposedChart data={chartData}>
             <XAxis dataKey="semana" tick={{ fontSize: 10, fill: '#8a978f' }} />
             <YAxis tick={{ fontSize: 10, fill: '#8a978f' }} width={50} />
@@ -1290,13 +1290,12 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <MilestoneBadges semanas={semanas} />
       </div>
 
-      <div className="kpi-grid">
+      <div className="kpi-grid kpi-grid-3">
         <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpis?.maior_venda)}</p></div>
         <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.dia_mais_vendas ? fmtDataBR(kpis.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpis?.dia_mais_vendas_qtd)} vendas</p></div>
         <div className="kpi"><p className="kpi-label">Valor total vendido</p><p className="kpi-value">{fmtMoeda(kpis?.valor_total)}</p></div>
         <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpis?.qtd_total)}</p></div>
-      </div>
-      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Banco mais vendido</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpis?.banco_top_qtd)} vendas</p></div>
         <div className="kpi"><p className="kpi-label">Semanas com meta batida</p><p className="kpi-value">{fmtInt(semanasBatidas.length)}</p></div>
         {semanasBatidas.slice(0, 3).map((s) => (
           <div className="kpi" key={s.semana}><p className="kpi-label">Semana {s.semana_label}</p><p className="kpi-value" style={{ fontSize: 16 }}>{fmtMoeda(s.valor_semana)}</p></div>
