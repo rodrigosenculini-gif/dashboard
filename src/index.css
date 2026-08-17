@@ -126,6 +126,10 @@ body {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+.kpi-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .kpi {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -306,6 +310,7 @@ body {
 }
 
 .chart-panel.tall { height: 260px; }
+.chart-panel.extra-tall { height: 320px; }
 
 /* --- Tabela "Por template" --- */
 .template-row {
