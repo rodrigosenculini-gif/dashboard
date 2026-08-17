@@ -1372,11 +1372,11 @@ as $$
   ),
   semanas as (
     select
-      row_number() over (order by semana_inicio) as semana,
-      semana_inicio,
-      least(semana_inicio + 6, (select fim from mes)) as semana_fim
+      row_number() over (order by semana_inicio_bruto) as semana,
+      greatest(semana_inicio_bruto, (select inicio from mes)) as semana_inicio,
+      least(semana_inicio_bruto + 6, (select fim from mes)) as semana_fim
     from (
-      select distinct greatest((date_trunc('week', dia))::date, (select inicio from mes)) as semana_inicio
+      select distinct (date_trunc('week', dia))::date as semana_inicio_bruto
       from generate_series((select inicio from mes), (select fim from mes), interval '1 day') dia
     ) s
   )
