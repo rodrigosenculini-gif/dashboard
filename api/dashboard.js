@@ -45,12 +45,44 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+// Senhas ficam só aqui no servidor — nunca são enviadas ao navegador.
+// "geral" enxerga o dashboard inteiro; as outras só a própria aba de vendas.
+const SENHAS = {
+  '654321': { role: 'geral', vendedor: null },
+  '123456': { role: 'vendedora', vendedor: 'JEANNE BARBOZA' },
+  '123567': { role: 'vendedora', vendedor: 'KAYANE BASQUE' },
+  '123789': { role: 'vendedora', vendedor: 'Leticia.Splendore' },
+  '123908': { role: 'vendedora', vendedor: 'Rafaela Ferreira' },
+};
+
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'POST') {
     const { type } = req.query;
+
+    if (type === 'auth_login') {
+      const senha = (req.body?.senha || '').toString().trim();
+      const found = SENHAS[senha];
+      if (!found) return res.status(401).json({ error: 'Senha incorreta.' });
+      return res.status(200).json(found);
+    }
+
+    if (type === 'vendedoras_add_venda') {
+      try {
+        const { vendedor, adesao, cpf, nome, valor, banco } = req.body || {};
+        const client = getPool();
+        const result = await client.query(
+          'select * from dashboard_vendedoras_add_venda($1::text,$2::bigint,$3::text,$4::text,$5::numeric,$6::text)',
+          [vendedor || null, adesao || null, cpf || null, nome || null, valor || null, banco || null]
+        );
+        return res.status(200).json(result.rows);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type !== 'vendedoras_import') {
       return res.status(400).json({ error: `type inválido para POST: ${type}` });
     }
@@ -72,12 +104,14 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
 
-  const { type = 'kpis', campanha, origem, meta, date_from, date_to } = req.query;
+  const { type = 'kpis', campanha, origem, meta, date_from, date_to, hora_inicio, hora_fim } = req.query;
   const p_campanha = campanha || null;
   const p_origem = origem || null;
   const p_meta = meta || null;
   const p_date_from = date_from || null;
   const p_date_to = date_to || null;
+  const p_hora_inicio = hora_inicio !== undefined && hora_inicio !== '' ? parseInt(hora_inicio, 10) : null;
+  const p_hora_fim = hora_fim !== undefined && hora_fim !== '' ? parseInt(hora_fim, 10) : null;
 
   let sql;
   let params;
@@ -110,11 +144,11 @@ export default async function handler(req, res) {
     sql = "select proname, pg_get_function_identity_arguments(oid) as args from pg_proc where proname like 'dashboard_%' order by proname";
     params = [];
   } else if (type === 'kpis') {
-    sql = 'select * from dashboard_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
-    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
+    sql = 'select * from dashboard_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_hora_inicio, p_hora_fim];
   } else if (type === 'envios') {
-    sql = 'select * from dashboard_envios_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
-    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
+    sql = 'select * from dashboard_envios_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_hora_inicio, p_hora_fim];
   } else if (type === 'campanhas') {
     sql = 'select * from dashboard_campanhas($1::text,$2::text,$3::timestamptz,$4::timestamptz)';
     params = [p_origem, p_meta, p_date_from, p_date_to];
@@ -128,8 +162,8 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_por_mensagem($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
   } else if (type === 'hoje_kpis') {
-    sql = 'select * from dashboard_hoje_kpis($1::timestamptz,$2::timestamptz,$3::text)';
-    params = [p_date_from, p_date_to, p_campanha];
+    sql = 'select * from dashboard_hoje_kpis($1::timestamptz,$2::timestamptz,$3::text,$4::int,$5::int)';
+    params = [p_date_from, p_date_to, p_campanha, p_hora_inicio, p_hora_fim];
   } else if (type === 'falha_por_minuto') {
     const minutos = parseInt(req.query.minutos, 10) || 60;
     sql = 'select * from dashboard_falha_por_minuto($1::int,$2::text)';
@@ -138,11 +172,11 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_por_template_hoje($1::timestamptz,$2::timestamptz,$3::text)';
     params = [p_date_from, p_date_to, p_campanha];
   } else if (type === 'produtos_kpis') {
-    sql = 'select * from dashboard_produtos_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
-    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
+    sql = 'select * from dashboard_produtos_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int)';
+    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to, p_hora_inicio, p_hora_fim];
   } else if (type === 'produtos_entradas_por_dia') {
-    sql = 'select * from dashboard_produtos_entradas_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
-    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
+    sql = 'select * from dashboard_produtos_entradas_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int)';
+    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to, p_hora_inicio, p_hora_fim];
   } else if (type === 'produtos_aprovadas_por_dia') {
     sql = 'select * from dashboard_produtos_aprovadas_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
@@ -181,6 +215,12 @@ export default async function handler(req, res) {
     const offset = parseInt(req.query.offset, 10) || 0;
     sql = 'select * from dashboard_vendedoras_tabela($1::text,$2::date,$3::date,$4::int,$5::int)';
     params = [req.query.vendedor || null, p_date_from, p_date_to, limit, offset];
+  } else if (type === 'vendedoras_meta') {
+    sql = 'select * from dashboard_vendedoras_meta($1::text)';
+    params = [req.query.vendedor || null];
+  } else if (type === 'vendedoras_semanas_mes') {
+    sql = 'select * from dashboard_vendedoras_semanas_mes($1::text)';
+    params = [req.query.vendedor || null];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
