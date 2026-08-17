@@ -991,7 +991,7 @@ function fmtDataBR(d) {
 }
 
 function RankingOverlay({ onClose }) {
-  const week = weekRange()
+  const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [dataInicio, setDataInicio] = useState(week.from)
   const [dataFim, setDataFim] = useState(week.to)
   const [ranking, setRanking] = useState([])
@@ -1075,7 +1075,7 @@ function LoginGate({ onLogin }) {
   return (
     <div className="login-screen">
       <form className="login-card" onSubmit={submit}>
-        <img src="/tiger-icon.svg" alt="" className="login-logo" />
+        <img src="/tiger-icon.png" alt="" className="login-logo" />
         <h2>Entrar</h2>
         <input
           type="password"
@@ -1087,6 +1087,26 @@ function LoginGate({ onLogin }) {
         {erro && <p className="login-error">{erro}</p>}
         <button type="submit" disabled={enviando}>{enviando ? 'Entrando...' : 'Entrar'}</button>
       </form>
+    </div>
+  )
+}
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const row = payload[0]?.payload
+  if (!row) return null
+  return (
+    <div style={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12, padding: '8px 10px' }}>
+      <p style={{ color: '#8a978f', margin: '0 0 4px' }}>{label}</p>
+      {row.realizado != null && (
+        <p style={{ margin: '2px 0', color: '#a9d97f' }}>Realizado: {fmtMoeda(row.realizado)}</p>
+      )}
+      {row.ehSemanaAtual && (
+        <p style={{ margin: '2px 0', color: '#d9b877' }}>Proje&ccedil;&atilde;o do m&ecirc;s: {fmtMoeda(row.projecaoMesTotal)}</p>
+      )}
+      {!row.ehSemanaAtual && row.realizado == null && row.projecao != null && (
+        <p style={{ margin: '2px 0', color: '#d9b877' }}>Proje&ccedil;&atilde;o: {fmtMoeda(row.projecao)}</p>
+      )}
     </div>
   )
 }
@@ -1120,7 +1140,7 @@ function MilestoneDot(props) {
 }
 
 function VendedoraPortal({ vendedor, onLogout }) {
-  const week = weekRange()
+  const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [kpis, setKpis] = useState(null)
   const [meta, setMeta] = useState(null)
   const [semanas, setSemanas] = useState([])
@@ -1202,8 +1222,13 @@ function VendedoraPortal({ vendedor, onLogout }) {
         row.realizado = acumulado
         row.nivel = nivel
         // ponto de conex\u00e3o: a \u00faltima semana real tamb\u00e9m entra na s\u00e9rie de
-        // proje\u00e7\u00e3o, pra linha ficar visualmente cont\u00ednua (sem quebra)
-        if (s.semana === ultimaIniciada?.semana) row.projecao = acumulado
+        // proje\u00e7\u00e3o, pra linha ficar visualmente cont\u00ednua (sem quebra) \u2014 mas o
+        // tooltip mostra a proje\u00e7\u00e3o de verdade (projecaoMesTotal), n\u00e3o esse valor
+        if (s.semana === ultimaIniciada?.semana) {
+          row.projecao = acumulado
+          row.ehSemanaAtual = true
+          row.projecaoMesTotal = projecaoFinal
+        }
       } else if (ultimaIniciada) {
         // interpola linearmente da \u00faltima semana real at\u00e9 a proje\u00e7\u00e3o final
         // (valor absoluto, nunca somado por cima do realizado)
@@ -1263,7 +1288,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   return (
     <div className="app">
       <div className="app-header">
-        <img src="/tiger-icon.svg" alt="" className="app-logo" />
+        <img src="/tiger-icon.png" alt="" className="app-logo" />
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <button className="reset-btn" onClick={onLogout} title="Sair" style={{ marginLeft: 'auto' }}>Sair</button>
       </div>
@@ -1297,11 +1322,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <ComposedChart data={chartData} margin={{ top: 26, right: 10, left: 0, bottom: 0 }}>
             <XAxis dataKey="semana" tick={{ fontSize: 10, fill: '#8a978f' }} />
             <YAxis tick={{ fontSize: 10, fill: '#8a978f' }} width={50} />
-            <Tooltip
-              contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
-              labelStyle={{ color: '#8a978f' }}
-              formatter={(value, name) => [fmtMoeda(value), name === 'realizado' ? 'Realizado' : 'Proje\u00e7\u00e3o']}
-            />
+            <Tooltip content={<ChartTooltip />} />
             <Line type="monotone" dataKey="realizado" stroke="#a9d97f" strokeWidth={2.5} dot={<MilestoneDot />} connectNulls />
             <Line type="monotone" dataKey="projecao" stroke="#a9d97f" strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={{ r: 3, fillOpacity: 0.4, fill: '#a9d97f' }} connectNulls legendType="none" />
           </ComposedChart>
@@ -1382,7 +1403,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
 }
 
 function VendedorasView() {
-  const week = weekRange()
+  const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [vendedores, setVendedores] = useState([])
   const [vendedor, setVendedor] = useState('')
   const [dataInicio, setDataInicio] = useState(week.from)
@@ -1854,7 +1875,7 @@ function Dashboard() {
   return (
     <div className="app">
       <div className="app-header">
-        <img src="/tiger-icon.svg" alt="" className="app-logo" />
+        <img src="/tiger-icon.png" alt="" className="app-logo" />
         <ViewSwitcher view={view} setView={changeView} />
       </div>
       {view === 'geral' && <VisaoGeral />}
