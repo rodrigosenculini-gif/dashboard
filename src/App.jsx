@@ -175,6 +175,25 @@ function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
   )
 }
 
+const HORAS = Array.from({ length: 24 }, (_, i) => i)
+
+function HourFilter({ horaInicio, setHoraInicio, horaFim, setHoraFim }) {
+  return (
+    <div className="hour-filter">
+      <span className="hour-filter-label">Hor&aacute;rio</span>
+      <select value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)}>
+        <option value="">--</option>
+        {HORAS.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}h</option>)}
+      </select>
+      <span className="hour-filter-sep">at&eacute;</span>
+      <select value={horaFim} onChange={(e) => setHoraFim(e.target.value)}>
+        <option value="">--</option>
+        {HORAS.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}h</option>)}
+      </select>
+    </div>
+  )
+}
+
 function SearchSelect({ value, onChange, options, label, allLabel }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -368,6 +387,8 @@ function LeilaoDetalhado() {
   const [campanhas, setCampanhas] = useState([])
   const [dataInicio, setDataInicio] = useState(todayISO())
   const [dataFim, setDataFim] = useState(todayISO())
+  const [horaInicio, setHoraInicio] = useState('')
+  const [horaFim, setHoraFim] = useState('')
   const [campanha, setCampanha] = useState('')
 
   useEffect(() => {
@@ -383,7 +404,7 @@ function LeilaoDetalhado() {
     const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
     try {
       const [kpiData, falhaData, templateData] = await Promise.all([
-        callApi('hoje_kpis', { date_from, date_to, campanha }),
+        callApi('hoje_kpis', { date_from, date_to, campanha, hora_inicio: horaInicio, hora_fim: horaFim }),
         callApi('falha_por_minuto', { minutos: '60', campanha }),
         callApi('por_template_hoje', { date_from, date_to, campanha }),
       ])
@@ -401,7 +422,7 @@ function LeilaoDetalhado() {
     } finally {
       setLoading(false)
     }
-  }, [dataInicio, dataFim, campanha])
+  }, [dataInicio, dataFim, campanha, horaInicio, horaFim])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -420,7 +441,7 @@ function LeilaoDetalhado() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanha(''); setDataInicio(todayISO()); setDataFim(todayISO()) }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanha(''); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
@@ -433,6 +454,7 @@ function LeilaoDetalhado() {
         <CampanhaSearch value={campanha} onChange={setCampanha} options={campanhas} />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+      <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
@@ -552,6 +574,8 @@ function EntradasLP() {
   const [origem, setOrigem] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
+  const [horaInicio, setHoraInicio] = useState('')
+  const [horaFim, setHoraFim] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
@@ -563,7 +587,9 @@ function EntradasLP() {
     origem: origem || '',
     date_from: dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : '',
     date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : '',
-  }), [campanha, produto, origem, dataInicio, dataFim])
+    hora_inicio: horaInicio,
+    hora_fim: horaFim,
+  }), [campanha, produto, origem, dataInicio, dataFim, horaInicio, horaFim])
 
   useEffect(() => {
     callApi('produtos_filtros', {})
@@ -628,7 +654,7 @@ function EntradasLP() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanha(''); setProduto(''); setOrigem(''); setDataInicio(''); setDataFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanha(''); setProduto(''); setOrigem(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
@@ -646,6 +672,7 @@ function EntradasLP() {
         <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+      <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
@@ -1021,6 +1048,318 @@ function RankingOverlay({ onClose }) {
   )
 }
 
+const AUTH_STORAGE_KEY = 'disparos_dashboard_auth'
+const META_SEMANA = 100000
+
+function LoginGate({ onLogin }) {
+  const [senha, setSenha] = useState('')
+  const [erro, setErro] = useState('')
+  const [enviando, setEnviando] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!senha.trim()) return
+    setEnviando(true)
+    setErro('')
+    try {
+      const data = await postApi('auth_login', { senha: senha.trim() })
+      try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data)) } catch { /* ignora */ }
+      onLogin(data)
+    } catch (e2) {
+      setErro(e2.message || 'Senha incorreta.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="login-screen">
+      <form className="login-card" onSubmit={submit}>
+        <img src="/tiger-icon.svg" alt="" className="login-logo" />
+        <h2>Entrar</h2>
+        <input
+          type="password"
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
+          placeholder="Senha"
+          autoFocus
+        />
+        {erro && <p className="login-error">{erro}</p>}
+        <button type="submit" disabled={enviando}>{enviando ? 'Entrando...' : 'Entrar'}</button>
+      </form>
+    </div>
+  )
+}
+
+function MilestoneBadges({ semanas }) {
+  const batidas = (semanas || []).filter((s) => Number(s.valor_semana) >= META_SEMANA && s.passada)
+  const tamanhos = [14, 19, 24, 30]
+  return (
+    <div className="milestones">
+      {[1, 2, 3, 4].map((nivel) => {
+        const atingido = batidas.length >= nivel
+        return (
+          <div key={nivel} className={`milestone ${atingido ? 'hit' : ''}`}>
+            {atingido && <span className="milestone-burst" />}
+            <span className="milestone-label" style={{ fontSize: tamanhos[nivel - 1] }}>
+              N&iacute;vel {nivel}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function VendedoraPortal({ vendedor, onLogout }) {
+  const week = weekRange()
+  const [kpis, setKpis] = useState(null)
+  const [meta, setMeta] = useState(null)
+  const [semanas, setSemanas] = useState([])
+  const [tabela, setTabela] = useState({ rows: [], total: 0 })
+  const [page, setPage] = useState(0)
+  const [dataInicio, setDataInicio] = useState(week.from)
+  const [dataFim, setDataFim] = useState(week.to)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [lastUpdate, setLastUpdate] = useState(null)
+
+  const [showAdd, setShowAdd] = useState(false)
+  const [addForm, setAddForm] = useState({ adesao: '', cpf: '', nome: '', valor: '', banco: '' })
+  const [addMsg, setAddMsg] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  const { limit, offset } = useMemo(() => {
+    if (page === 0) return { limit: 10, offset: 0 }
+    if (page === 1) return { limit: 40, offset: 0 }
+    return { limit: 30, offset: 40 + (page - 2) * 30 }
+  }, [page])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const date_from = dataInicio || ''
+    const date_to = dataFim || ''
+    try {
+      const [kv, mt, sm, tab] = await Promise.all([
+        callApi('vendedoras_kpis_vendedor', { vendedor, date_from, date_to }),
+        callApi('vendedoras_meta', { vendedor }),
+        callApi('vendedoras_semanas_mes', { vendedor }),
+        callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }),
+      ])
+      setKpis(kv?.[0] ?? null)
+      setMeta(mt?.[0] ?? null)
+      setSemanas(sm ?? [])
+      setTabela({ rows: tab ?? [], total: tab?.[0]?.total_count ? Number(tab[0].total_count) : 0 })
+      setLastUpdate(new Date())
+    } catch (e) {
+      setError(e.message || 'Erro ao carregar dados.')
+    } finally {
+      setLoading(false)
+    }
+  }, [vendedor, dataInicio, dataFim, limit, offset])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const id = setInterval(load, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [load])
+
+  // monta os dois pontos do gráfico: realizado (acumulado, s\u00f3 semanas
+  // passadas) e proje\u00e7\u00e3o (linha tracejada da \u00faltima semana real at\u00e9 o
+  // total projetado, na \u00faltima semana do m\u00eas)
+  const chartData = useMemo(() => {
+    if (!semanas.length) return []
+    let acumulado = 0
+    const semanasPassadas = semanas.filter((s) => s.passada)
+    const ultimaPassada = semanasPassadas[semanasPassadas.length - 1]
+    const projecaoFinal = meta ? Number(meta.projecao_mes) : 0
+
+    return semanas.map((s) => {
+      const valor = Number(s.valor_semana) || 0
+      if (s.passada) acumulado += valor
+      const row = { semana: s.semana_label, meta: s.semana * META_SEMANA }
+      if (s.passada) {
+        row.realizado = acumulado
+      } else if (ultimaPassada) {
+        // interpola linearmente da \u00faltima semana real at\u00e9 a proje\u00e7\u00e3o final
+        const totalSemanas = semanas.length
+        const semanasRestantes = totalSemanas - ultimaPassada.semana
+        const passo = semanasRestantes > 0 ? (projecaoFinal - acumuladoAteUltima(semanas, ultimaPassada)) / semanasRestantes : 0
+        row.projecao = acumuladoAteUltima(semanas, ultimaPassada) + passo * (s.semana - ultimaPassada.semana)
+      }
+      return row
+    })
+  }, [semanas, meta])
+
+  function acumuladoAteUltima(lista, ultima) {
+    let soma = 0
+    for (const s of lista) {
+      if (s.semana <= ultima.semana) soma += Number(s.valor_semana) || 0
+    }
+    return soma
+  }
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    setAdding(true)
+    setAddMsg('')
+    try {
+      const result = await postApi('vendedoras_add_venda', {
+        vendedor,
+        adesao: addForm.adesao,
+        cpf: addForm.cpf,
+        nome: addForm.nome,
+        valor: addForm.valor.replace(',', '.'),
+        banco: addForm.banco,
+      })
+      const r = result?.[0]
+      if (r?.ok) {
+        setAddMsg('Venda adicionada. Sincronizando...')
+        setAddForm({ adesao: '', cpf: '', nome: '', valor: '', banco: '' })
+        await callApi('vendedoras_sync', {})
+        await load()
+        setAddMsg('Conclu\u00eddo!')
+        setTimeout(() => { setShowAdd(false); setAddMsg('') }, 1500)
+      } else {
+        setAddMsg(r?.mensagem || 'N\u00e3o foi poss\u00edvel adicionar.')
+      }
+    } catch (e2) {
+      setAddMsg('Erro: ' + (e2.message || ''))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const semanasBatidas = semanas.filter((s) => Number(s.valor_semana) >= META_SEMANA && s.passada)
+  const podeExpandir = page === 0 && tabela.total > 10
+  const podeProximaPagina = page >= 1 && offset + limit < tabela.total
+  const podePaginaAnterior = page >= 2
+
+  return (
+    <div className="app">
+      <div className="app-header">
+        <img src="/tiger-icon.svg" alt="" className="app-logo" />
+        <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
+        <button className="reset-btn" onClick={onLogout} title="Sair" style={{ marginLeft: 'auto' }}>Sair</button>
+      </div>
+
+      <div className="topbar">
+        <h1><span className="pulse" /> Minhas Vendas</h1>
+        <div className="topbar-right">
+          <span className="status-line">
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+          </span>
+          <button className="reset-btn" onClick={() => { setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
+            &#10226; Redefinir filtros
+          </button>
+          <button className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar ades\u00e3o">
+            + Adicionar ades\u00e3o
+          </button>
+          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+            &#8635; Atualizar
+          </button>
+        </div>
+      </div>
+
+      <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+
+      {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <div className="panel chart-panel">
+        <p className="section-label">Vendas por semana &mdash; meta e proje&ccedil;&atilde;o</p>
+        <p className="section-sub">meta de {fmtMoeda(META_SEMANA)}/semana &middot; linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s</p>
+        <ResponsiveContainer width="100%" height="72%">
+          <ComposedChart data={chartData}>
+            <XAxis dataKey="semana" tick={{ fontSize: 10, fill: '#8a978f' }} />
+            <YAxis tick={{ fontSize: 10, fill: '#8a978f' }} width={50} />
+            <Tooltip
+              contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
+              labelStyle={{ color: '#8a978f' }}
+              formatter={(value, name) => [fmtMoeda(value), name === 'realizado' ? 'Realizado' : name === 'projecao' ? 'Proje\u00e7\u00e3o' : 'Meta acumulada']}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }}
+              formatter={(v) => (v === 'realizado' ? 'Realizado' : v === 'projecao' ? 'Proje\u00e7\u00e3o' : 'Meta acumulada')}
+            />
+            <Line type="monotone" dataKey="meta" stroke="#5b6a63" strokeDasharray="2 4" strokeWidth={1.5} dot={false} />
+            <Line type="monotone" dataKey="realizado" stroke="#a9d97f" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+            <Line type="monotone" dataKey="projecao" stroke="#a9d97f" strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={{ r: 3, fillOpacity: 0.4 }} connectNulls />
+          </ComposedChart>
+        </ResponsiveContainer>
+        <MilestoneBadges semanas={semanas} />
+      </div>
+
+      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpis?.maior_venda)}</p></div>
+        <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.dia_mais_vendas ? fmtDataBR(kpis.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpis?.dia_mais_vendas_qtd)} vendas</p></div>
+        <div className="kpi"><p className="kpi-label">Valor total vendido</p><p className="kpi-value">{fmtMoeda(kpis?.valor_total)}</p></div>
+        <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpis?.qtd_total)}</p></div>
+      </div>
+      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Semanas com meta batida</p><p className="kpi-value">{fmtInt(semanasBatidas.length)}</p></div>
+        {semanasBatidas.slice(0, 3).map((s) => (
+          <div className="kpi" key={s.semana}><p className="kpi-label">Semana {s.semana_label}</p><p className="kpi-value" style={{ fontSize: 16 }}>{fmtMoeda(s.valor_semana)}</p></div>
+        ))}
+      </div>
+
+      <div className="panel table-panel">
+        <p className="section-label">Minhas vendas ({fmtInt(tabela.total)})</p>
+        <div className="template-row head" style={{ gridTemplateColumns: '1fr 1fr 1fr 0.8fr' }}>
+          <span>Valor</span><span>CPF</span><span>Banco</span><span>Data</span>
+        </div>
+        {tabela.rows.length === 0 && !loading && (
+          <div className="state-msg">Nenhuma venda encontrada para os filtros selecionados.</div>
+        )}
+        {tabela.rows.map((r, i) => (
+          <div className="template-row" key={i} style={{ gridTemplateColumns: '1fr 1fr 1fr 0.8fr' }}>
+            <span>{fmtMoeda(r.valor)}</span>
+            <span>{r.cpf}</span>
+            <span>{r.banco || '-'}</span>
+            <span>{fmtDataBR(r.dia)}</span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          {podeExpandir && (
+            <button className="expand-btn" onClick={() => setPage(1)}>Mostrar mais (+30)</button>
+          )}
+          {page >= 1 && (
+            <>
+              <button className="expand-btn" onClick={() => setPage(0)}>Recolher</button>
+              {podePaginaAnterior && (
+                <button className="expand-btn" onClick={() => setPage((p) => p - 1)}>&larr; P&aacute;gina anterior</button>
+              )}
+              {podeProximaPagina && (
+                <button className="expand-btn" onClick={() => setPage((p) => p + 1)}>Pr&oacute;xima p&aacute;gina &rarr;</button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {showAdd && (
+        <div className="funil-overlay" onClick={() => setShowAdd(false)}>
+          <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="funil-header">
+              <div><h2>Adicionar ades&atilde;o</h2></div>
+              <button className="funil-close" onClick={() => setShowAdd(false)}>&times;</button>
+            </div>
+            <form className="add-venda-form" onSubmit={handleAdd}>
+              <label>Ades&atilde;o<input required value={addForm.adesao} onChange={(e) => setAddForm({ ...addForm, adesao: e.target.value })} /></label>
+              <label>CPF<input required value={addForm.cpf} onChange={(e) => setAddForm({ ...addForm, cpf: e.target.value })} /></label>
+              <label>Nome<input required value={addForm.nome} onChange={(e) => setAddForm({ ...addForm, nome: e.target.value })} /></label>
+              <label>Valor<input required value={addForm.valor} onChange={(e) => setAddForm({ ...addForm, valor: e.target.value })} placeholder="0,00" /></label>
+              <label>Banco<input required value={addForm.banco} onChange={(e) => setAddForm({ ...addForm, banco: e.target.value })} /></label>
+              {addMsg && <p className="state-msg" style={{ margin: '4px 0' }}>{addMsg}</p>}
+              <button type="submit" className="refresh-btn" disabled={adding}>{adding ? 'Enviando...' : 'Adicionar'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function VendedorasView() {
   const week = weekRange()
   const [vendedores, setVendedores] = useState([])
@@ -1307,6 +1646,8 @@ function VisaoGeral() {
   const [meta, setMeta] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
+  const [horaInicio, setHoraInicio] = useState('')
+  const [horaFim, setHoraFim] = useState('')
   const [showFunil, setShowFunil] = useState(false)
 
   const [kpis, setKpis] = useState(null)
@@ -1325,7 +1666,9 @@ function VisaoGeral() {
     meta: meta || '',
     date_from: dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : '',
     date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : '',
-  }), [campanha, origem, meta, dataInicio, dataFim])
+    hora_inicio: horaInicio,
+    hora_fim: horaFim,
+  }), [campanha, origem, meta, dataInicio, dataFim, horaInicio, horaFim])
 
   const loadFiltros = useCallback(async () => {
     try {
@@ -1390,7 +1733,7 @@ function VisaoGeral() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setDataInicio(''); setDataFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={loadDados} disabled={loading} title="Atualizar agora">
@@ -1417,6 +1760,7 @@ function VisaoGeral() {
         </select>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+      <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
@@ -1472,7 +1816,7 @@ function VisaoGeral() {
 
 const VIEW_STORAGE_KEY = 'disparos_dashboard_view'
 
-export default function App() {
+function Dashboard() {
   const [view, setView] = useState(() => {
     try {
       return localStorage.getItem(VIEW_STORAGE_KEY) || 'geral'
@@ -1499,4 +1843,24 @@ export default function App() {
       {view === 'vendedoras' && <VendedorasView />}
     </div>
   )
+}
+
+export default function App() {
+  const [auth, setAuth] = useState(() => {
+    try {
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  })
+
+  const logout = () => {
+    try { localStorage.removeItem(AUTH_STORAGE_KEY) } catch { /* ignora */ }
+    setAuth(null)
+  }
+
+  if (!auth) return <LoginGate onLogin={setAuth} />
+  if (auth.role === 'vendedora') return <VendedoraPortal vendedor={auth.vendedor} onLogout={logout} />
+  return <Dashboard />
 }
