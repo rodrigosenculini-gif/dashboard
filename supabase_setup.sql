@@ -1405,7 +1405,7 @@ declare
 begin
   if p_vendedor is null or p_adesao is null or p_cpf is null or p_nome is null
      or p_valor is null or p_banco is null or trim(p_cpf) = '' or trim(p_nome) = '' or trim(p_banco) = '' then
-    return query select false, 'Preencha ades\u00e3o, cpf, nome, valor e banco.';
+    return query select false, 'Preencha adesão, cpf, nome, valor e banco.';
     return;
   end if;
 
@@ -1415,7 +1415,7 @@ begin
     select 1 from vendedoras_analise
     where norm_cpf(cpf) = v_cpf and coalesce(adesao, -1) = p_adesao
   ) then
-    return query select false, 'J\u00e1 existe uma venda com esse CPF e ades\u00e3o.';
+    return query select false, 'Já existe uma venda com esse CPF e adesão.';
     return;
   end if;
 
