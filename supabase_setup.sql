@@ -1054,6 +1054,8 @@ $$;
 -- KPIs de um vendedor específico
 drop function if exists dashboard_vendedoras_kpis_vendedor(text, timestamptz, timestamptz);
 
+drop function if exists dashboard_vendedoras_kpis_vendedor(text, date, date);
+
 create or replace function dashboard_vendedoras_kpis_vendedor(
   p_vendedor text,
   p_date_from date default null,
@@ -1064,7 +1066,9 @@ returns table (
   dia_mais_vendas date,
   dia_mais_vendas_qtd bigint,
   valor_total numeric,
-  qtd_total bigint
+  qtd_total bigint,
+  banco_top text,
+  banco_top_qtd bigint
 )
 language sql
 security definer
@@ -1072,7 +1076,7 @@ set search_path = public
 stable
 as $$
   with base as (
-    select valor, data_status as dia
+    select valor, banco, data_status as dia
     from vendedoras_analise
     where vendedor = p_vendedor
       and (p_date_from is null or data_status >= p_date_from)
@@ -1080,13 +1084,18 @@ as $$
   ),
   por_dia as (
     select dia, count(*) as qtd from base where dia is not null group by dia
+  ),
+  por_banco as (
+    select banco, count(*) as qtd from base where banco is not null group by banco
   )
   select
     (select coalesce(max(valor), 0) from base),
     (select dia from por_dia order by qtd desc limit 1),
     (select qtd from por_dia order by qtd desc limit 1),
     (select coalesce(sum(valor), 0) from base),
-    (select count(*) from base);
+    (select count(*) from base),
+    (select banco from por_banco order by qtd desc limit 1),
+    (select qtd from por_banco order by qtd desc limit 1);
 $$;
 
 -- Vendas por dia e por vendedora (gráfico) — formato longo
@@ -1367,7 +1376,7 @@ as $$
       semana_inicio,
       least(semana_inicio + 6, (select fim from mes)) as semana_fim
     from (
-      select distinct (date_trunc('week', dia))::date as semana_inicio
+      select distinct greatest((date_trunc('week', dia))::date, (select inicio from mes)) as semana_inicio
       from generate_series((select inicio from mes), (select fim from mes), interval '1 day') dia
     ) s
   )
