@@ -41,7 +41,9 @@ create or replace function dashboard_kpis(
   p_origem text default null,
   p_meta text default null,
   p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_to timestamptz default null,
+  p_hora_inicio int default null,
+  p_hora_fim int default null
 )
 returns table (
   total_leads bigint,
@@ -69,6 +71,8 @@ as $$
       and (p_meta is null or meta = p_meta)
       and (p_date_from is null or realizado >= p_date_from)
       and (p_date_to is null or realizado <= p_date_to)
+      and (p_hora_inicio is null or extract(hour from realizado at time zone 'America/Sao_Paulo') >= p_hora_inicio)
+      and (p_hora_fim is null or extract(hour from realizado at time zone 'America/Sao_Paulo') <= p_hora_fim)
   ),
   agg as (
     select
@@ -118,7 +122,9 @@ create or replace function dashboard_envios_por_dia(
   p_origem text default null,
   p_meta text default null,
   p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_to timestamptz default null,
+  p_hora_inicio int default null,
+  p_hora_fim int default null
 )
 returns table (
   dia date,
@@ -139,6 +145,8 @@ as $$
       and (p_meta is null or meta = p_meta)
       and (p_date_from is null or realizado >= p_date_from)
       and (p_date_to is null or realizado <= p_date_to)
+      and (p_hora_inicio is null or extract(hour from realizado at time zone 'America/Sao_Paulo') >= p_hora_inicio)
+      and (p_hora_fim is null or extract(hour from realizado at time zone 'America/Sao_Paulo') <= p_hora_fim)
     group by 1
   ),
   reenvios_dia as (
@@ -149,6 +157,8 @@ as $$
       and (p_origem is null or origem = p_origem)
       and (p_meta is null or meta = p_meta)
       and (p_date_from is null or reenvio >= p_date_from)
+      and (p_hora_inicio is null or extract(hour from reenvio at time zone 'America/Sao_Paulo') >= p_hora_inicio)
+      and (p_hora_fim is null or extract(hour from reenvio at time zone 'America/Sao_Paulo') <= p_hora_fim)
       and (p_date_to is null or reenvio <= p_date_to)
     group by 1
   )
@@ -308,10 +318,14 @@ $$;
 -- p_date_from/p_date_to (opcionais) definem o intervalo; padrão é hoje (Brasília).
 drop function if exists dashboard_hoje_kpis(date, text);
 
+drop function if exists dashboard_hoje_kpis(timestamptz, timestamptz, text);
+
 create or replace function dashboard_hoje_kpis(
   p_date_from timestamptz default null,
   p_date_to timestamptz default null,
-  p_campanha text default null
+  p_campanha text default null,
+  p_hora_inicio int default null,
+  p_hora_fim int default null
 )
 returns table (
   mensagens_hoje bigint,
@@ -341,6 +355,11 @@ as $$
         or (d.reenvio is not null and d.reenvio between alvo.de and alvo.ate)
         or (d.status_atualizado is not null
           and d.status_atualizado between alvo.de and alvo.ate)
+      )
+      and (
+        p_hora_inicio is null and p_hora_fim is null
+        or extract(hour from coalesce(d.reenvio, d.realizado, d.status_atualizado) at time zone 'America/Sao_Paulo')
+           between coalesce(p_hora_inicio, 0) and coalesce(p_hora_fim, 23)
       )
   ),
   agg as (
@@ -456,12 +475,16 @@ $$;
 -- =========================================================
 
 -- 8) KPIs da visão Entradas LP
+drop function if exists dashboard_produtos_kpis(text, text, text, timestamptz, timestamptz);
+
 create or replace function dashboard_produtos_kpis(
   p_campanha text default null,
   p_produto text default null,
   p_origem text default null,
   p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_to timestamptz default null,
+  p_hora_inicio int default null,
+  p_hora_fim int default null
 )
 returns table (
   total bigint,
@@ -488,6 +511,8 @@ as $$
       and (p_origem is null or origem = p_origem)
       and (p_date_from is null or created_at >= p_date_from)
       and (p_date_to is null or created_at <= p_date_to)
+      and (p_hora_inicio is null or extract(hour from created_at at time zone 'America/Sao_Paulo') >= p_hora_inicio)
+      and (p_hora_fim is null or extract(hour from created_at at time zone 'America/Sao_Paulo') <= p_hora_fim)
   ),
   agg as (
     select
@@ -514,12 +539,16 @@ as $$
 $$;
 
 -- 9) Entradas por dia e produto (formato longo — o front-end pivota pra empilhar)
+drop function if exists dashboard_produtos_entradas_por_dia(text, text, text, timestamptz, timestamptz);
+
 create or replace function dashboard_produtos_entradas_por_dia(
   p_campanha text default null,
   p_produto text default null,
   p_origem text default null,
   p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_to timestamptz default null,
+  p_hora_inicio int default null,
+  p_hora_fim int default null
 )
 returns table (
   dia date,
@@ -540,6 +569,8 @@ as $$
     and (p_campanha is null or campanha = p_campanha)
     and (p_produto is null or produto = p_produto)
     and (p_origem is null or origem = p_origem)
+    and (p_hora_inicio is null or extract(hour from created_at at time zone 'America/Sao_Paulo') >= p_hora_inicio)
+    and (p_hora_fim is null or extract(hour from created_at at time zone 'America/Sao_Paulo') <= p_hora_fim)
     and (p_date_from is null or created_at >= p_date_from)
     and (p_date_to is null or created_at <= p_date_to)
   group by 1, 2
@@ -1239,3 +1270,162 @@ grant execute on function dashboard_vendedoras_por_dia to anon;
 grant execute on function dashboard_vendedoras_ranking to anon;
 grant execute on function dashboard_vendedoras_tabela to anon;
 grant execute on function dashboard_vendedoras_filtros to anon;
+
+-- =========================================================
+-- META / PROJEÇÃO / ADIÇÃO DE VENDA (portal da vendedora)
+-- =========================================================
+
+-- Resumo do mês corrente: total feito, dias úteis passados/do mês,
+-- projeção (regra de três simples: total ÷ dias úteis passados × dias úteis
+-- do mês inteiro) e o valor da semana atual (meta de R$100.000/semana).
+-- "Dia útil" aqui = segunda a sexta (não desconta feriados).
+create or replace function dashboard_vendedoras_meta(p_vendedor text)
+returns table (
+  total_mes_atual numeric,
+  dias_uteis_passados int,
+  dias_uteis_mes int,
+  projecao_mes numeric,
+  semana_atual_valor numeric,
+  meta_semana numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with hoje as (
+    select (now() at time zone 'America/Sao_Paulo')::date as d
+  ),
+  mes as (
+    select
+      date_trunc('month', d)::date as inicio,
+      (date_trunc('month', d) + interval '1 month - 1 day')::date as fim
+    from hoje
+  ),
+  du_passados as (
+    select count(*) as n
+    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+    where extract(isodow from g.dia) < 6
+  ),
+  du_mes as (
+    select count(*) as n
+    from generate_series((select inicio from mes), (select fim from mes), interval '1 day') g(dia)
+    where extract(isodow from g.dia) < 6
+  ),
+  total_mes as (
+    select coalesce(sum(valor), 0) as v
+    from vendedoras_analise, mes, hoje
+    where vendedor = p_vendedor
+      and data_status >= mes.inicio
+      and data_status <= hoje.d
+  ),
+  semana_atual as (
+    select coalesce(sum(valor), 0) as v
+    from vendedoras_analise, hoje
+    where vendedor = p_vendedor
+      and data_status >= (hoje.d - (extract(isodow from hoje.d)::int - 1))
+      and data_status <= hoje.d
+  )
+  select
+    (select v from total_mes),
+    (select n from du_passados),
+    (select n from du_mes),
+    case when (select n from du_passados) > 0
+      then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end,
+    (select v from semana_atual),
+    100000;
+$$;
+
+-- Vendas por semana do mês corrente (cada semana = segunda a domingo).
+-- "passada" indica se a semana já terminou (usado pro front-end saber o que
+-- é real e o que é projeção/transparente no gráfico).
+create or replace function dashboard_vendedoras_semanas_mes(p_vendedor text)
+returns table (
+  semana int,
+  semana_label text,
+  inicio date,
+  fim date,
+  valor_semana numeric,
+  passada boolean
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with hoje as (select (now() at time zone 'America/Sao_Paulo')::date as d),
+  mes as (
+    select
+      date_trunc('month', d)::date as inicio,
+      (date_trunc('month', d) + interval '1 month - 1 day')::date as fim
+    from hoje
+  ),
+  semanas as (
+    select
+      row_number() over (order by semana_inicio) as semana,
+      semana_inicio,
+      least(semana_inicio + 6, (select fim from mes)) as semana_fim
+    from (
+      select distinct (date_trunc('week', dia))::date as semana_inicio
+      from generate_series((select inicio from mes), (select fim from mes), interval '1 day') dia
+    ) s
+  )
+  select
+    s.semana::int,
+    to_char(s.semana_inicio, 'DD/MM') || '-' || to_char(s.semana_fim, 'DD/MM'),
+    s.semana_inicio,
+    s.semana_fim,
+    coalesce((
+      select sum(v.valor) from vendedoras_analise v
+      where v.vendedor = p_vendedor and v.data_status between s.semana_inicio and s.semana_fim
+    ), 0),
+    (s.semana_fim <= (select d from hoje))
+  from semanas s
+  order by s.semana;
+$$;
+
+-- Adicionar uma venda avulsa (portal da vendedora). data_status e vendedor
+-- são sempre definidos automaticamente pelo servidor — nunca pelo cliente.
+create or replace function dashboard_vendedoras_add_venda(
+  p_vendedor text,
+  p_adesao bigint,
+  p_cpf text,
+  p_nome text,
+  p_valor numeric,
+  p_banco text
+)
+returns table (ok boolean, mensagem text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_cpf text;
+begin
+  if p_vendedor is null or p_adesao is null or p_cpf is null or p_nome is null
+     or p_valor is null or p_banco is null or trim(p_cpf) = '' or trim(p_nome) = '' or trim(p_banco) = '' then
+    return query select false, 'Preencha ades\u00e3o, cpf, nome, valor e banco.';
+    return;
+  end if;
+
+  v_cpf := norm_cpf(p_cpf);
+
+  if exists (
+    select 1 from vendedoras_analise
+    where norm_cpf(cpf) = v_cpf and coalesce(adesao, -1) = p_adesao
+  ) then
+    return query select false, 'J\u00e1 existe uma venda com esse CPF e ades\u00e3o.';
+    return;
+  end if;
+
+  insert into vendedoras_analise (data_status, banco, adesao, cpf, nome, vendedor, valor)
+  values ((now() at time zone 'America/Sao_Paulo')::date, p_banco, p_adesao, v_cpf, p_nome, p_vendedor, p_valor);
+
+  return query select true, 'Venda adicionada com sucesso.';
+end;
+$$;
+
+grant execute on function dashboard_vendedoras_meta to anon;
+grant execute on function dashboard_vendedoras_semanas_mes to anon;
+grant execute on function dashboard_vendedoras_add_venda to anon;
