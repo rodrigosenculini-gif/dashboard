@@ -1178,40 +1178,45 @@ function VendedoraPortal({ vendedor, onLogout }) {
   // total projetado, na \u00faltima semana do m\u00eas)
   const chartData = useMemo(() => {
     if (!semanas.length) return []
+    const hoje = todayISO()
     let acumulado = 0
     let marcosBatidos = 0
-    const semanasPassadas = semanas.filter((s) => s.passada)
-    const ultimaPassada = semanasPassadas[semanasPassadas.length - 1]
+    // "iniciada" = a semana j\u00e1 come\u00e7ou (mesmo que ainda n\u00e3o tenha terminado)
+    // \u2014 o valor_semana dela j\u00e1 reflete s\u00f3 os dias que realmente aconteceram,
+    // ent\u00e3o conta como realizado at\u00e9 agora, n\u00e3o como proje\u00e7\u00e3o
+    const semanasIniciadas = semanas.filter((s) => s.inicio.slice(0, 10) <= hoje)
+    const ultimaIniciada = semanasIniciadas[semanasIniciadas.length - 1]
     const projecaoFinal = meta ? Number(meta.projecao_mes) : 0
 
     return semanas.map((s) => {
       const valor = Number(s.valor_semana) || 0
-      if (s.passada) acumulado += valor
+      const iniciada = s.inicio.slice(0, 10) <= hoje
+      if (iniciada) acumulado += valor
       const row = { semana: s.semana_label }
       let nivel = null
       if (valor >= META_SEMANA && s.passada && marcosBatidos < 4) {
         marcosBatidos += 1
         nivel = marcosBatidos
       }
-      if (s.passada) {
+      if (iniciada) {
         row.realizado = acumulado
         row.nivel = nivel
         // ponto de conex\u00e3o: a \u00faltima semana real tamb\u00e9m entra na s\u00e9rie de
         // proje\u00e7\u00e3o, pra linha ficar visualmente cont\u00ednua (sem quebra)
-        if (s.semana === ultimaPassada?.semana) row.projecao = acumulado
-      } else if (ultimaPassada) {
+        if (s.semana === ultimaIniciada?.semana) row.projecao = acumulado
+      } else if (ultimaIniciada) {
         // interpola linearmente da \u00faltima semana real at\u00e9 a proje\u00e7\u00e3o final
         // (valor absoluto, nunca somado por cima do realizado)
         const totalSemanas = semanas.length
-        const semanasRestantes = totalSemanas - ultimaPassada.semana
-        const passo = semanasRestantes > 0 ? (projecaoFinal - acumuladoAteUltima(semanas, ultimaPassada)) / semanasRestantes : 0
-        row.projecao = acumuladoAteUltima(semanas, ultimaPassada) + passo * (s.semana - ultimaPassada.semana)
+        const semanasRestantes = totalSemanas - ultimaIniciada.semana
+        const passo = semanasRestantes > 0 ? (projecaoFinal - acumuladoAteUltima(semanas, ultimaIniciada, hoje)) / semanasRestantes : 0
+        row.projecao = acumuladoAteUltima(semanas, ultimaIniciada, hoje) + passo * (s.semana - ultimaIniciada.semana)
       }
       return row
     })
   }, [semanas, meta])
 
-  function acumuladoAteUltima(lista, ultima) {
+  function acumuladoAteUltima(lista, ultima, hoje) {
     let soma = 0
     for (const s of lista) {
       if (s.semana <= ultima.semana) soma += Number(s.valor_semana) || 0
