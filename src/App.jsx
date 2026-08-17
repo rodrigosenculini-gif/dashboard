@@ -1091,23 +1091,31 @@ function LoginGate({ onLogin }) {
   )
 }
 
-function MilestoneBadges({ semanas }) {
-  const batidas = (semanas || []).filter((s) => Number(s.valor_semana) >= META_SEMANA && s.passada)
-  const tamanhos = [14, 19, 24, 30]
+function MilestoneDot(props) {
+  const { cx, cy, payload } = props
+  if (cx == null || cy == null) return null
+  if (!payload?.nivel) {
+    // ponto normal, sem marco
+    return <circle cx={cx} cy={cy} r={4} fill="#a9d97f" stroke="none" />
+  }
+  const tamanhos = [13, 17, 21, 26]
+  const nivel = payload.nivel
   return (
-    <div className="milestones">
-      {[1, 2, 3, 4].map((nivel) => {
-        const atingido = batidas.length >= nivel
-        return (
-          <div key={nivel} className={`milestone ${atingido ? 'hit' : ''}`}>
-            {atingido && <span className="milestone-burst" />}
-            <span className="milestone-label" style={{ fontSize: tamanhos[nivel - 1] }}>
-              N&iacute;vel {nivel}
-            </span>
-          </div>
-        )
-      })}
-    </div>
+    <g>
+      <circle className="milestone-burst-svg" cx={cx} cy={cy} r={4} fill="none" />
+      <circle cx={cx} cy={cy} r={5} fill="#d9b877" stroke="#16211b" strokeWidth={1.5} />
+      <text
+        x={cx}
+        y={cy - 14}
+        textAnchor="middle"
+        fontSize={tamanhos[Math.min(nivel, 4) - 1]}
+        fontWeight={600}
+        fill="#d9b877"
+        fontFamily="IBM Plex Mono, monospace"
+      >
+        N&iacute;vel {nivel}
+      </text>
+    </g>
   )
 }
 
@@ -1171,6 +1179,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const chartData = useMemo(() => {
     if (!semanas.length) return []
     let acumulado = 0
+    let marcosBatidos = 0
     const semanasPassadas = semanas.filter((s) => s.passada)
     const ultimaPassada = semanasPassadas[semanasPassadas.length - 1]
     const projecaoFinal = meta ? Number(meta.projecao_mes) : 0
@@ -1178,11 +1187,21 @@ function VendedoraPortal({ vendedor, onLogout }) {
     return semanas.map((s) => {
       const valor = Number(s.valor_semana) || 0
       if (s.passada) acumulado += valor
-      const row = { semana: s.semana_label, meta: s.semana * META_SEMANA }
+      const row = { semana: s.semana_label }
+      let nivel = null
+      if (valor >= META_SEMANA && s.passada && marcosBatidos < 4) {
+        marcosBatidos += 1
+        nivel = marcosBatidos
+      }
       if (s.passada) {
         row.realizado = acumulado
+        row.nivel = nivel
+        // ponto de conex\u00e3o: a \u00faltima semana real tamb\u00e9m entra na s\u00e9rie de
+        // proje\u00e7\u00e3o, pra linha ficar visualmente cont\u00ednua (sem quebra)
+        if (s.semana === ultimaPassada?.semana) row.projecao = acumulado
       } else if (ultimaPassada) {
         // interpola linearmente da \u00faltima semana real at\u00e9 a proje\u00e7\u00e3o final
+        // (valor absoluto, nunca somado por cima do realizado)
         const totalSemanas = semanas.length
         const semanasRestantes = totalSemanas - ultimaPassada.semana
         const passo = semanasRestantes > 0 ? (projecaoFinal - acumuladoAteUltima(semanas, ultimaPassada)) / semanasRestantes : 0
@@ -1266,34 +1285,32 @@ function VendedoraPortal({ vendedor, onLogout }) {
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
-      <div className="panel chart-panel extra-tall">
+      <div className="panel chart-panel tall">
         <p className="section-label">Vendas por semana &mdash; meta e proje&ccedil;&atilde;o</p>
         <p className="section-sub">meta de {fmtMoeda(META_SEMANA)}/semana &middot; linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s</p>
         <ResponsiveContainer width="100%" height="65%">
-          <ComposedChart data={chartData}>
+          <ComposedChart data={chartData} margin={{ top: 26, right: 10, left: 0, bottom: 0 }}>
             <XAxis dataKey="semana" tick={{ fontSize: 10, fill: '#8a978f' }} />
             <YAxis tick={{ fontSize: 10, fill: '#8a978f' }} width={50} />
             <Tooltip
               contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
               labelStyle={{ color: '#8a978f' }}
-              formatter={(value, name) => [fmtMoeda(value), name === 'realizado' ? 'Realizado' : name === 'projecao' ? 'Proje\u00e7\u00e3o' : 'Meta acumulada']}
+              formatter={(value, name) => [fmtMoeda(value), name === 'realizado' ? 'Realizado' : 'Proje\u00e7\u00e3o']}
             />
-            <Legend
-              wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }}
-              formatter={(v) => (v === 'realizado' ? 'Realizado' : v === 'projecao' ? 'Proje\u00e7\u00e3o' : 'Meta acumulada')}
-            />
-            <Line type="monotone" dataKey="meta" stroke="#5b6a63" strokeDasharray="2 4" strokeWidth={1.5} dot={false} />
-            <Line type="monotone" dataKey="realizado" stroke="#a9d97f" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
-            <Line type="monotone" dataKey="projecao" stroke="#a9d97f" strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={{ r: 3, fillOpacity: 0.4 }} connectNulls />
+            <Line type="monotone" dataKey="realizado" stroke="#a9d97f" strokeWidth={2.5} dot={<MilestoneDot />} connectNulls />
+            <Line type="monotone" dataKey="projecao" stroke="#a9d97f" strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={{ r: 3, fillOpacity: 0.4, fill: '#a9d97f' }} connectNulls legendType="none" />
           </ComposedChart>
         </ResponsiveContainer>
-        <MilestoneBadges semanas={semanas} />
       </div>
 
       <div className="kpi-grid kpi-grid-3">
         <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpis?.maior_venda)}</p></div>
         <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.dia_mais_vendas ? fmtDataBR(kpis.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpis?.dia_mais_vendas_qtd)} vendas</p></div>
-        <div className="kpi"><p className="kpi-label">Valor total vendido</p><p className="kpi-value">{fmtMoeda(kpis?.valor_total)}</p></div>
+        <div className="kpi">
+          <p className="kpi-label">Valor total vendido</p>
+          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(meta?.projecao_mes)}</span></p>
+          <p className="kpi-sub">realizado | proje&ccedil;&atilde;o do m&ecirc;s</p>
+        </div>
         <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpis?.qtd_total)}</p></div>
         <div className="kpi"><p className="kpi-label">Banco mais vendido</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpis?.banco_top_qtd)} vendas</p></div>
         <div className="kpi"><p className="kpi-label">Semanas com meta batida</p><p className="kpi-value">{fmtInt(semanasBatidas.length)}</p></div>
