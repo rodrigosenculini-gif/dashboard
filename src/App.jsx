@@ -1764,6 +1764,7 @@ function VendasView() {
   const mesAtual = presetRange('este_mes')
   const [dataInicio, setDataInicio] = useState(mesAtual.from)
   const [dataFim, setDataFim] = useState(mesAtual.to)
+  const [produto, setProduto] = useState('')
 
   const [kpis, setKpis] = useState(null)
   const [porProduto, setPorProduto] = useState([])
@@ -1785,11 +1786,11 @@ function VendasView() {
     setError(null)
     try {
       const [kp, pp, dm, pc, po] = await Promise.all([
-        callApi('vendas_kpis', { date_from: dataInicio, date_to: dataFim }),
+        callApi('vendas_kpis', { date_from: dataInicio, date_to: dataFim, produto }),
         callApi('vendas_por_produto', { date_from: dataInicio, date_to: dataFim }),
-        callApi('vendas_dias_mes', {}),
-        callApi('vendas_por_campanha', { date_from: dataInicio, date_to: dataFim }),
-        callApi('vendas_por_origem', { date_from: dataInicio, date_to: dataFim }),
+        callApi('vendas_dias_mes', { produto }),
+        callApi('vendas_por_campanha', { date_from: dataInicio, date_to: dataFim, produto }),
+        callApi('vendas_por_origem', { date_from: dataInicio, date_to: dataFim, produto }),
       ])
       setKpis(kp?.[0] ?? null)
       setPorProduto(pp ?? [])
@@ -1802,7 +1803,7 @@ function VendasView() {
     } finally {
       setLoading(false)
     }
-  }, [dataInicio, dataFim])
+  }, [dataInicio, dataFim, produto])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -1855,6 +1856,14 @@ function VendasView() {
       return row
     })
   }, [diasMes, kpis])
+
+  // cor do gr\u00e1fico e dos KPIs muda de acordo com o produto selecionado no
+  // filtro (mesma cor do card daquele produto); sem filtro, usa o verde padr\u00e3o
+  const corAtual = useMemo(() => {
+    if (!produto) return '#a9d97f'
+    const idx = porProduto.findIndex((p) => p.produto === produto)
+    return idx >= 0 ? VENDAS_CORES[idx % VENDAS_CORES.length] : '#a9d97f'
+  }, [produto, porProduto])
 
   const handleSync = async () => {
     setSyncing(true)
@@ -1915,7 +1924,7 @@ function VendasView() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to) }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setProduto('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
@@ -1937,6 +1946,9 @@ function VendasView() {
       {importMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{importMsg}</div>}
       {syncMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{syncMsg}</div>}
 
+      <div className="filters">
+        <SearchSelect value={produto} onChange={setProduto} options={porProduto.map((p) => p.produto)} label="produto" allLabel="produto — todos" />
+      </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
@@ -1949,8 +1961,8 @@ function VendasView() {
             <XAxis dataKey="dia" tick={{ fontSize: 9, fill: '#8a978f' }} interval={2} />
             <YAxis tick={{ fontSize: 10, fill: '#8a978f' }} width={50} />
             <Tooltip content={<ChartTooltip />} />
-            <Line type="monotone" dataKey="realizado" stroke="#a9d97f" strokeWidth={2.5} dot={false} connectNulls />
-            <Line type="monotone" dataKey="projecao" stroke="#a9d97f" strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={false} connectNulls legendType="none" />
+            <Line type="monotone" dataKey="realizado" stroke={corAtual} strokeWidth={2.5} dot={false} connectNulls />
+            <Line type="monotone" dataKey="projecao" stroke={corAtual} strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={false} connectNulls legendType="none" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -1961,8 +1973,8 @@ function VendasView() {
           <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(kpis?.qtd_total)}</span></p>
         </div>
         <div className="kpi">
-          <p className="kpi-label">Soma de Valor | Proje&ccedil;&atilde;o do m&ecirc;s</p>
-          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_hoje)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_mes)}</span></p>
+          <p className="kpi-label">Proje&ccedil;&atilde;o do m&ecirc;s</p>
+          <p className="kpi-value" style={{ color: corAtual }}>{fmtMoeda(kpis?.projecao_mes)}</p>
         </div>
         <div className="kpi">
           <p className="kpi-label">Soma de pontos | Proje&ccedil;&atilde;o</p>
@@ -1972,10 +1984,17 @@ function VendasView() {
 
       <div className="kpi-grid">
         {porProduto.map((p, i) => (
-          <div className="kpi" key={p.produto}>
+          <div
+            className="kpi"
+            key={p.produto}
+            onClick={() => setProduto(produto === p.produto ? '' : p.produto)}
+            style={{ cursor: 'pointer', outline: produto === p.produto ? `1px solid ${VENDAS_CORES[i % VENDAS_CORES.length]}` : 'none' }}
+            title="Clique para filtrar por esse produto"
+          >
             <p className="kpi-label">{p.produto}</p>
             <p className="kpi-value" style={{ color: VENDAS_CORES[i % VENDAS_CORES.length] }}>{fmtMoeda(p.valor_total)}</p>
             <p className="kpi-sub">{fmtInt(p.qtd_total)} vendas &middot; {fmtInt(Math.round(p.pontos_total))} pontos</p>
+            <p className="kpi-sub">proje&ccedil;&atilde;o: {fmtMoeda(p.projecao_mes)}</p>
           </div>
         ))}
       </div>
