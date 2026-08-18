@@ -2243,6 +2243,18 @@ function Dashboard() {
   )
 }
 
+function SingleViewPortal({ children, onLogout }) {
+  return (
+    <div className="app">
+      <div className="app-header">
+        <img src="/tiger-icon.png" alt="" className="app-logo" />
+        <button className="reset-btn" onClick={onLogout} title="Sair" style={{ marginLeft: 'auto' }}>Sair</button>
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export default function App() {
   const [auth, setAuth] = useState(() => {
     try {
@@ -2260,5 +2272,6 @@ export default function App() {
 
   if (!auth) return <LoginGate onLogin={setAuth} />
   if (auth.role === 'vendedora') return <VendedoraPortal vendedor={auth.vendedor} onLogout={logout} />
+  if (auth.role === 'entradas_lp') return <SingleViewPortal onLogout={logout}><EntradasLP /></SingleViewPortal>
   return <Dashboard />
 }
