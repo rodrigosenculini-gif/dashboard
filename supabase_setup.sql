@@ -1864,6 +1864,8 @@ $$;
 -- KPIs gerais: valor/qtd total do período + projeção do dia (valor de hoje)
 -- e projeção geral (regra de três: total do mês ÷ dias úteis passados ×
 -- dias úteis do mês inteiro — mesma fórmula do portal da vendedora)
+drop function if exists dashboard_vendas_kpis(date, date);
+
 create or replace function dashboard_vendas_kpis(
   p_date_from date default null,
   p_date_to date default null
@@ -1872,7 +1874,8 @@ returns table (
   valor_total numeric,
   qtd_total bigint,
   valor_hoje numeric,
-  projecao_mes numeric
+  projecao_mes numeric,
+  pontos_total numeric
 )
 language sql
 security definer
@@ -1884,7 +1887,7 @@ as $$
     select date_trunc('month', d)::date as inicio from hoje
   ),
   periodo as (
-    select coalesce(sum(valor), 0) as valor_total, count(*) as qtd_total
+    select coalesce(sum(valor), 0) as valor_total, count(*) as qtd_total, coalesce(sum(ponto), 0) as pontos_total
     from vendas_gerais
     where (p_date_from is null or data >= p_date_from)
       and (p_date_to is null or data <= p_date_to)
@@ -1913,7 +1916,8 @@ as $$
     (select v from hoje_valor),
     case when (select n from du_passados) > 0
       then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
-      else 0 end;
+      else 0 end,
+    (select pontos_total from periodo);
 $$;
 
 -- KPI por produto (dinâmico — um card por produto existente)
@@ -2010,15 +2014,16 @@ set search_path = public
 stable
 as $$
   select
-    coalesce(campanha, '(sem campanha)'),
+    campanha,
     count(*),
     coalesce(sum(valor), 0)
   from vendas_gerais
-  where (p_date_from is null or data >= p_date_from)
+  where campanha is not null
+    and (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
   group by campanha
   order by coalesce(sum(valor), 0) desc
-  limit 60;
+  limit 300;
 $$;
 
 -- Tabela detalhada por origem (vem do cruzamento com disparochat/total_produtos)
@@ -2037,15 +2042,16 @@ set search_path = public
 stable
 as $$
   select
-    coalesce(origem, '(sem origem)'),
+    origem,
     count(*),
     coalesce(sum(valor), 0)
   from vendas_gerais
-  where (p_date_from is null or data >= p_date_from)
+  where origem is not null
+    and (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
   group by origem
   order by coalesce(sum(valor), 0) desc
-  limit 60;
+  limit 300;
 $$;
 
 grant execute on function dashboard_vendas_import to anon;
