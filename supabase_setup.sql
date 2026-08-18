@@ -2017,7 +2017,7 @@ as $$
   where (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
   group by campanha
-  order by valor desc
+  order by coalesce(sum(valor), 0) desc
   limit 60;
 $$;
 
@@ -2044,7 +2044,7 @@ as $$
   where (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
   group by origem
-  order by valor desc
+  order by coalesce(sum(valor), 0) desc
   limit 60;
 $$;
 
