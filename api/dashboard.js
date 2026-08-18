@@ -53,6 +53,7 @@ const SENHAS = {
   '123567': { role: 'vendedora', vendedor: 'KAYANE BASQUE' },
   '123789': { role: 'vendedora', vendedor: 'Leticia.Splendore' },
   '123908': { role: 'vendedora', vendedor: 'Rafaela Ferreira' },
+  '345612': { role: 'entradas_lp', vendedor: null },
 };
 
 export default async function handler(req, res) {
