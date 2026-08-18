@@ -83,23 +83,25 @@ export default async function handler(req, res) {
       }
     }
 
-    if (type !== 'vendedoras_import') {
-      return res.status(400).json({ error: `type inválido para POST: ${type}` });
-    }
-    try {
-      const rows = req.body?.rows;
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return res.status(400).json({ error: 'Nenhuma linha para importar.' });
+    if (type === 'vendedoras_import' || type === 'vendas_import') {
+      try {
+        const rows = req.body?.rows;
+        if (!Array.isArray(rows) || rows.length === 0) {
+          return res.status(400).json({ error: 'Nenhuma linha para importar.' });
+        }
+        const fn = type === 'vendas_import' ? 'dashboard_vendas_import' : 'dashboard_vendedoras_import';
+        const client = getPool();
+        const result = await client.query(
+          `select * from ${fn}($1::jsonb)`,
+          [JSON.stringify(rows)]
+        );
+        return res.status(200).json(result.rows);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
       }
-      const client = getPool();
-      const result = await client.query(
-        'select * from dashboard_vendedoras_import($1::jsonb)',
-        [JSON.stringify(rows)]
-      );
-      return res.status(200).json(result.rows);
-    } catch (e) {
-      return res.status(500).json({ error: e.message });
     }
+
+    return res.status(400).json({ error: `type inválido para POST: ${type}` });
   }
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
@@ -112,6 +114,35 @@ export default async function handler(req, res) {
   const p_date_to = date_to || null;
   const p_hora_inicio = hora_inicio !== undefined && hora_inicio !== '' ? parseInt(hora_inicio, 10) : null;
   const p_hora_fim = hora_fim !== undefined && hora_fim !== '' ? parseInt(hora_fim, 10) : null;
+
+  if (type === 'vendas_export') {
+    try {
+      const client = getPool();
+      const result = await client.query(
+        `select adesao, cpf, nome, tabela, produto, banco, parcelas, seguro, peso, ponto, valor, data, campanha, origem
+         from vendas_gerais
+         where ($1::date is null or data >= $1::date) and ($2::date is null or data <= $2::date)
+         order by data desc nulls last, id desc`,
+        [p_date_from, p_date_to]
+      );
+      const cols = ['adesao', 'cpf', 'nome', 'tabela', 'produto', 'banco', 'parcelas', 'seguro', 'peso', 'ponto', 'valor', 'data', 'campanha', 'origem'];
+      const esc = (v) => {
+        if (v === null || v === undefined) return '';
+        const s = String(v);
+        return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const lines = [cols.join(';')];
+      for (const row of result.rows) {
+        lines.push(cols.map((c) => esc(row[c])).join(';'));
+      }
+      const csv = '\uFEFF' + lines.join('\r\n'); // BOM pra acentuação abrir certo no Excel
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="vendas_gerais_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv"`);
+      return res.status(200).send(csv);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   let sql;
   let params;
@@ -192,6 +223,27 @@ export default async function handler(req, res) {
   } else if (type === 'funil_produtos') {
     sql = 'select * from dashboard_funil_produtos($1::timestamptz,$2::timestamptz,$3::text,$4::text,$5::text)';
     params = [p_date_from, p_date_to, p_campanha, p_origem, req.query.produto || null];
+  } else if (type === 'vendas_kpis') {
+    sql = 'select * from dashboard_vendas_kpis($1::date,$2::date)';
+    params = [p_date_from, p_date_to];
+  } else if (type === 'vendas_por_produto') {
+    sql = 'select * from dashboard_vendas_por_produto($1::date,$2::date)';
+    params = [p_date_from, p_date_to];
+  } else if (type === 'vendas_dias_mes') {
+    sql = 'select * from dashboard_vendas_dias_mes()';
+    params = [];
+  } else if (type === 'vendas_por_dia') {
+    sql = 'select * from dashboard_vendas_por_dia($1::date,$2::date)';
+    params = [p_date_from, p_date_to];
+  } else if (type === 'vendas_por_campanha') {
+    sql = 'select * from dashboard_vendas_por_campanha($1::date,$2::date)';
+    params = [p_date_from, p_date_to];
+  } else if (type === 'vendas_por_origem') {
+    sql = 'select * from dashboard_vendas_por_origem($1::date,$2::date)';
+    params = [p_date_from, p_date_to];
+  } else if (type === 'vendas_sync') {
+    sql = 'select * from dashboard_vendas_sync()';
+    params = [];
   } else if (type === 'vendedoras_filtros') {
     sql = 'select * from dashboard_vendedoras_filtros()';
     params = [];
