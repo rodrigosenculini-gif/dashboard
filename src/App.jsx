@@ -1162,17 +1162,27 @@ function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   const row = payload[0]?.payload
   if (!row) return null
+  const ehAtual = row.ehSemanaAtual || row.ehAtual
   return (
     <div style={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12, padding: '8px 10px' }}>
       <p style={{ color: '#8a978f', margin: '0 0 4px' }}>{label}</p>
       {row.realizado != null && (
-        <p style={{ margin: '2px 0', color: '#a9d97f' }}>Realizado: {fmtMoeda(row.realizado)}</p>
+        <p style={{ margin: '2px 0', color: '#a9d97f' }}>Valor realizado: {fmtMoeda(row.realizado)}</p>
       )}
-      {row.ehSemanaAtual && (
-        <p style={{ margin: '2px 0', color: '#d9b877' }}>Proje&ccedil;&atilde;o do m&ecirc;s: {fmtMoeda(row.projecaoMesTotal)}</p>
+      {ehAtual && (
+        <p style={{ margin: '2px 0', color: '#d9b877' }}>Valor proje&ccedil;&atilde;o do m&ecirc;s: {fmtMoeda(row.projecaoMesTotal)}</p>
       )}
-      {!row.ehSemanaAtual && row.realizado == null && row.projecao != null && (
-        <p style={{ margin: '2px 0', color: '#d9b877' }}>Proje&ccedil;&atilde;o: {fmtMoeda(row.projecao)}</p>
+      {!ehAtual && row.realizado == null && row.projecao != null && (
+        <p style={{ margin: '2px 0', color: '#d9b877' }}>Valor proje&ccedil;&atilde;o: {fmtMoeda(row.projecao)}</p>
+      )}
+      {row.pontoRealizado != null && (
+        <p style={{ margin: '2px 0', color: '#a9d97f' }}>Pontos realizado: {fmtInt(Math.round(row.pontoRealizado))}</p>
+      )}
+      {ehAtual && row.pontoMesTotal != null && (
+        <p style={{ margin: '2px 0', color: '#d9b877' }}>Pontos proje&ccedil;&atilde;o do m&ecirc;s: {fmtInt(Math.round(row.pontoMesTotal))}</p>
+      )}
+      {!ehAtual && row.pontoRealizado == null && row.pontoProjecao != null && (
+        <p style={{ margin: '2px 0', color: '#d9b877' }}>Pontos proje&ccedil;&atilde;o: {fmtInt(Math.round(row.pontoProjecao))}</p>
       )}
     </div>
   )
@@ -1801,34 +1811,46 @@ function VendasView() {
   }, [load])
 
   // gr\u00e1fico realizado x proje\u00e7\u00e3o, dia a dia do m\u00eas corrente (igual ao
-  // portal da vendedora, s\u00f3 que sem os n\u00edveis de marco)
+  // portal da vendedora, s\u00f3 que sem os n\u00edveis de marco) \u2014 traz tanto valor
+  // quanto pontos, pra aparecer os dois no tooltip ao passar o mouse
   const chartData = useMemo(() => {
     if (!diasMes.length) return []
     const hoje = todayISO()
-    let acumulado = 0
+    let acumuladoValor = 0
+    let acumuladoPonto = 0
     const diasIniciados = diasMes.filter((d) => d.dia.slice(0, 10) <= hoje)
     const ultimoIniciado = diasIniciados[diasIniciados.length - 1]
-    const projecaoFinal = kpis ? Number(kpis.projecao_mes) : 0
+    const projecaoValorFinal = kpis ? Number(kpis.projecao_mes) : 0
+    const projecaoPontoFinal = kpis ? Number(kpis.pontos_projecao_mes) : 0
 
     return diasMes.map((d, i) => {
       const valor = Number(d.valor_dia) || 0
+      const ponto = Number(d.ponto_dia) || 0
       const iniciado = d.dia.slice(0, 10) <= hoje
-      if (iniciado) acumulado += valor
+      if (iniciado) {
+        acumuladoValor += valor
+        acumuladoPonto += ponto
+      }
       const row = { dia: fmtDataBR(d.dia) }
       if (iniciado) {
-        row.realizado = acumulado
+        row.realizado = acumuladoValor
+        row.pontoRealizado = acumuladoPonto
         const ultimoIdx = diasMes.indexOf(ultimoIniciado)
         if (i === ultimoIdx) {
-          row.projecao = acumulado
+          row.projecao = acumuladoValor
           row.ehAtual = true
-          row.projecaoMesTotal = projecaoFinal
+          row.projecaoMesTotal = projecaoValorFinal
+          row.pontoMesTotal = projecaoPontoFinal
         }
       } else if (ultimoIniciado) {
         const ultimoIdx = diasMes.indexOf(ultimoIniciado)
-        const acumuladoUltimo = diasMes.slice(0, ultimoIdx + 1).reduce((s, x) => s + (Number(x.valor_dia) || 0), 0)
+        const acumuladoValorUltimo = diasMes.slice(0, ultimoIdx + 1).reduce((s, x) => s + (Number(x.valor_dia) || 0), 0)
+        const acumuladoPontoUltimo = diasMes.slice(0, ultimoIdx + 1).reduce((s, x) => s + (Number(x.ponto_dia) || 0), 0)
         const diasRestantes = diasMes.length - 1 - ultimoIdx
-        const passo = diasRestantes > 0 ? (projecaoFinal - acumuladoUltimo) / diasRestantes : 0
-        row.projecao = acumuladoUltimo + passo * (i - ultimoIdx)
+        const passoValor = diasRestantes > 0 ? (projecaoValorFinal - acumuladoValorUltimo) / diasRestantes : 0
+        const passoPonto = diasRestantes > 0 ? (projecaoPontoFinal - acumuladoPontoUltimo) / diasRestantes : 0
+        row.projecao = acumuladoValorUltimo + passoValor * (i - ultimoIdx)
+        row.pontoProjecao = acumuladoPontoUltimo + passoPonto * (i - ultimoIdx)
       }
       return row
     })
@@ -1939,12 +1961,12 @@ function VendasView() {
           <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(kpis?.qtd_total)}</span></p>
         </div>
         <div className="kpi">
-          <p className="kpi-label">Hoje | Proje&ccedil;&atilde;o do m&ecirc;s</p>
+          <p className="kpi-label">Soma de Valor | Proje&ccedil;&atilde;o do m&ecirc;s</p>
           <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_hoje)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_mes)}</span></p>
         </div>
         <div className="kpi">
-          <p className="kpi-label">Soma de pontos</p>
-          <p className="kpi-value">{fmtInt(Math.round(kpis?.pontos_total ?? 0))}</p>
+          <p className="kpi-label">Soma de pontos | Proje&ccedil;&atilde;o</p>
+          <p className="kpi-value kpi-split"><span>{fmtInt(Math.round(kpis?.pontos_total ?? 0))}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(Math.round(kpis?.pontos_projecao_mes ?? 0))}</span></p>
         </div>
       </div>
 
@@ -1953,7 +1975,7 @@ function VendasView() {
           <div className="kpi" key={p.produto}>
             <p className="kpi-label">{p.produto}</p>
             <p className="kpi-value" style={{ color: VENDAS_CORES[i % VENDAS_CORES.length] }}>{fmtMoeda(p.valor_total)}</p>
-            <p className="kpi-sub">{fmtInt(p.qtd_total)} vendas</p>
+            <p className="kpi-sub">{fmtInt(p.qtd_total)} vendas &middot; {fmtInt(Math.round(p.pontos_total))} pontos</p>
           </div>
         ))}
       </div>
