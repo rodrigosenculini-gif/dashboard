@@ -1933,7 +1933,7 @@ function VendasView() {
         </ResponsiveContainer>
       </div>
 
-      <div className="kpi-grid">
+      <div className="kpi-grid kpi-grid-3">
         <div className="kpi">
           <p className="kpi-label">Valor total | Qtd total</p>
           <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(kpis?.qtd_total)}</span></p>
@@ -1941,6 +1941,10 @@ function VendasView() {
         <div className="kpi">
           <p className="kpi-label">Hoje | Proje&ccedil;&atilde;o do m&ecirc;s</p>
           <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_hoje)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_mes)}</span></p>
+        </div>
+        <div className="kpi">
+          <p className="kpi-label">Soma de pontos</p>
+          <p className="kpi-value">{fmtInt(Math.round(kpis?.pontos_total ?? 0))}</p>
         </div>
       </div>
 
@@ -1959,14 +1963,16 @@ function VendasView() {
         <div className="template-row head" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
           <span>Campanha</span><span>Qtd</span><span>Valor</span>
         </div>
-        {porCampanha.length === 0 && !loading && <div className="state-msg">Nenhum dado encontrado.</div>}
-        {porCampanha.map((r, i) => (
-          <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
-            <span className="campanha-nome">{r.campanha}</span>
-            <span>{fmtInt(r.qtd)}</span>
-            <span>{fmtMoeda(r.valor)}</span>
-          </div>
-        ))}
+        <div className="scroll-table">
+          {porCampanha.length === 0 && !loading && <div className="state-msg">Nenhum dado encontrado.</div>}
+          {porCampanha.map((r, i) => (
+            <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+              <span className="campanha-nome">{r.campanha}</span>
+              <span>{fmtInt(r.qtd)}</span>
+              <span>{fmtMoeda(r.valor)}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="panel table-panel">
@@ -1974,14 +1980,16 @@ function VendasView() {
         <div className="template-row head" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
           <span>Origem</span><span>Qtd</span><span>Valor</span>
         </div>
-        {porOrigem.length === 0 && !loading && <div className="state-msg">Nenhum dado encontrado.</div>}
-        {porOrigem.map((r, i) => (
-          <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
-            <span className="campanha-nome">{r.origem}</span>
-            <span>{fmtInt(r.qtd)}</span>
-            <span>{fmtMoeda(r.valor)}</span>
-          </div>
-        ))}
+        <div className="scroll-table">
+          {porOrigem.length === 0 && !loading && <div className="state-msg">Nenhum dado encontrado.</div>}
+          {porOrigem.map((r, i) => (
+            <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+              <span className="campanha-nome">{r.origem}</span>
+              <span>{fmtInt(r.qtd)}</span>
+              <span>{fmtMoeda(r.valor)}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </>
   )
