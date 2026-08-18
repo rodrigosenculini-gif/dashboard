@@ -1868,9 +1868,12 @@ drop function if exists dashboard_vendas_kpis(date, date);
 
 drop function if exists dashboard_vendas_kpis(date, date);
 
+drop function if exists dashboard_vendas_kpis(date, date);
+
 create or replace function dashboard_vendas_kpis(
   p_date_from date default null,
-  p_date_to date default null
+  p_date_to date default null,
+  p_produto text default null
 )
 returns table (
   valor_total numeric,
@@ -1894,9 +1897,13 @@ as $$
     from vendas_gerais
     where (p_date_from is null or data >= p_date_from)
       and (p_date_to is null or data <= p_date_to)
+      and (p_produto is null or produto = p_produto)
   ),
   hoje_valor as (
-    select coalesce(sum(valor), 0) as v from vendas_gerais, hoje where data = hoje.d
+    select coalesce(sum(valor), 0) as v
+    from vendas_gerais, hoje
+    where data = hoje.d
+      and (p_produto is null or produto = p_produto)
   ),
   du_passados as (
     select count(*) as n
@@ -1912,6 +1919,7 @@ as $$
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, mes, hoje
     where data >= mes.inicio and data <= hoje.d
+      and (p_produto is null or produto = p_produto)
   )
   select
     (select valor_total from periodo),
@@ -1929,6 +1937,8 @@ $$;
 -- KPI por produto (dinâmico — um card por produto existente)
 drop function if exists dashboard_vendas_por_produto(date, date);
 
+drop function if exists dashboard_vendas_por_produto(date, date);
+
 create or replace function dashboard_vendas_por_produto(
   p_date_from date default null,
   p_date_to date default null
@@ -1937,23 +1947,54 @@ returns table (
   produto text,
   valor_total numeric,
   qtd_total bigint,
-  pontos_total numeric
+  pontos_total numeric,
+  projecao_mes numeric
 )
 language sql
 security definer
 set search_path = public
 stable
 as $$
+  with hoje as (select (now() at time zone 'America/Sao_Paulo')::date as d),
+  mes as (select date_trunc('month', d)::date as inicio from hoje),
+  du_passados as (
+    select count(*) as n
+    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+    where extract(isodow from g.dia) < 6
+  ),
+  du_mes as (
+    select count(*) as n
+    from generate_series((select inicio from mes), (date_trunc('month', (select d from hoje)) + interval '1 month - 1 day')::date, interval '1 day') g(dia)
+    where extract(isodow from g.dia) < 6
+  ),
+  agg as (
+    select
+      produto,
+      coalesce(sum(valor), 0) as valor_total,
+      count(*) as qtd_total,
+      coalesce(sum(ponto), 0) as pontos_total
+    from vendas_gerais
+    where (p_date_from is null or data >= p_date_from)
+      and (p_date_to is null or data <= p_date_to)
+    group by produto
+  ),
+  mes_por_produto as (
+    select produto, coalesce(sum(valor), 0) as v
+    from vendas_gerais, mes, hoje
+    where data >= mes.inicio and data <= hoje.d
+    group by produto
+  )
   select
-    coalesce(produto, '(sem produto)'),
-    coalesce(sum(valor), 0),
-    count(*),
-    coalesce(sum(ponto), 0)
-  from vendas_gerais
-  where (p_date_from is null or data >= p_date_from)
-    and (p_date_to is null or data <= p_date_to)
-  group by produto
-  order by sum(valor) desc;
+    coalesce(a.produto, '(sem produto)'),
+    a.valor_total,
+    a.qtd_total,
+    a.pontos_total,
+    case when (select n from du_passados) > 0
+      then round(coalesce(m.v, 0) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end
+  from agg a
+  left join mes_por_produto m on m.produto is not distinct from a.produto
+  order by a.valor_total desc;
 $$;
 
 -- Vendas por dia (gráfico realizado x projeção — mesmo estilo do portal da
@@ -1984,7 +2025,9 @@ $$;
 -- realizado x projeção — mesmo estilo do portal da vendedora, mas diário.
 drop function if exists dashboard_vendas_dias_mes();
 
-create or replace function dashboard_vendas_dias_mes()
+drop function if exists dashboard_vendas_dias_mes();
+
+create or replace function dashboard_vendas_dias_mes(p_produto text default null)
 returns table (
   dia date,
   valor_dia numeric,
@@ -2005,8 +2048,8 @@ as $$
   )
   select
     g.dia::date,
-    coalesce((select sum(v.valor) from vendas_gerais v where v.data = g.dia), 0),
-    coalesce((select sum(v.ponto) from vendas_gerais v where v.data = g.dia), 0),
+    coalesce((select sum(v.valor) from vendas_gerais v where v.data = g.dia and (p_produto is null or v.produto = p_produto)), 0),
+    coalesce((select sum(v.ponto) from vendas_gerais v where v.data = g.dia and (p_produto is null or v.produto = p_produto)), 0),
     (g.dia <= (select d from hoje))
   from generate_series((select inicio from mes), (select fim from mes), interval '1 day') g(dia)
   order by g.dia;
@@ -2015,7 +2058,8 @@ $$;
 -- Tabela detalhada por campanha (vem do cruzamento com disparochat/total_produtos)
 create or replace function dashboard_vendas_por_campanha(
   p_date_from date default null,
-  p_date_to date default null
+  p_date_to date default null,
+  p_produto text default null
 )
 returns table (
   campanha text,
@@ -2035,6 +2079,7 @@ as $$
   where campanha is not null
     and (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
+    and (p_produto is null or produto = p_produto)
   group by campanha
   order by coalesce(sum(valor), 0) desc
   limit 300;
@@ -2043,7 +2088,8 @@ $$;
 -- Tabela detalhada por origem (vem do cruzamento com disparochat/total_produtos)
 create or replace function dashboard_vendas_por_origem(
   p_date_from date default null,
-  p_date_to date default null
+  p_date_to date default null,
+  p_produto text default null
 )
 returns table (
   origem text,
@@ -2063,6 +2109,7 @@ as $$
   where origem is not null
     and (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
+    and (p_produto is null or produto = p_produto)
   group by origem
   order by coalesce(sum(valor), 0) desc
   limit 300;
