@@ -1445,6 +1445,15 @@ begin
   insert into vendedoras_analise (data_status, banco, adesao, cpf, nome, vendedor, valor)
   values ((now() at time zone 'America/Sao_Paulo')::date, p_banco, p_adesao, v_cpf, p_nome, p_vendedor, p_valor);
 
+  -- espelha também na visão geral de Vendas (se ainda não existir lá)
+  if not exists (
+    select 1 from vendas_gerais
+    where norm_cpf(cpf) = v_cpf and coalesce(adesao, -1) = p_adesao
+  ) then
+    insert into vendas_gerais (data, banco, adesao, cpf, nome, valor)
+    values ((now() at time zone 'America/Sao_Paulo')::date, p_banco, p_adesao, v_cpf, p_nome, p_valor);
+  end if;
+
   return query select true, 'Venda adicionada com sucesso.';
 end;
 $$;
@@ -1452,3 +1461,597 @@ $$;
 grant execute on function dashboard_vendedoras_meta to anon;
 grant execute on function dashboard_vendedoras_semanas_mes to anon;
 grant execute on function dashboard_vendedoras_add_venda to anon;
+
+-- =========================================================
+-- VENDAS (visão geral de vendas — tabela vendas_gerais)
+-- =========================================================
+
+create table if not exists vendas_gerais (
+  id bigserial primary key,
+  created_at timestamptz not null default now(),
+  adesao bigint,
+  cpf text,
+  tabela text,
+  nome text,
+  valor numeric,
+  peso numeric,
+  ponto numeric,
+  data date,
+  produto text,
+  banco text,
+  parcelas int,
+  seguro text,
+  whatsapp bigint,
+  covnersation_id bigint,
+  conversa_sistema text,
+  campanha text,
+  origem text
+);
+
+-- Classifica o produto automaticamente a partir de banco/tabela:
+--   tabela contém "refin"  -> REFIN
+--   banco é crefaz         -> ENERGIA
+--   banco é novo saque     -> FGTS
+--   qualquer outro caso    -> CLT
+create or replace function calc_produto_vendas(p_banco text, p_tabela text)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when upper(coalesce(p_tabela, '')) like '%REFIN%' then 'REFIN'
+    when upper(coalesce(p_banco, '')) like '%CREFAZ%' then 'ENERGIA'
+    when upper(coalesce(p_banco, '')) like '%NOVO SAQUE%' or upper(coalesce(p_banco, '')) like '%NOVOSAQUE%' then 'FGTS'
+    else 'CLT'
+  end;
+$$;
+
+-- Calcula o peso automaticamente a partir de banco + tabela (código) +
+-- parcelas + seguro, seguindo as tabelas de comissão de cada banco.
+create or replace function calc_peso_vendas(
+  p_banco text,
+  p_tabela text,
+  p_parcelas int,
+  p_seguro text
+)
+returns numeric
+language plpgsql
+immutable
+as $$
+declare
+  banco_norm text := upper(coalesce(p_banco, ''));
+  tabela_norm text := upper(coalesce(p_tabela, ''));
+  codigo text;
+  tem_seguro boolean := upper(coalesce(p_seguro, '')) in ('SIM', 'S', 'TRUE', '1', 'COM SEGURO', 'COM');
+begin
+  -- extrai um código numérico de 4 a 6 dígitos do texto da tabela (se houver)
+  codigo := substring(tabela_norm from '[0-9]{4,6}');
+
+  -- FACTA
+  if banco_norm like '%FACTA%' then
+    return case codigo
+      when '69205' then 1.45
+      when '69191' then 1.35
+      when '69183' then 1.35
+      when '69035' then 1.35
+      when '69027' then 1.35
+      when '69043' then 1.35
+      when '69051' then 1.35
+      when '69167' then 1.25
+      when '69175' then 1.25
+      when '69159' then 1.20
+      when '69140' then 1.15
+      when '69060' then 1.15
+      when '69132' then 1.10
+      when '692213' then 1.10
+      when '69221' then 1.10
+      when '69230' then 1.10 -- ambíguo na planilha original (aparece também como 0,70)
+      when '69078' then 0.90
+      when '69086' then 0.90
+      when '69213' then 0.90
+      when '69116' then 0.90
+      when '69019' then 0.80
+      when '69094' then 0.80
+      when '69272' then 0.90
+      when '69264' then 0.80
+      when '69256' then 0.70
+      when '69280' then 0.60
+      when '61107' then 0.35
+      when '61093' then 0.35
+      when '61085' then 0.35
+      when '69299' then 0.35
+      when '69302' then 0.35
+      when '64815' then 0.00
+      when '64823' then 0.00
+      when '64831' then 0.00
+      else null
+    end;
+  end if;
+
+  -- CREFAZ
+  if banco_norm like '%CREFAZ%' then
+    if p_parcelas is null then return null; end if;
+    if p_parcelas between 9 and 24 then return 1.65; end if;
+    if p_parcelas between 1 and 8 then return 1.30; end if;
+    return null;
+  end if;
+
+  -- PAN
+  if banco_norm like '%PAN%' then
+    return 0.80;
+  end if;
+
+  -- MERCANTIL
+  if banco_norm like '%MERCANTIL%' then
+    return 1.10;
+  end if;
+
+  -- PRESENÇA
+  if banco_norm like '%PRESEN%' then
+    return case p_parcelas
+      when 48 then 1.75
+      when 36 then 1.25
+      when 26 then 0.75
+      when 24 then 0.60
+      when 18 then 0.20
+      else null
+    end;
+  end if;
+
+  -- SOMA (por código de tabela quando disponível)
+  if banco_norm like '%SOMA%' then
+    if codigo is not null then
+      return case codigo
+        when '2267' then 1.50
+        when '2266' then 1.35
+        when '2265' then 1.15
+        when '2283' then 1.15
+        when '2264' then 0.80
+        when '2282' then 0.80
+        when '2263' then 0.65
+        when '2281' then 0.60
+        when '2280' then 0.45
+        when '2275' then 0.45
+        when '2274' then 0.45
+        when '2273' then 0.30
+        when '2272' then 0.30
+        when '2279' then 0.25
+        when '2271' then 0.15
+        else null
+      end;
+    end if;
+    -- sem código: usa parcelas + seguro (aproximação — usa a tabela Celcoin
+    -- quando existe ambiguidade entre bancarizadoras)
+    if tem_seguro then
+      return case p_parcelas
+        when 48 then 1.50
+        when 42 then 1.35
+        when 36 then 1.15
+        when 30 then 0.80
+        when 24 then 0.65
+        when 18 then 0.45
+        when 12 then 0.25
+        else null
+      end;
+    else
+      return case p_parcelas
+        when 48 then 0.45
+        when 42 then 0.45
+        when 36 then 0.30
+        when 30 then 0.30
+        when 24 then 0.15
+        else null
+      end;
+    end if;
+  end if;
+
+  -- NOVO SAQUE (por nome da tabela)
+  if banco_norm like '%NOVO SAQUE%' or banco_norm like '%NOVOSAQUE%' then
+    if tabela_norm like '%CAMPANHA%' then return 9.50; end if;
+    if tabela_norm like '%DIAMANTE%' then return 7.50; end if;
+    if tabela_norm like '%GOLD%' then return 6.00; end if;
+    if tabela_norm like '%MONEY%' then return 4.50; end if;
+    if tabela_norm like '%LIGHT%' then return 3.50; end if;
+    if tabela_norm like '%SOFT%' then return 2.00; end if;
+    if tabela_norm like '%SMART%' then return 1.10; end if;
+    if tabela_norm like '%ZERO%' then return 0.70; end if;
+    if tabela_norm like '%NS%' or tabela_norm like '%NOVO SAQUE%' then return 12.00; end if;
+    return null;
+  end if;
+
+  return null;
+end;
+$$;
+
+-- Gatilho: toda vez que uma linha for inserida/atualizada em vendas_gerais,
+-- recalcula produto/peso/ponto automaticamente — nunca fica por conta de
+-- quem inseriu os dados (CSV, formulário da vendedora, etc.)
+create or replace function trg_vendas_gerais_calcula()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.produto := calc_produto_vendas(new.banco, new.tabela);
+  new.peso := calc_peso_vendas(new.banco, new.tabela, new.parcelas, new.seguro);
+  new.ponto := coalesce(new.peso, 0) * coalesce(new.valor, 0);
+  return new;
+end;
+$$;
+
+drop trigger if exists vendas_gerais_calcula on vendas_gerais;
+create trigger vendas_gerais_calcula
+before insert or update on vendas_gerais
+for each row execute function trg_vendas_gerais_calcula();
+
+grant execute on function calc_produto_vendas to anon;
+grant execute on function calc_peso_vendas to anon;
+
+-- Sincronização manual da visão Vendas (botão "Sincronizar") — igual à de
+-- vendedoras_analise, mas também traz campanha/origem (usados nas tabelas
+-- "Por Campanha"/"Por Origem") e não mexe em vendedor algum.
+create or replace function dashboard_vendas_sync()
+returns table (
+  atualizados_vendas int,
+  atualizados_disparochat int,
+  atualizados_total_produtos int,
+  atualizados_leads_chatwoot int
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v1 int := 0;
+  v2 int := 0;
+  v3 int := 0;
+  v4 int := 0;
+begin
+  -- 1) enriquece com disparochat (sistema "vendeai" + campanha/origem)
+  with match_d as (
+    select distinct on (norm_cpf(d.cpf))
+      norm_cpf(d.cpf) as cpf_norm, d.whatsapp, d.conversation_id, d.campanha, d.origem
+    from disparochat d
+    where coalesce(d.reenvio, d.realizado, d.status_atualizado) >= now() - interval '7 days'
+      and d.cpf is not null
+    order by norm_cpf(d.cpf), coalesce(d.reenvio, d.realizado, d.status_atualizado) desc
+  )
+  update vendas_gerais v
+  set covnersation_id = coalesce(v.covnersation_id, m.conversation_id),
+      conversa_sistema = coalesce(v.conversa_sistema, case when m.conversation_id is not null then 'vendeai' end),
+      whatsapp = coalesce(v.whatsapp, m.whatsapp),
+      campanha = coalesce(v.campanha, m.campanha),
+      origem = coalesce(v.origem, m.origem)
+  from match_d m
+  where norm_cpf(v.cpf) = m.cpf_norm
+    and (v.covnersation_id is null or v.whatsapp is null or v.campanha is null or v.origem is null);
+  get diagnostics v1 = row_count;
+
+  -- 1b) completa com leads_chatwoot (não tem campanha/origem, só conversa)
+  with match_l as (
+    select distinct on (norm_cpf(l.cpf))
+      norm_cpf(l.cpf) as cpf_norm, l.whatsapp, l.conversation_id,
+      case when l.conta = 'chatwoot' then 'chatwoot' else 'vendeai' end as sistema
+    from leads_chatwoot l
+    where coalesce(l.atualizacao, l.entrada_tabela) >= now() - interval '7 days'
+      and l.cpf is not null
+    order by norm_cpf(l.cpf), coalesce(l.atualizacao, l.entrada_tabela) desc
+  )
+  update vendas_gerais v
+  set covnersation_id = coalesce(v.covnersation_id, m.conversation_id),
+      conversa_sistema = coalesce(v.conversa_sistema, case when m.conversation_id is not null then m.sistema end),
+      whatsapp = coalesce(v.whatsapp, m.whatsapp)
+  from match_l m
+  where norm_cpf(v.cpf) = m.cpf_norm
+    and (v.covnersation_id is null or v.whatsapp is null);
+
+  -- 1c) completa com total_produtos (whatsapp/conversation_id + campanha/origem)
+  with match_t as (
+    select distinct on (norm_cpf(t.cpf))
+      norm_cpf(t.cpf) as cpf_norm, t.whatsapp, t.conversation_id, t.campanha, t.origem
+    from total_produtos t
+    where t.created_at >= now() - interval '7 days'
+      and t.cpf is not null
+    order by norm_cpf(t.cpf), t.created_at desc
+  )
+  update vendas_gerais v
+  set covnersation_id = coalesce(v.covnersation_id, m.conversation_id),
+      conversa_sistema = coalesce(v.conversa_sistema, case when m.conversation_id is not null then 'vendeai' end),
+      whatsapp = coalesce(v.whatsapp, m.whatsapp),
+      campanha = coalesce(v.campanha, m.campanha),
+      origem = coalesce(v.origem, m.origem)
+  from match_t m
+  where norm_cpf(v.cpf) = m.cpf_norm
+    and (v.covnersation_id is null or v.whatsapp is null or v.campanha is null or v.origem is null);
+
+  select count(*) into v1 from vendas_gerais where covnersation_id is not null or whatsapp is not null;
+
+  -- 2) reconcilia pagamento nas tabelas de origem (mesma regra de vendedoras)
+  with vs as (
+    select norm_cpf(cpf) as cpf_norm, valor
+    from vendas_gerais
+    where valor is not null and cpf is not null
+  )
+  update disparochat d
+  set pagas = vs.valor
+  from vs
+  where norm_cpf(d.cpf) = vs.cpf_norm
+    and coalesce(d.reenvio, d.realizado, d.status_atualizado) >= now() - interval '7 days'
+    and d.pagas is null;
+  get diagnostics v2 = row_count;
+
+  with vs as (
+    select norm_cpf(cpf) as cpf_norm, valor
+    from vendas_gerais
+    where valor is not null and cpf is not null
+  )
+  update total_produtos t
+  set valor = vs.valor, pagas = 1
+  from vs
+  where norm_cpf(t.cpf) = vs.cpf_norm
+    and t.created_at >= now() - interval '7 days'
+    and (t.pagas is null or t.pagas <> 1);
+  get diagnostics v3 = row_count;
+
+  with vs as (
+    select norm_cpf(cpf) as cpf_norm, valor
+    from vendas_gerais
+    where valor is not null and cpf is not null
+  )
+  update leads_chatwoot l
+  set valor = vs.valor, pagas = 1
+  from vs
+  where norm_cpf(l.cpf) = vs.cpf_norm
+    and coalesce(l.atualizacao, l.entrada_tabela) >= now() - interval '7 days'
+    and (l.pagas is null or l.pagas <> 1);
+  get diagnostics v4 = row_count;
+
+  return query select v1, v2, v3, v4;
+end;
+$$;
+
+grant execute on function dashboard_vendas_sync to anon;
+
+-- Importação de vendas via CSV pra vendas_gerais. peso/ponto/produto NÃO
+-- entram aqui — o gatilho calcula tudo sozinho a partir de banco/tabela/
+-- parcelas/seguro, então funciona tanto se o arquivo trouxer "tabela"
+-- (nome ou código) quanto se trouxer só parcelas + seguro.
+create or replace function dashboard_vendas_import(p_rows jsonb)
+returns table (inseridos int, ignorados int, total int)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_inseridos int := 0;
+  v_total int := 0;
+begin
+  select count(*) into v_total from jsonb_array_elements(p_rows);
+
+  with novos as (
+    select
+      nullif(r->>'adesao', '')::bigint as adesao,
+      norm_cpf(r->>'cpf') as cpf,
+      nullif(r->>'tabela', '') as tabela,
+      nullif(r->>'nome', '') as nome,
+      nullif(r->>'valor', '')::numeric as valor,
+      nullif(r->>'data', '')::date as data,
+      nullif(r->>'banco', '') as banco,
+      nullif(r->>'parcelas', '')::int as parcelas,
+      nullif(r->>'seguro', '') as seguro
+    from jsonb_array_elements(p_rows) r
+  ),
+  dedup_input as (
+    select distinct on (cpf, coalesce(adesao, -1)) *
+    from novos
+  ),
+  a_inserir as (
+    select n.* from dedup_input n
+    where not exists (
+      select 1 from vendas_gerais v
+      where norm_cpf(v.cpf) = n.cpf
+        and coalesce(v.adesao, -1) = coalesce(n.adesao, -1)
+    )
+  )
+  insert into vendas_gerais (adesao, cpf, tabela, nome, valor, data, banco, parcelas, seguro)
+  select adesao, cpf, tabela, nome, valor, data, banco, parcelas, seguro from a_inserir;
+
+  get diagnostics v_inseridos = row_count;
+
+  return query select v_inseridos, (v_total - v_inseridos), v_total;
+end;
+$$;
+
+-- KPIs gerais: valor/qtd total do período + projeção do dia (valor de hoje)
+-- e projeção geral (regra de três: total do mês ÷ dias úteis passados ×
+-- dias úteis do mês inteiro — mesma fórmula do portal da vendedora)
+create or replace function dashboard_vendas_kpis(
+  p_date_from date default null,
+  p_date_to date default null
+)
+returns table (
+  valor_total numeric,
+  qtd_total bigint,
+  valor_hoje numeric,
+  projecao_mes numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with hoje as (select (now() at time zone 'America/Sao_Paulo')::date as d),
+  mes as (
+    select date_trunc('month', d)::date as inicio from hoje
+  ),
+  periodo as (
+    select coalesce(sum(valor), 0) as valor_total, count(*) as qtd_total
+    from vendas_gerais
+    where (p_date_from is null or data >= p_date_from)
+      and (p_date_to is null or data <= p_date_to)
+  ),
+  hoje_valor as (
+    select coalesce(sum(valor), 0) as v from vendas_gerais, hoje where data = hoje.d
+  ),
+  du_passados as (
+    select count(*) as n
+    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+    where extract(isodow from g.dia) < 6
+  ),
+  du_mes as (
+    select count(*) as n
+    from generate_series((select inicio from mes), (date_trunc('month', (select d from hoje)) + interval '1 month - 1 day')::date, interval '1 day') g(dia)
+    where extract(isodow from g.dia) < 6
+  ),
+  total_mes as (
+    select coalesce(sum(valor), 0) as v
+    from vendas_gerais, mes, hoje
+    where data >= mes.inicio and data <= hoje.d
+  )
+  select
+    (select valor_total from periodo),
+    (select qtd_total from periodo),
+    (select v from hoje_valor),
+    case when (select n from du_passados) > 0
+      then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end;
+$$;
+
+-- KPI por produto (dinâmico — um card por produto existente)
+create or replace function dashboard_vendas_por_produto(
+  p_date_from date default null,
+  p_date_to date default null
+)
+returns table (
+  produto text,
+  valor_total numeric,
+  qtd_total bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(produto, '(sem produto)'),
+    coalesce(sum(valor), 0),
+    count(*)
+  from vendas_gerais
+  where (p_date_from is null or data >= p_date_from)
+    and (p_date_to is null or data <= p_date_to)
+  group by produto
+  order by sum(valor) desc;
+$$;
+
+-- Vendas por dia (gráfico realizado x projeção — mesmo estilo do portal da
+-- vendedora, mas dia a dia e sem recorte por vendedora)
+create or replace function dashboard_vendas_por_dia(
+  p_date_from date default null,
+  p_date_to date default null
+)
+returns table (
+  dia date,
+  valor_dia numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select data, coalesce(sum(valor), 0)
+  from vendas_gerais
+  where data is not null
+    and (p_date_from is null or data >= p_date_from)
+    and (p_date_to is null or data <= p_date_to)
+  group by data
+  order by data;
+$$;
+
+-- Dias do mês corrente completo (inclusive os sem venda), pro gráfico de
+-- realizado x projeção — mesmo estilo do portal da vendedora, mas diário.
+create or replace function dashboard_vendas_dias_mes()
+returns table (
+  dia date,
+  valor_dia numeric,
+  passada boolean
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with hoje as (select (now() at time zone 'America/Sao_Paulo')::date as d),
+  mes as (
+    select
+      date_trunc('month', d)::date as inicio,
+      (date_trunc('month', d) + interval '1 month - 1 day')::date as fim
+    from hoje
+  )
+  select
+    g.dia::date,
+    coalesce((select sum(v.valor) from vendas_gerais v where v.data = g.dia), 0),
+    (g.dia <= (select d from hoje))
+  from generate_series((select inicio from mes), (select fim from mes), interval '1 day') g(dia)
+  order by g.dia;
+$$;
+
+-- Tabela detalhada por campanha (vem do cruzamento com disparochat/total_produtos)
+create or replace function dashboard_vendas_por_campanha(
+  p_date_from date default null,
+  p_date_to date default null
+)
+returns table (
+  campanha text,
+  qtd bigint,
+  valor numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(campanha, '(sem campanha)'),
+    count(*),
+    coalesce(sum(valor), 0)
+  from vendas_gerais
+  where (p_date_from is null or data >= p_date_from)
+    and (p_date_to is null or data <= p_date_to)
+  group by campanha
+  order by valor desc
+  limit 60;
+$$;
+
+-- Tabela detalhada por origem (vem do cruzamento com disparochat/total_produtos)
+create or replace function dashboard_vendas_por_origem(
+  p_date_from date default null,
+  p_date_to date default null
+)
+returns table (
+  origem text,
+  qtd bigint,
+  valor numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(origem, '(sem origem)'),
+    count(*),
+    coalesce(sum(valor), 0)
+  from vendas_gerais
+  where (p_date_from is null or data >= p_date_from)
+    and (p_date_to is null or data <= p_date_to)
+  group by origem
+  order by valor desc
+  limit 60;
+$$;
+
+grant execute on function dashboard_vendas_import to anon;
+grant execute on function dashboard_vendas_kpis to anon;
+grant execute on function dashboard_vendas_por_produto to anon;
+grant execute on function dashboard_vendas_por_dia to anon;
+grant execute on function dashboard_vendas_dias_mes to anon;
+grant execute on function dashboard_vendas_por_campanha to anon;
+grant execute on function dashboard_vendas_por_origem to anon;
