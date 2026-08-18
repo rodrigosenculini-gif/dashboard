@@ -117,13 +117,15 @@ export default async function handler(req, res) {
 
   if (type === 'vendas_export') {
     try {
+      const p_produto = req.query.produto || null;
       const client = getPool();
       const result = await client.query(
         `select adesao, cpf, nome, tabela, produto, banco, parcelas, seguro, peso, ponto, valor, data, campanha, origem
          from vendas_gerais
          where ($1::date is null or data >= $1::date) and ($2::date is null or data <= $2::date)
+           and ($3::text is null or produto = $3::text)
          order by data desc nulls last, id desc`,
-        [p_date_from, p_date_to]
+        [p_date_from, p_date_to, p_produto]
       );
       const cols = ['adesao', 'cpf', 'nome', 'tabela', 'produto', 'banco', 'parcelas', 'seguro', 'peso', 'ponto', 'valor', 'data', 'campanha', 'origem'];
       const esc = (v) => {
@@ -224,23 +226,23 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_funil_produtos($1::timestamptz,$2::timestamptz,$3::text,$4::text,$5::text)';
     params = [p_date_from, p_date_to, p_campanha, p_origem, req.query.produto || null];
   } else if (type === 'vendas_kpis') {
-    sql = 'select * from dashboard_vendas_kpis($1::date,$2::date)';
-    params = [p_date_from, p_date_to];
+    sql = 'select * from dashboard_vendas_kpis($1::date,$2::date,$3::text)';
+    params = [p_date_from, p_date_to, req.query.produto || null];
   } else if (type === 'vendas_por_produto') {
     sql = 'select * from dashboard_vendas_por_produto($1::date,$2::date)';
     params = [p_date_from, p_date_to];
   } else if (type === 'vendas_dias_mes') {
-    sql = 'select * from dashboard_vendas_dias_mes()';
-    params = [];
+    sql = 'select * from dashboard_vendas_dias_mes($1::text)';
+    params = [req.query.produto || null];
   } else if (type === 'vendas_por_dia') {
     sql = 'select * from dashboard_vendas_por_dia($1::date,$2::date)';
     params = [p_date_from, p_date_to];
   } else if (type === 'vendas_por_campanha') {
-    sql = 'select * from dashboard_vendas_por_campanha($1::date,$2::date)';
-    params = [p_date_from, p_date_to];
+    sql = 'select * from dashboard_vendas_por_campanha($1::date,$2::date,$3::text)';
+    params = [p_date_from, p_date_to, req.query.produto || null];
   } else if (type === 'vendas_por_origem') {
-    sql = 'select * from dashboard_vendas_por_origem($1::date,$2::date)';
-    params = [p_date_from, p_date_to];
+    sql = 'select * from dashboard_vendas_por_origem($1::date,$2::date,$3::text)';
+    params = [p_date_from, p_date_to, req.query.produto || null];
   } else if (type === 'vendas_sync') {
     sql = 'select * from dashboard_vendas_sync()';
     params = [];
