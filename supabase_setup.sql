@@ -1500,8 +1500,12 @@ immutable
 as $$
   select case
     when upper(coalesce(p_tabela, '')) like '%REFIN%' then 'REFIN'
-    when upper(coalesce(p_banco, '')) like '%CREFAZ%' then 'ENERGIA'
-    when upper(coalesce(p_banco, '')) like '%NOVO SAQUE%' or upper(coalesce(p_banco, '')) like '%NOVOSAQUE%' then 'FGTS'
+    when upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%CREFAZ%' then 'ENERGIA'
+    when upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%NOVO SAQUE%'
+      -- refor\u00e7o: esses nomes de tabela s\u00e3o exclusivos da Novo Saque, ent\u00e3o
+      -- reconhece mesmo que o campo banco venha vazio/diferente do esperado
+      or upper(coalesce(p_tabela, '')) ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
+    then 'FGTS'
     else 'CLT'
   end;
 $$;
@@ -1519,7 +1523,7 @@ language plpgsql
 immutable
 as $$
 declare
-  banco_norm text := upper(coalesce(p_banco, ''));
+  banco_norm text := upper(replace(coalesce(p_banco, ''), '_', ' '));
   tabela_norm text := upper(coalesce(p_tabela, ''));
   codigo text;
   tem_seguro boolean := upper(coalesce(p_seguro, '')) in ('SIM', 'S', 'TRUE', '1', 'COM SEGURO', 'COM');
@@ -1645,8 +1649,11 @@ begin
     end if;
   end if;
 
-  -- NOVO SAQUE (por nome da tabela)
-  if banco_norm like '%NOVO SAQUE%' or banco_norm like '%NOVOSAQUE%' then
+  -- NOVO SAQUE (por banco OU pelo nome da tabela, já que esses nomes são
+  -- exclusivos dela — cobre casos em que o campo banco veio vazio/diferente)
+  if banco_norm like '%NOVO SAQUE%'
+     or tabela_norm ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
+  then
     if tabela_norm like '%CAMPANHA%' then return 9.50; end if;
     if tabela_norm like '%DIAMANTE%' then return 7.50; end if;
     if tabela_norm like '%GOLD%' then return 6.00; end if;
