@@ -69,10 +69,15 @@ as $$
     where (p_campanha is null or campanha = p_campanha)
       and (p_origem is null or origem = p_origem)
       and (p_meta is null or meta = p_meta)
-      and (p_date_from is null or realizado >= p_date_from)
-      and (p_date_to is null or realizado <= p_date_to)
-      and (p_hora_inicio is null or extract(hour from realizado at time zone 'America/Sao_Paulo') >= p_hora_inicio)
-      and (p_hora_fim is null or extract(hour from realizado at time zone 'America/Sao_Paulo') <= p_hora_fim)
+      and (
+        p_date_from is null and p_date_to is null
+        or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
+        or (reenvio is not null and (p_date_from is null or reenvio >= p_date_from) and (p_date_to is null or reenvio <= p_date_to))
+      )
+      and (
+        p_hora_inicio is null and p_hora_fim is null
+        or extract(hour from coalesce(realizado, reenvio) at time zone 'America/Sao_Paulo') between coalesce(p_hora_inicio, 0) and coalesce(p_hora_fim, 23)
+      )
   ),
   agg as (
     select
@@ -236,8 +241,11 @@ as $$
     and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
     and (p_meta is null or meta = p_meta)
-    and (p_date_from is null or realizado >= p_date_from)
-    and (p_date_to is null or realizado <= p_date_to)
+    and (
+      p_date_from is null and p_date_to is null
+      or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
+      or (reenvio is not null and (p_date_from is null or reenvio >= p_date_from) and (p_date_to is null or reenvio <= p_date_to))
+    )
   group by 1
   order by leads desc
   limit 20;
@@ -267,8 +275,11 @@ as $$
   where meta is not null
     and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
-    and (p_date_from is null or realizado >= p_date_from)
-    and (p_date_to is null or realizado <= p_date_to)
+    and (
+      p_date_from is null and p_date_to is null
+      or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
+      or (reenvio is not null and (p_date_from is null or reenvio >= p_date_from) and (p_date_to is null or reenvio <= p_date_to))
+    )
   group by 1
   order by leads desc
   limit 20;
@@ -299,8 +310,11 @@ as $$
     and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
     and (p_meta is null or meta = p_meta)
-    and (p_date_from is null or realizado >= p_date_from)
-    and (p_date_to is null or realizado <= p_date_to)
+    and (
+      p_date_from is null and p_date_to is null
+      or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
+      or (reenvio is not null and (p_date_from is null or reenvio >= p_date_from) and (p_date_to is null or reenvio <= p_date_to))
+    )
   group by 1
   order by leads desc
   limit 20;
