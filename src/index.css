@@ -157,6 +157,11 @@ body {
   margin-top: 18px;
 }
 
+.scroll-table {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
 .breakdown-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -219,9 +224,9 @@ body {
 }
 
 .app-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
