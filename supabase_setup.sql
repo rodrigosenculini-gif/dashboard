@@ -1502,7 +1502,7 @@ as $$
     when upper(coalesce(p_tabela, '')) like '%REFIN%' then 'REFIN'
     when upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%CREFAZ%' then 'ENERGIA'
     when upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%NOVO SAQUE%'
-      -- refor\u00e7o: esses nomes de tabela s\u00e3o exclusivos da Novo Saque, ent\u00e3o
+      -- reforço: esses nomes de tabela são exclusivos da Novo Saque, então
       -- reconhece mesmo que o campo banco venha vazio/diferente do esperado
       or upper(coalesce(p_tabela, '')) ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
     then 'FGTS'
