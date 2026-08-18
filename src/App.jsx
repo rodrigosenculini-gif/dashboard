@@ -10,6 +10,7 @@ const VIEWS = [
   { id: 'produtos', label: 'Entradas LP' },
   { id: 'n8n', label: 'n8n \u2014 Execu\u00e7\u00f5es' },
   { id: 'vendedoras', label: 'Vendedoras' },
+  { id: 'vendas', label: 'Vendas' },
 ]
 
 async function callApi(type, params) {
@@ -75,6 +76,72 @@ async function parseVendedorasCsv(file) {
       vendedor: (cols[iVendedor] || '').trim(),
       tabela: (cols[iTabela] || '').trim(),
       valor,
+    })
+  }
+  return rows
+}
+
+// Le\u00ea o CSV da visão Vendas. Aceita variações de nome de coluna e não
+// exige todas — o gatilho no banco calcula produto/peso/ponto sozinho a
+// partir do que vier (tabela OU parcelas+seguro).
+async function parseVendasCsv(file) {
+  const buf = await file.arrayBuffer()
+  const text = new TextDecoder('iso-8859-1').decode(buf)
+  const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0)
+  if (lines.length < 2) return []
+
+  const delim = lines[0].includes(';') ? ';' : ','
+  const header = lines[0].split(delim).map((h) => h.trim().toLowerCase())
+  const idx = (...aliases) => {
+    for (const a of aliases) {
+      const i = header.indexOf(a.toLowerCase())
+      if (i !== -1) return i
+    }
+    return -1
+  }
+  const iAdesao = idx('ade', 'adesão', 'adesao')
+  const iCpf = idx('cpf')
+  const iTabela = idx('tabela')
+  const iNome = idx('nome')
+  const iValor = idx('valor')
+  const iData = idx('data status', 'data')
+  const iBanco = idx('banco')
+  const iParcelas = idx('parcelas')
+  const iSeguro = idx('seguro')
+
+  const rows = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(delim)
+    if (cols.length < 2) continue
+
+    const cpfDigits = (iCpf !== -1 ? cols[iCpf] : '').replace(/\D/g, '')
+    if (!cpfDigits) continue
+    const cpf = cpfDigits.padStart(11, '0')
+
+    let dataIso = ''
+    if (iData !== -1) {
+      const dataRaw = (cols[iData] || '').trim()
+      if (dataRaw.includes('/')) {
+        const [dd, mm, yyyy] = dataRaw.split('/')
+        dataIso = dd && mm && yyyy ? `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}` : ''
+      } else {
+        dataIso = dataRaw
+      }
+    }
+
+    const valorRaw = iValor !== -1 ? (cols[iValor] || '').trim().replace(/\./g, '').replace(',', '.') : ''
+    const valor = valorRaw && !isNaN(Number(valorRaw)) ? valorRaw : ''
+
+    rows.push({
+      adesao: iAdesao !== -1 ? (cols[iAdesao] || '').trim() : '',
+      cpf,
+      tabela: iTabela !== -1 ? (cols[iTabela] || '').trim() : '',
+      nome: iNome !== -1 ? (cols[iNome] || '').trim() : '',
+      valor,
+      data: dataIso,
+      banco: iBanco !== -1 ? (cols[iBanco] || '').trim() : '',
+      parcelas: iParcelas !== -1 ? (cols[iParcelas] || '').trim() : '',
+      seguro: iSeguro !== -1 ? (cols[iSeguro] || '').trim() : '',
     })
   }
   return rows
@@ -1681,6 +1748,245 @@ function VendedorasView() {
   )
 }
 
+const VENDAS_CORES = ['#a9d97f', '#d99089', '#7fa8d9', '#d9b877', '#c17fd9', '#7fd9c1']
+
+function VendasView() {
+  const mesAtual = presetRange('este_mes')
+  const [dataInicio, setDataInicio] = useState(mesAtual.from)
+  const [dataFim, setDataFim] = useState(mesAtual.to)
+
+  const [kpis, setKpis] = useState(null)
+  const [porProduto, setPorProduto] = useState([])
+  const [diasMes, setDiasMes] = useState([])
+  const [porCampanha, setPorCampanha] = useState([])
+  const [porOrigem, setPorOrigem] = useState([])
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [lastUpdate, setLastUpdate] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const fileInputRef = useRef(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [kp, pp, dm, pc, po] = await Promise.all([
+        callApi('vendas_kpis', { date_from: dataInicio, date_to: dataFim }),
+        callApi('vendas_por_produto', { date_from: dataInicio, date_to: dataFim }),
+        callApi('vendas_dias_mes', {}),
+        callApi('vendas_por_campanha', { date_from: dataInicio, date_to: dataFim }),
+        callApi('vendas_por_origem', { date_from: dataInicio, date_to: dataFim }),
+      ])
+      setKpis(kp?.[0] ?? null)
+      setPorProduto(pp ?? [])
+      setDiasMes(dm ?? [])
+      setPorCampanha(pc ?? [])
+      setPorOrigem(po ?? [])
+      setLastUpdate(new Date())
+    } catch (e) {
+      setError(e.message || 'Erro ao carregar dados.')
+    } finally {
+      setLoading(false)
+    }
+  }, [dataInicio, dataFim])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const id = setInterval(load, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [load])
+
+  // gr\u00e1fico realizado x proje\u00e7\u00e3o, dia a dia do m\u00eas corrente (igual ao
+  // portal da vendedora, s\u00f3 que sem os n\u00edveis de marco)
+  const chartData = useMemo(() => {
+    if (!diasMes.length) return []
+    const hoje = todayISO()
+    let acumulado = 0
+    const diasIniciados = diasMes.filter((d) => d.dia.slice(0, 10) <= hoje)
+    const ultimoIniciado = diasIniciados[diasIniciados.length - 1]
+    const projecaoFinal = kpis ? Number(kpis.projecao_mes) : 0
+
+    return diasMes.map((d, i) => {
+      const valor = Number(d.valor_dia) || 0
+      const iniciado = d.dia.slice(0, 10) <= hoje
+      if (iniciado) acumulado += valor
+      const row = { dia: fmtDataBR(d.dia) }
+      if (iniciado) {
+        row.realizado = acumulado
+        const ultimoIdx = diasMes.indexOf(ultimoIniciado)
+        if (i === ultimoIdx) {
+          row.projecao = acumulado
+          row.ehAtual = true
+          row.projecaoMesTotal = projecaoFinal
+        }
+      } else if (ultimoIniciado) {
+        const ultimoIdx = diasMes.indexOf(ultimoIniciado)
+        const acumuladoUltimo = diasMes.slice(0, ultimoIdx + 1).reduce((s, x) => s + (Number(x.valor_dia) || 0), 0)
+        const diasRestantes = diasMes.length - 1 - ultimoIdx
+        const passo = diasRestantes > 0 ? (projecaoFinal - acumuladoUltimo) / diasRestantes : 0
+        row.projecao = acumuladoUltimo + passo * (i - ultimoIdx)
+      }
+      return row
+    })
+  }, [diasMes, kpis])
+
+  const handleSync = async () => {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const r = await callApi('vendas_sync', {})
+      const s = r?.[0]
+      setSyncMsg(
+        s
+          ? `Conclu\u00eddo \u2014 ${fmtInt(s.atualizados_vendas)} vendas com dados completos, ${fmtInt(s.atualizados_disparochat)} atualizadas em disparochat, ${fmtInt(s.atualizados_total_produtos)} em total_produtos, ${fmtInt(s.atualizados_leads_chatwoot)} em leads_chatwoot.`
+          : 'Sincroniza\u00e7\u00e3o conclu\u00edda.'
+      )
+      load()
+    } catch (e) {
+      setSyncMsg('Erro ao sincronizar: ' + (e.message || ''))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleImportClick = () => fileInputRef.current?.click()
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setImporting(true)
+    setImportMsg('')
+    try {
+      const rows = await parseVendasCsv(file)
+      if (rows.length === 0) {
+        setImportMsg('Nenhuma linha v\u00e1lida encontrada no arquivo.')
+        return
+      }
+      const result = await postApi('vendas_import', { rows })
+      const r = result?.[0]
+      setImportMsg(
+        `Importa\u00e7\u00e3o conclu\u00edda \u2014 ${fmtInt(r?.inseridos)} vendas novas, ${fmtInt(r?.ignorados)} j\u00e1 existiam (mesmo CPF + ades\u00e3o). Sincronizando...`
+      )
+      await handleSync()
+    } catch (err) {
+      setImportMsg('Erro ao importar: ' + (err.message || ''))
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const handleDownload = () => {
+    const qs = new URLSearchParams({ type: 'vendas_export', date_from: dataInicio, date_to: dataFim })
+    window.open(`/api/dashboard?${qs.toString()}`, '_blank')
+  }
+
+  return (
+    <>
+      <div className="topbar">
+        <h1><span className="pulse" /> Vendas</h1>
+        <div className="topbar-right">
+          <span className="status-line">
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+          </span>
+          <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to) }} title="Redefinir filtros">
+            &#10226; Redefinir filtros
+          </button>
+          <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
+          <button className="refresh-btn" onClick={handleImportClick} disabled={importing} title="Importar vendas de um arquivo CSV">
+            {importing ? 'Importando...' : '\u2191 Importar'}
+          </button>
+          <button className="refresh-btn" onClick={handleDownload} title="Baixar tabela filtrada em CSV">
+            &#8595; Baixar
+          </button>
+          <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
+            {syncing ? 'Sincronizando...' : '\u21bb Sincronizar'}
+          </button>
+          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+            &#8635; Atualizar
+          </button>
+        </div>
+      </div>
+
+      {importMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{importMsg}</div>}
+      {syncMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{syncMsg}</div>}
+
+      <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+
+      {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <div className="panel chart-panel tall">
+        <p className="section-label">Vendas por dia &mdash; realizado e proje&ccedil;&atilde;o</p>
+        <p className="section-sub">linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s (m&ecirc;s corrente, independente do filtro de data acima)</p>
+        <ResponsiveContainer width="100%" height="80%">
+          <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <XAxis dataKey="dia" tick={{ fontSize: 9, fill: '#8a978f' }} interval={2} />
+            <YAxis tick={{ fontSize: 10, fill: '#8a978f' }} width={50} />
+            <Tooltip content={<ChartTooltip />} />
+            <Line type="monotone" dataKey="realizado" stroke="#a9d97f" strokeWidth={2.5} dot={false} connectNulls />
+            <Line type="monotone" dataKey="projecao" stroke="#a9d97f" strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={false} connectNulls legendType="none" />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="kpi-grid">
+        <div className="kpi">
+          <p className="kpi-label">Valor total | Qtd total</p>
+          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(kpis?.qtd_total)}</span></p>
+        </div>
+        <div className="kpi">
+          <p className="kpi-label">Hoje | Proje&ccedil;&atilde;o do m&ecirc;s</p>
+          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_hoje)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_mes)}</span></p>
+        </div>
+      </div>
+
+      <div className="kpi-grid">
+        {porProduto.map((p, i) => (
+          <div className="kpi" key={p.produto}>
+            <p className="kpi-label">{p.produto}</p>
+            <p className="kpi-value" style={{ color: VENDAS_CORES[i % VENDAS_CORES.length] }}>{fmtMoeda(p.valor_total)}</p>
+            <p className="kpi-sub">{fmtInt(p.qtd_total)} vendas</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="panel table-panel">
+        <p className="section-label">Por campanha</p>
+        <div className="template-row head" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+          <span>Campanha</span><span>Qtd</span><span>Valor</span>
+        </div>
+        {porCampanha.length === 0 && !loading && <div className="state-msg">Nenhum dado encontrado.</div>}
+        {porCampanha.map((r, i) => (
+          <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+            <span className="campanha-nome">{r.campanha}</span>
+            <span>{fmtInt(r.qtd)}</span>
+            <span>{fmtMoeda(r.valor)}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="panel table-panel">
+        <p className="section-label">Por origem</p>
+        <div className="template-row head" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+          <span>Origem</span><span>Qtd</span><span>Valor</span>
+        </div>
+        {porOrigem.length === 0 && !loading && <div className="state-msg">Nenhum dado encontrado.</div>}
+        {porOrigem.map((r, i) => (
+          <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+            <span className="campanha-nome">{r.origem}</span>
+            <span>{fmtInt(r.qtd)}</span>
+            <span>{fmtMoeda(r.valor)}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function VisaoGeral() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [] })
   const [campanha, setCampanha] = useState('')
@@ -1883,6 +2189,7 @@ function Dashboard() {
       {view === 'produtos' && <EntradasLP />}
       {view === 'n8n' && <N8nExecucoes />}
       {view === 'vendedoras' && <VendedorasView />}
+      {view === 'vendas' && <VendasView />}
     </div>
   )
 }
