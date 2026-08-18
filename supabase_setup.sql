@@ -1866,6 +1866,8 @@ $$;
 -- dias úteis do mês inteiro — mesma fórmula do portal da vendedora)
 drop function if exists dashboard_vendas_kpis(date, date);
 
+drop function if exists dashboard_vendas_kpis(date, date);
+
 create or replace function dashboard_vendas_kpis(
   p_date_from date default null,
   p_date_to date default null
@@ -1875,7 +1877,8 @@ returns table (
   qtd_total bigint,
   valor_hoje numeric,
   projecao_mes numeric,
-  pontos_total numeric
+  pontos_total numeric,
+  pontos_projecao_mes numeric
 )
 language sql
 security definer
@@ -1906,7 +1909,7 @@ as $$
     where extract(isodow from g.dia) < 6
   ),
   total_mes as (
-    select coalesce(sum(valor), 0) as v
+    select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, mes, hoje
     where data >= mes.inicio and data <= hoje.d
   )
@@ -1917,10 +1920,15 @@ as $$
     case when (select n from du_passados) > 0
       then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
       else 0 end,
-    (select pontos_total from periodo);
+    (select pontos_total from periodo),
+    case when (select n from du_passados) > 0
+      then round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end;
 $$;
 
 -- KPI por produto (dinâmico — um card por produto existente)
+drop function if exists dashboard_vendas_por_produto(date, date);
+
 create or replace function dashboard_vendas_por_produto(
   p_date_from date default null,
   p_date_to date default null
@@ -1928,7 +1936,8 @@ create or replace function dashboard_vendas_por_produto(
 returns table (
   produto text,
   valor_total numeric,
-  qtd_total bigint
+  qtd_total bigint,
+  pontos_total numeric
 )
 language sql
 security definer
@@ -1938,7 +1947,8 @@ as $$
   select
     coalesce(produto, '(sem produto)'),
     coalesce(sum(valor), 0),
-    count(*)
+    count(*),
+    coalesce(sum(ponto), 0)
   from vendas_gerais
   where (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
@@ -1972,10 +1982,13 @@ $$;
 
 -- Dias do mês corrente completo (inclusive os sem venda), pro gráfico de
 -- realizado x projeção — mesmo estilo do portal da vendedora, mas diário.
+drop function if exists dashboard_vendas_dias_mes();
+
 create or replace function dashboard_vendas_dias_mes()
 returns table (
   dia date,
   valor_dia numeric,
+  ponto_dia numeric,
   passada boolean
 )
 language sql
@@ -1993,6 +2006,7 @@ as $$
   select
     g.dia::date,
     coalesce((select sum(v.valor) from vendas_gerais v where v.data = g.dia), 0),
+    coalesce((select sum(v.ponto) from vendas_gerais v where v.data = g.dia), 0),
     (g.dia <= (select d from hoje))
   from generate_series((select inicio from mes), (select fim from mes), interval '1 day') g(dia)
   order by g.dia;
