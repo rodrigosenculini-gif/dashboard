@@ -224,9 +224,9 @@ body {
 }
 
 .app-logo {
-  width: 52px;
-  height: 52px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   flex-shrink: 0;
 }
 
@@ -618,8 +618,10 @@ body {
 .kpi-split {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 5px;
+  flex-wrap: nowrap;
+  font-size: 18px;
+  white-space: nowrap;
 }
 .kpi-split-bar {
   color: var(--muted);
@@ -627,7 +629,7 @@ body {
 }
 .kpi-split-proj {
   color: var(--gold);
-  font-size: 0.75em;
+  font-size: 0.68em;
 }
 
 /* --- Formulário "Adicionar adesão" --- */
