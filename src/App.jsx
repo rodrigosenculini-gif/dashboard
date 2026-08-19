@@ -358,37 +358,38 @@ function BreakdownList({ title, items, loading }) {
   )
 }
 
-function CampanhasList({ items, loading }) {
+function CampanhaDetalhadoList({ items, loading }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
-  const maxLeads = Math.max(1, ...items.map((c) => Number(c.leads) || 0))
-  const maxReenvios = Math.max(1, ...items.map((c) => Number(c.reenvios) || 0))
+  const cols = '1.6fr 0.9fr 1fr 1.1fr 1fr 0.7fr 1fr'
   return (
     <div className="panel table-panel">
-      <p className="section-label">Campanhas &Uacute;nicas</p>
-      <div className="campanha-row head">
-        <span>Campanha</span><span>Leads</span><span>Reenvios</span>
+      <p className="section-label">Campanha Detalhado</p>
+      <div className="template-row head" style={{ gridTemplateColumns: cols }}>
+        <span>Campanha</span>
+        <span>Leads totais</span>
+        <span>Envios/Reenvios</span>
+        <span>Tempo m&eacute;dio resposta</span>
+        <span>Valor Pago</span>
+        <span>Pagas</span>
+        <span>Intera&ccedil;&atilde;o (qtd)</span>
       </div>
       {items.length === 0 && !loading && (
         <div className="state-msg">Nenhum dado para os filtros selecionados.</div>
       )}
-      {visible.map((c) => (
-        <div className="campanha-row" key={c.campanha}>
-          <span className="campanha-nome">{c.campanha}</span>
-          <span className="bar-cell">
-            <span className="bar-track">
-              <span className="bar-fill" style={{ width: `${(Number(c.leads) / maxLeads) * 100}%` }} />
-            </span>
-            <span className="bar-value">{fmtInt(c.leads)}</span>
-          </span>
-          <span className="bar-cell">
-            <span className="bar-track">
-              <span className="bar-fill reenvio" style={{ width: `${(Number(c.reenvios) / maxReenvios) * 100}%` }} />
-            </span>
-            <span className="bar-value">{fmtInt(c.reenvios)}</span>
-          </span>
-        </div>
-      ))}
+      <div className="scroll-table">
+        {visible.map((c) => (
+          <div className="template-row" key={c.campanha} style={{ gridTemplateColumns: cols }}>
+            <span className="campanha-nome">{c.campanha}</span>
+            <span>{fmtInt(c.leads_totais)}</span>
+            <span>{fmtInt(c.envios)} / {fmtInt(c.reenvios)}</span>
+            <span>{c.tempo_resposta_min != null ? `${fmtInt(Math.round(c.tempo_resposta_min))} min` : '-'}</span>
+            <span>{fmtMoeda(c.valor_pago)}</span>
+            <span>{fmtInt(c.pagas)}</span>
+            <span>{fmtInt(c.interacao_qtd)}</span>
+          </div>
+        ))}
+      </div>
       <ExpandToggle
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
@@ -676,7 +677,7 @@ function EntradasLP() {
         callApi('produtos_kpis', args),
         callApi('produtos_entradas_por_dia', args),
         callApi('produtos_aprovadas_por_dia', args),
-        callApi('produtos_campanhas', { produto: args.produto, origem: args.origem, date_from: args.date_from, date_to: args.date_to }),
+        callApi('produtos_campanhas', { campanha: args.campanha, produto: args.produto, origem: args.origem, date_from: args.date_from, date_to: args.date_to }),
       ])
       setKpis(kpiData?.[0] ?? null)
 
@@ -2037,11 +2038,12 @@ function VendasView() {
 }
 
 function VisaoGeral() {
-  const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [], tiposEnvio: [] })
+  const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [], tiposEnvio: [], mensagens: [] })
   const [campanha, setCampanha] = useState('')
   const [origem, setOrigem] = useState('')
   const [meta, setMeta] = useState('')
   const [tipoEnvio, setTipoEnvio] = useState('')
+  const [mensagemFiltro, setMensagemFiltro] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [horaInicio, setHoraInicio] = useState('')
@@ -2063,11 +2065,12 @@ function VisaoGeral() {
     origem: origem || '',
     meta: meta || '',
     tipo_envio: tipoEnvio || '',
+    mensagem: mensagemFiltro || '',
     date_from: dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : '',
     date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : '',
     hora_inicio: horaInicio,
     hora_fim: horaFim,
-  }), [campanha, origem, meta, tipoEnvio, dataInicio, dataFim, horaInicio, horaFim])
+  }), [campanha, origem, meta, tipoEnvio, mensagemFiltro, dataInicio, dataFim, horaInicio, horaFim])
 
   const loadFiltros = useCallback(async () => {
     try {
@@ -2078,6 +2081,7 @@ function VisaoGeral() {
           origens: data[0].origens || [],
           metas: data[0].metas || [],
           tiposEnvio: data[0].tipos_envio || [],
+          mensagens: data[0].mensagens || [],
         })
       }
     } catch {
@@ -2096,6 +2100,7 @@ function VisaoGeral() {
           origem: apiArgsBase.origem,
           meta: apiArgsBase.meta,
           tipo_envio: apiArgsBase.tipo_envio,
+          mensagem: apiArgsBase.mensagem,
           date_from: apiArgsBase.date_from,
           date_to: apiArgsBase.date_to,
         }),
@@ -2134,7 +2139,7 @@ function VisaoGeral() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setTipoEnvio(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setTipoEnvio(''); setMensagemFiltro(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={loadDados} disabled={loading} title="Atualizar agora">
@@ -2151,6 +2156,7 @@ function VisaoGeral() {
         <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
         <SearchSelect value={meta} onChange={setMeta} options={filtros.metas} label="meta" allLabel="meta — todos" />
         <SearchSelect value={tipoEnvio} onChange={setTipoEnvio} options={filtros.tiposEnvio} label="tipo de envio" allLabel="tipo de envio — todos" />
+        <SearchSelect value={mensagemFiltro} onChange={setMensagemFiltro} options={filtros.mensagens} label="mensagem" allLabel="mensagem — todas" />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
@@ -2194,7 +2200,7 @@ function VisaoGeral() {
         <div className="kpi"><p className="kpi-label">Tempo m&eacute;dio resposta</p><p className="kpi-value">{fmtMin(kpis?.tempo_resposta_min)}</p></div>
       </div>
 
-      <CampanhasList items={campanhas} loading={loading} />
+      <CampanhaDetalhadoList items={campanhas} loading={loading} />
 
       <div className="breakdown-grid">
         <BreakdownList title="Por Conversa" items={porConversa} loading={loading} />
