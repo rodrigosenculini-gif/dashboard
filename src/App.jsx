@@ -1489,6 +1489,28 @@ function VendedoraPortal({ vendedor, onLogout }) {
         {semanasBatidas.slice(0, 3).map((s) => (
           <div className="kpi" key={s.semana}><p className="kpi-label">Semana {s.semana_label}</p><p className="kpi-value" style={{ fontSize: 16 }}>{fmtMoeda(s.valor_semana)}</p></div>
         ))}
+        {meta && (
+          <>
+            <div className="kpi">
+              <p className="kpi-label">M&eacute;dia di&aacute;ria | semanal</p>
+              <p className="kpi-value kpi-split">
+                <span>{fmtMoeda(meta.dias_uteis_passados > 0 ? meta.total_mes_atual / meta.dias_uteis_passados : 0)}</span>
+                <span className="kpi-split-bar">|</span>
+                <span className="kpi-split-proj">{fmtMoeda(meta.dias_uteis_passados > 0 ? (meta.total_mes_atual / meta.dias_uteis_passados) * 5 : 0)}</span>
+              </p>
+              <p className="kpi-sub">m&eacute;dia semanal = di&aacute;ria &times; 5 dias &uacute;teis</p>
+            </div>
+            <div className="kpi">
+              <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
+              <p className="kpi-value kpi-split">
+                <span>{fmtMoeda(meta.dias_uteis_mes > 0 ? meta.projecao_mes / meta.dias_uteis_mes : 0)}</span>
+                <span className="kpi-split-bar">|</span>
+                <span className="kpi-split-proj">{fmtMoeda(meta.dias_uteis_mes > 0 ? (meta.projecao_mes / meta.dias_uteis_mes) * 5 : 0)}</span>
+              </p>
+              <p className="kpi-sub">baseado na proje&ccedil;&atilde;o do m&ecirc;s</p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="panel table-panel">
@@ -1596,6 +1618,7 @@ function VendedorasView() {
 
   const [kpisGeral, setKpisGeral] = useState(null)
   const [kpisVendedor, setKpisVendedor] = useState(null)
+  const [mediasGeral, setMediasGeral] = useState(null)
   const [porDia, setPorDia] = useState({ rows: [], vendedoresVistos: [] })
   const [tabela, setTabela] = useState({ rows: [], total: 0 })
   const [page, setPage] = useState(0) // 0 = 10 itens, 1 = 40 itens, 2+ = pagina de 30 depois dos 40
@@ -1632,10 +1655,12 @@ function VendedorasView() {
     const date_from = dataInicio || ''
     const date_to = dataFim || ''
     try {
-      const [dia, tab] = await Promise.all([
+      const [dia, tab, medias] = await Promise.all([
         callApi('vendedoras_por_dia', { vendedor, date_from, date_to }),
         callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }),
+        callApi('vendedoras_medias_geral', {}),
       ])
+      setMediasGeral(medias?.[0] ?? null)
 
       const porDiaMap = {}
       const vendedoresVistos = new Set()
@@ -1798,6 +1823,29 @@ function VendedorasView() {
           <div className="kpi"><p className="kpi-label">Vendedora com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_valor_vendedor || '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.top_valor_valor)}</p></div>
           <div className="kpi"><p className="kpi-label">Banco mais utilizado</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.banco_top_qtd)} vendas</p></div>
           <div className="kpi"><p className="kpi-label">Dia com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.dia_maior_valor ? fmtDataBR(kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.dia_maior_valor_total)}</p></div>
+        </div>
+      )}
+      {!vendedor && mediasGeral && (
+        <div className="kpi-grid kpi-grid-3">
+          <div className="kpi">
+            <p className="kpi-label">M&eacute;dia di&aacute;ria (time todo)</p>
+            <p className="kpi-value">{fmtMoeda(mediasGeral.dias_uteis_passados > 0 ? mediasGeral.total_mes_atual / mediasGeral.dias_uteis_passados : 0)}</p>
+            <p className="kpi-sub">por dia &uacute;til, m&ecirc;s corrente</p>
+          </div>
+          <div className="kpi">
+            <p className="kpi-label">M&eacute;dia semanal (time todo)</p>
+            <p className="kpi-value">{fmtMoeda(mediasGeral.dias_uteis_passados > 0 ? (mediasGeral.total_mes_atual / mediasGeral.dias_uteis_passados) * 5 : 0)}</p>
+            <p className="kpi-sub">m&eacute;dia di&aacute;ria &times; 5 dias &uacute;teis</p>
+          </div>
+          <div className="kpi">
+            <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
+            <p className="kpi-value kpi-split">
+              <span>{fmtMoeda(mediasGeral.dias_uteis_mes > 0 ? mediasGeral.projecao_mes / mediasGeral.dias_uteis_mes : 0)}</span>
+              <span className="kpi-split-bar">|</span>
+              <span className="kpi-split-proj">{fmtMoeda(mediasGeral.dias_uteis_mes > 0 ? (mediasGeral.projecao_mes / mediasGeral.dias_uteis_mes) * 5 : 0)}</span>
+            </p>
+            <p className="kpi-sub">baseado na proje&ccedil;&atilde;o do m&ecirc;s</p>
+          </div>
         </div>
       )}
       {vendedor && (
