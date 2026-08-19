@@ -649,7 +649,8 @@ body {
   font-family: var(--font-mono);
 }
 
-.add-venda-form input {
+.add-venda-form input,
+.add-venda-form select {
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
@@ -658,7 +659,8 @@ body {
   padding: 9px 10px;
   border-radius: 7px;
 }
-.add-venda-form input:focus { border-color: var(--rose); outline: none; }
+.add-venda-form input:focus,
+.add-venda-form select:focus { border-color: var(--rose); outline: none; }
 
 .add-venda-form button {
   margin-top: 6px;
