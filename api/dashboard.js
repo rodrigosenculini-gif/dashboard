@@ -107,7 +107,7 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
 
-  const { type = 'kpis', campanha, origem, meta, date_from, date_to, hora_inicio, hora_fim } = req.query;
+  const { type = 'kpis', campanha, origem, meta, date_from, date_to, hora_inicio, hora_fim, tipo_envio } = req.query;
   const p_campanha = campanha || null;
   const p_origem = origem || null;
   const p_meta = meta || null;
@@ -115,6 +115,7 @@ export default async function handler(req, res) {
   const p_date_to = date_to || null;
   const p_hora_inicio = hora_inicio !== undefined && hora_inicio !== '' ? parseInt(hora_inicio, 10) : null;
   const p_hora_fim = hora_fim !== undefined && hora_fim !== '' ? parseInt(hora_fim, 10) : null;
+  const p_tipo_envio = tipo_envio || null;
 
   if (type === 'vendas_export') {
     try {
@@ -178,23 +179,23 @@ export default async function handler(req, res) {
     sql = "select proname, pg_get_function_identity_arguments(oid) as args from pg_proc where proname like 'dashboard_%' order by proname";
     params = [];
   } else if (type === 'kpis') {
-    sql = 'select * from dashboard_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int)';
-    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_hora_inicio, p_hora_fim];
+    sql = 'select * from dashboard_kpis($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int,$8::text)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_hora_inicio, p_hora_fim, p_tipo_envio];
   } else if (type === 'envios') {
-    sql = 'select * from dashboard_envios_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int)';
-    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_hora_inicio, p_hora_fim];
+    sql = 'select * from dashboard_envios_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int,$8::text)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_hora_inicio, p_hora_fim, p_tipo_envio];
   } else if (type === 'campanhas') {
-    sql = 'select * from dashboard_campanhas($1::text,$2::text,$3::timestamptz,$4::timestamptz)';
-    params = [p_origem, p_meta, p_date_from, p_date_to];
+    sql = 'select * from dashboard_campanhas($1::text,$2::text,$3::timestamptz,$4::timestamptz,$5::text)';
+    params = [p_origem, p_meta, p_date_from, p_date_to, p_tipo_envio];
   } else if (type === 'por_conversa') {
-    sql = 'select * from dashboard_por_conversa($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
-    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
+    sql = 'select * from dashboard_por_conversa($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::text)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_tipo_envio];
   } else if (type === 'por_meta') {
-    sql = 'select * from dashboard_por_meta($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
-    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
+    sql = 'select * from dashboard_por_meta($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::text)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_tipo_envio];
   } else if (type === 'por_mensagem') {
-    sql = 'select * from dashboard_por_mensagem($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
-    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to];
+    sql = 'select * from dashboard_por_mensagem($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::text)';
+    params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_tipo_envio];
   } else if (type === 'hoje_kpis') {
     sql = 'select * from dashboard_hoje_kpis($1::timestamptz,$2::timestamptz,$3::text,$4::int,$5::int)';
     params = [p_date_from, p_date_to, p_campanha, p_hora_inicio, p_hora_fim];
