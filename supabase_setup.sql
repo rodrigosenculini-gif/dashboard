@@ -2129,3 +2129,33 @@ grant execute on function dashboard_vendas_por_dia to anon;
 grant execute on function dashboard_vendas_dias_mes to anon;
 grant execute on function dashboard_vendas_por_campanha to anon;
 grant execute on function dashboard_vendas_por_origem to anon;
+
+-- Diagnóstico temporário: agrupa as linhas de vendas_gerais com peso nulo,
+-- pra identificar padrões (banco sem regra, combinação de parcelas/seguro
+-- não coberta, etc.) em vez de adivinhar caso a caso.
+create or replace function dashboard_debug_peso_nulo()
+returns table (
+  banco text,
+  tabela_amostra text,
+  parcelas int,
+  seguro text,
+  qtd bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    banco,
+    max(tabela) as tabela_amostra,
+    parcelas,
+    seguro,
+    count(*) as qtd
+  from vendas_gerais
+  where peso is null
+  group by banco, parcelas, seguro
+  order by qtd desc;
+$$;
+
+grant execute on function dashboard_debug_peso_nulo to anon;
