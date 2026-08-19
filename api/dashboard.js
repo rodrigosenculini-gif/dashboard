@@ -276,6 +276,9 @@ export default async function handler(req, res) {
   } else if (type === 'vendedoras_semanas_mes') {
     sql = 'select * from dashboard_vendedoras_semanas_mes($1::text)';
     params = [req.query.vendedor || null];
+  } else if (type === 'debug_peso_nulo') {
+    sql = 'select * from dashboard_debug_peso_nulo()';
+    params = [];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
