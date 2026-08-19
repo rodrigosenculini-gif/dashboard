@@ -2037,10 +2037,11 @@ function VendasView() {
 }
 
 function VisaoGeral() {
-  const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [] })
+  const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [], tiposEnvio: [] })
   const [campanha, setCampanha] = useState('')
   const [origem, setOrigem] = useState('')
   const [meta, setMeta] = useState('')
+  const [tipoEnvio, setTipoEnvio] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [horaInicio, setHoraInicio] = useState('')
@@ -2061,11 +2062,12 @@ function VisaoGeral() {
     campanha: campanha || '',
     origem: origem || '',
     meta: meta || '',
+    tipo_envio: tipoEnvio || '',
     date_from: dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : '',
     date_to: dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : '',
     hora_inicio: horaInicio,
     hora_fim: horaFim,
-  }), [campanha, origem, meta, dataInicio, dataFim, horaInicio, horaFim])
+  }), [campanha, origem, meta, tipoEnvio, dataInicio, dataFim, horaInicio, horaFim])
 
   const loadFiltros = useCallback(async () => {
     try {
@@ -2075,6 +2077,7 @@ function VisaoGeral() {
           campanhas: data[0].campanhas || [],
           origens: data[0].origens || [],
           metas: data[0].metas || [],
+          tiposEnvio: data[0].tipos_envio || [],
         })
       }
     } catch {
@@ -2092,6 +2095,7 @@ function VisaoGeral() {
         callApi('campanhas', {
           origem: apiArgsBase.origem,
           meta: apiArgsBase.meta,
+          tipo_envio: apiArgsBase.tipo_envio,
           date_from: apiArgsBase.date_from,
           date_to: apiArgsBase.date_to,
         }),
@@ -2130,7 +2134,7 @@ function VisaoGeral() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setTipoEnvio(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={loadDados} disabled={loading} title="Atualizar agora">
@@ -2143,18 +2147,10 @@ function VisaoGeral() {
       </div>
 
       <div className="filters">
-        <select value={campanha} onChange={(e) => setCampanha(e.target.value)}>
-          <option value="">campanha &mdash; todas</option>
-          {filtros.campanhas.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={origem} onChange={(e) => setOrigem(e.target.value)}>
-          <option value="">origem &mdash; todas</option>
-          {filtros.origens.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-        <select value={meta} onChange={(e) => setMeta(e.target.value)}>
-          <option value="">meta &mdash; todos</option>
-          {filtros.metas.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+        <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
+        <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
+        <SearchSelect value={meta} onChange={setMeta} options={filtros.metas} label="meta" allLabel="meta — todos" />
+        <SearchSelect value={tipoEnvio} onChange={setTipoEnvio} options={filtros.tiposEnvio} label="tipo de envio" allLabel="tipo de envio — todos" />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
