@@ -1504,7 +1504,7 @@ begin
   -- reconhece REFIN pelo texto "REFIN" OU pelos códigos Facta que já são
   -- refin mesmo quando o campo tabela só traz o número, sem a palavra
   if upper(coalesce(p_tabela, '')) like '%REFIN%'
-     or codigo in ('69272', '69264', '69256', '69280')
+     or codigo in ('69272', '69264', '69256', '69280', '69299', '69302', '641130', '64181', '61433', '64785')
   then
     return 'REFIN';
   end if;
@@ -1558,43 +1558,96 @@ begin
 
   -- FACTA
   if banco_norm like '%FACTA%' then
-    return case codigo
-      when '69205' then 1.45
-      when '69191' then 1.35
-      when '69183' then 1.35
-      when '69035' then 1.35
-      when '69027' then 1.35
-      when '69043' then 1.35
-      when '69051' then 1.35
-      when '69167' then 1.25
-      when '69175' then 1.25
-      when '69159' then 1.20
-      when '69140' then 1.15
-      when '69060' then 1.15
-      when '69132' then 1.10
-      when '692213' then 1.10
-      when '69221' then 1.10
-      when '69230' then 1.10 -- ambíguo na planilha original (aparece também como 0,70)
-      when '69078' then 0.90
-      when '69086' then 0.90
-      when '69213' then 0.90
-      when '69116' then 0.90
-      when '69019' then 0.80
-      when '69094' then 0.80
-      when '69272' then 0.90
-      when '69264' then 0.80
-      when '69256' then 0.70
-      when '69280' then 0.60
-      when '61107' then 0.35
-      when '61093' then 0.35
-      when '61085' then 0.35
-      when '69299' then 0.35
-      when '69302' then 0.35
-      when '64815' then 0.00
-      when '64823' then 0.00
-      when '64831' then 0.00
-      else null
-    end;
+    -- série 69xxx
+    if codigo = '69205' then
+      if p_parcelas = 60 then return 1.45; end if;
+      return null;
+    end if;
+    if codigo in ('69191','69183','69035','69027','69043','69051') then
+      if p_parcelas in (36,48) then return 1.35; end if;
+      return null;
+    end if;
+    if codigo in ('69167','69175') then
+      if p_parcelas in (24,60) then return 1.25; end if;
+      return null;
+    end if;
+    if codigo = '69159' then
+      if p_parcelas = 48 then return 1.20; end if;
+      return null;
+    end if;
+    if codigo in ('69140','69060') then
+      if p_parcelas in (24,36) then return 1.15; end if;
+      return null;
+    end if;
+    if codigo = '69132' then
+      if p_parcelas = 24 then return 1.10; end if;
+      return null;
+    end if;
+    if codigo in ('692213','69221','69230') then
+      -- 69230 também aparecia isolado com 0,70 pra 24 parcelas —
+      -- confirmado que prevalece o valor do grupo (1,10)
+      if p_parcelas in (24,36,48,60) then return 1.10; end if;
+      return null;
+    end if;
+    if codigo in ('69078','69086') then
+      if p_parcelas in (36,48) then return 0.90; end if;
+      return null;
+    end if;
+    if codigo = '69213' then
+      if p_parcelas = 24 then return 0.90; end if;
+      return null;
+    end if;
+    if codigo = '69116' then
+      if p_parcelas in (24,36,48) then return 0.90; end if;
+      return null;
+    end if;
+    if codigo in ('69019','69094') then
+      if p_parcelas = 24 then return 0.80; end if;
+      return null;
+    end if;
+    if codigo = '69272' then
+      if p_parcelas in (36,48,60) then return 0.90; end if;
+      return null;
+    end if;
+    if codigo = '69264' then
+      if p_parcelas in (36,48,60) then return 0.80; end if;
+      return null;
+    end if;
+    if codigo = '69256' then
+      if p_parcelas in (36,48,60) then return 0.70; end if;
+      return null;
+    end if;
+    if codigo = '69280' then
+      if p_parcelas in (36,48,60) then return 0.60; end if;
+      return null;
+    end if;
+    if codigo in ('61107','61093','61085') then
+      -- confirmado 0,35 (havia uma versão com 0,30 numa imagem, descartada)
+      if p_parcelas between 1 and 48 then return 0.35; end if;
+      return null;
+    end if;
+    if codigo in ('69299','69302') then
+      if p_parcelas in (36,60) then return 0.35; end if;
+      return null;
+    end if;
+    if codigo in ('64815','64823','64831') then
+      if p_parcelas between 1 and 48 then return 0.00; end if;
+      return null;
+    end if;
+
+    -- série 66xxx / 64xxx (tabela mais recente)
+    if codigo in ('66036','66028') and p_parcelas = 60 then return 1.15; end if;
+    if codigo in ('66036','66028','66010') and p_parcelas = 48 then return 1.00; end if;
+    if codigo in ('66060','66052','66010','65951') and p_parcelas = 36 then return 0.90; end if;
+    if codigo in ('66044','65943') and p_parcelas = 24 then return 0.75; end if;
+    if codigo in ('66095','66087') and p_parcelas in (48,60) then return 0.80; end if;
+    if codigo in ('66095','66087','66079','65935') and p_parcelas = 36 then return 0.65; end if;
+    if codigo in ('66079','65935') and p_parcelas = 24 then return 0.55; end if;
+    if codigo = '641130' and p_parcelas in (36,48) then return 0.75; end if;
+    if codigo = '64181' and p_parcelas between 36 and 60 then return 0.60; end if;
+    if codigo in ('61433','64785') and p_parcelas in (36,48) then return 0.30; end if;
+
+    return null;
   end if;
 
   -- CREFAZ
