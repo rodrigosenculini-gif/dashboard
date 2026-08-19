@@ -1574,9 +1574,15 @@ begin
 
   -- CREFAZ
   if banco_norm like '%CREFAZ%' then
-    if p_parcelas is null then return null; end if;
-    if p_parcelas between 9 and 24 then return 1.65; end if;
-    if p_parcelas between 1 and 8 then return 1.30; end if;
+    if p_parcelas is not null then
+      if p_parcelas between 9 and 24 then return 1.65; end if;
+      if p_parcelas between 1 and 8 then return 1.30; end if;
+      return null;
+    end if;
+    -- coluna parcelas vazia: tenta reconhecer a faixa pelo texto da tabela
+    -- (ex: "CRÉDITO CONTA DE LUZ 9-24")
+    if tabela_norm ~ '9\s*-\s*24' or tabela_norm ~ '9\s*A\s*24' then return 1.65; end if;
+    if tabela_norm ~ '1\s*-\s*8' or tabela_norm ~ '1\s*A\s*8' then return 1.30; end if;
     return null;
   end if;
 
@@ -1590,9 +1596,10 @@ begin
     return 1.10;
   end if;
 
-  -- PRESENÇA
+  -- PRESENÇA — o número de parcelas às vezes vem só no texto da tabela
+  -- (ex: "PRESENÇA 36"), não na coluna parcelas — extrai de lá nesse caso
   if banco_norm like '%PRESEN%' then
-    return case p_parcelas
+    return case coalesce(p_parcelas, nullif(substring(tabela_norm from '[0-9]{2}'), '')::int)
       when 48 then 1.75
       when 36 then 1.25
       when 26 then 0.75
