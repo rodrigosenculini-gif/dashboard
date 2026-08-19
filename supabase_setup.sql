@@ -1514,9 +1514,13 @@ begin
   end if;
 
   if upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%NOVO SAQUE%'
-     -- reforço: esses nomes de tabela são exclusivos da Novo Saque, então
-     -- reconhece mesmo que o campo banco venha vazio/diferente do esperado
-     or upper(coalesce(p_tabela, '')) ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
+     -- reforço só quando o banco vier vazio de verdade — "GOLD"/"SMART"
+     -- também aparecem em nomes de tabela da Facta, então nunca pode
+     -- sobrescrever um banco já identificado
+     or (
+       (p_banco is null or trim(p_banco) = '')
+       and upper(coalesce(p_tabela, '')) ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
+     )
   then
     return 'FGTS';
   end if;
@@ -1558,94 +1562,54 @@ begin
 
   -- FACTA
   if banco_norm like '%FACTA%' then
-    -- série 69xxx
-    if codigo = '69205' then
-      if p_parcelas = 60 then return 1.45; end if;
-      return null;
-    end if;
-    if codigo in ('69191','69183','69035','69027','69043','69051') then
-      if p_parcelas in (36,48) then return 1.35; end if;
-      return null;
-    end if;
-    if codigo in ('69167','69175') then
-      if p_parcelas in (24,60) then return 1.25; end if;
-      return null;
-    end if;
-    if codigo = '69159' then
-      if p_parcelas = 48 then return 1.20; end if;
-      return null;
-    end if;
-    if codigo in ('69140','69060') then
-      if p_parcelas in (24,36) then return 1.15; end if;
-      return null;
-    end if;
-    if codigo = '69132' then
-      if p_parcelas = 24 then return 1.10; end if;
-      return null;
-    end if;
-    if codigo in ('692213','69221','69230') then
-      -- 69230 também aparecia isolado com 0,70 pra 24 parcelas —
-      -- confirmado que prevalece o valor do grupo (1,10)
-      if p_parcelas in (24,36,48,60) then return 1.10; end if;
-      return null;
-    end if;
-    if codigo in ('69078','69086') then
-      if p_parcelas in (36,48) then return 0.90; end if;
-      return null;
-    end if;
-    if codigo = '69213' then
-      if p_parcelas = 24 then return 0.90; end if;
-      return null;
-    end if;
-    if codigo = '69116' then
-      if p_parcelas in (24,36,48) then return 0.90; end if;
-      return null;
-    end if;
-    if codigo in ('69019','69094') then
-      if p_parcelas = 24 then return 0.80; end if;
-      return null;
-    end if;
-    if codigo = '69272' then
-      if p_parcelas in (36,48,60) then return 0.90; end if;
-      return null;
-    end if;
-    if codigo = '69264' then
-      if p_parcelas in (36,48,60) then return 0.80; end if;
-      return null;
-    end if;
-    if codigo = '69256' then
-      if p_parcelas in (36,48,60) then return 0.70; end if;
-      return null;
-    end if;
-    if codigo = '69280' then
-      if p_parcelas in (36,48,60) then return 0.60; end if;
-      return null;
-    end if;
-    if codigo in ('61107','61093','61085') then
-      -- confirmado 0,35 (havia uma versão com 0,30 numa imagem, descartada)
-      if p_parcelas between 1 and 48 then return 0.35; end if;
-      return null;
-    end if;
-    if codigo in ('69299','69302') then
-      if p_parcelas in (36,60) then return 0.35; end if;
-      return null;
-    end if;
-    if codigo in ('64815','64823','64831') then
-      if p_parcelas between 1 and 48 then return 0.00; end if;
-      return null;
-    end if;
+    -- códigos sem ambiguidade: o peso é o mesmo não importa qual parcela da
+    -- lista o cliente pegou, então não exige a coluna parcelas preenchida
+    if codigo = '69205' then return 1.45; end if;
+    if codigo in ('69191','69183','69035','69027','69043','69051') then return 1.35; end if;
+    if codigo in ('69167','69175') then return 1.25; end if;
+    if codigo = '69159' then return 1.20; end if;
+    if codigo in ('69140','69060') then return 1.15; end if;
+    if codigo = '69132' then return 1.10; end if;
+    if codigo in ('692213','69221','69230') then return 1.10; end if;
+    if codigo in ('69078','69086') then return 0.90; end if;
+    if codigo = '69213' then return 0.90; end if;
+    if codigo = '69116' then return 0.90; end if;
+    if codigo in ('69019','69094') then return 0.80; end if;
+    if codigo = '69272' then return 0.90; end if;
+    if codigo = '69264' then return 0.80; end if;
+    if codigo = '69256' then return 0.70; end if;
+    if codigo = '69280' then return 0.60; end if;
+    if codigo in ('61107','61093','61085') then return 0.35; end if;
+    if codigo in ('69299','69302') then return 0.35; end if;
+    if codigo in ('64815','64823','64831') then return 0.00; end if;
+    if codigo in ('66044','65943') then return 0.75; end if;
+    if codigo in ('66060','66052','65951') then return 0.90; end if;
+    if codigo = '641130' then return 0.75; end if;
+    if codigo = '64181' then return 0.60; end if;
+    if codigo in ('61433','64785') then return 0.30; end if;
 
-    -- série 66xxx / 64xxx (tabela mais recente)
-    if codigo in ('66036','66028') and p_parcelas = 60 then return 1.15; end if;
-    if codigo in ('66036','66028','66010') and p_parcelas = 48 then return 1.00; end if;
-    if codigo in ('66060','66052','66010','65951') and p_parcelas = 36 then return 0.90; end if;
-    if codigo in ('66044','65943') and p_parcelas = 24 then return 0.75; end if;
-    if codigo in ('66095','66087') and p_parcelas in (48,60) then return 0.80; end if;
-    if codigo in ('66095','66087','66079','65935') and p_parcelas = 36 then return 0.65; end if;
-    if codigo in ('66079','65935') and p_parcelas = 24 then return 0.55; end if;
-    if codigo = '641130' and p_parcelas in (36,48) then return 0.75; end if;
-    if codigo = '64181' and p_parcelas between 36 and 60 then return 0.60; end if;
-    if codigo in ('61433','64785') and p_parcelas in (36,48) then return 0.30; end if;
+    -- códigos ambíguos: o MESMO código vale pesos diferentes dependendo da
+    -- quantidade de parcelas — aqui sim precisa saber a parcela pra decidir
+    if codigo in ('66036','66028') then
+      if p_parcelas = 60 then return 1.15; end if;
+      if p_parcelas = 48 then return 1.00; end if;
+      return null;
+    end if;
+    if codigo = '66010' then
+      if p_parcelas = 48 then return 1.00; end if;
+      if p_parcelas = 36 then return 0.90; end if;
+      return null;
+    end if;
+    if codigo in ('66095','66087') then
+      if p_parcelas in (48,60) then return 0.80; end if;
+      if p_parcelas = 36 then return 0.65; end if;
+      return null;
+    end if;
+    if codigo in ('66079','65935') then
+      if p_parcelas = 36 then return 0.65; end if;
+      if p_parcelas = 24 then return 0.55; end if;
+      return null;
+    end if;
 
     return null;
   end if;
@@ -1734,10 +1698,14 @@ begin
     end if;
   end if;
 
-  -- NOVO SAQUE (por banco OU pelo nome da tabela, já que esses nomes são
-  -- exclusivos dela — cobre casos em que o campo banco veio vazio/diferente)
+  -- NOVO SAQUE (por banco OU pelo nome da tabela quando o banco vier vazio
+  -- de verdade — "GOLD"/"SMART" também existem em nomes da Facta, então
+  -- esse reforço nunca pode sobrescrever um banco já identificado)
   if banco_norm like '%NOVO SAQUE%'
-     or tabela_norm ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
+     or (
+       trim(banco_norm) = ''
+       and tabela_norm ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
+     )
   then
     if tabela_norm like '%CAMPANHA%' then return 9.50; end if;
     if tabela_norm like '%DIAMANTE%' then return 7.50; end if;
