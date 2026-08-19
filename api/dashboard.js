@@ -118,6 +118,20 @@ export default async function handler(req, res) {
   const p_tipo_envio = tipo_envio || null;
   const p_mensagem = mensagem || null;
 
+  const csvEsc = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const sendCsv = (res, cols, rows, filename) => {
+    const lines = [cols.join(';')];
+    for (const row of rows) lines.push(cols.map((c) => csvEsc(row[c])).join(';'));
+    const csv = '\uFEFF' + lines.join('\r\n'); // BOM pra acentuação abrir certo no Excel
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(csv);
+  };
+
   if (type === 'vendas_export') {
     try {
       const p_produto = req.query.produto || null;
@@ -131,19 +145,79 @@ export default async function handler(req, res) {
         [p_date_from, p_date_to, p_produto]
       );
       const cols = ['adesao', 'cpf', 'nome', 'tabela', 'produto', 'banco', 'parcelas', 'seguro', 'peso', 'ponto', 'valor', 'data', 'campanha', 'origem'];
-      const esc = (v) => {
-        if (v === null || v === undefined) return '';
-        const s = String(v);
-        return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-      };
-      const lines = [cols.join(';')];
-      for (const row of result.rows) {
-        lines.push(cols.map((c) => esc(row[c])).join(';'));
-      }
-      const csv = '\uFEFF' + lines.join('\r\n'); // BOM pra acentuação abrir certo no Excel
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="vendas_gerais_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv"`);
-      return res.status(200).send(csv);
+      return sendCsv(res, cols, result.rows, `vendas_gerais_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (type === 'disparos_export') {
+    try {
+      const client = getPool();
+      const result = await client.query(
+        `select efetiva_campanha(campanha, campanha_reenvio, reenvio) as campanha, origem, meta, tipo_envio, mensagem,
+                conversa, status, banco, valor, pagas, interacao, whatsapp, cpf, realizado, reenvio
+         from disparochat
+         where ($1::text is null or efetiva_campanha(campanha, campanha_reenvio, reenvio) = $1::text)
+           and ($2::text is null or origem = $2::text)
+           and ($3::text is null or meta = $3::text)
+           and ($4::text is null or tipo_envio = $4::text)
+           and ($5::text is null or mensagem = $5::text)
+           and (
+             ($6::timestamptz is null and $7::timestamptz is null)
+             or (($6::timestamptz is null or realizado >= $6::timestamptz) and ($7::timestamptz is null or realizado <= $7::timestamptz))
+             or (reenvio is not null and ($6::timestamptz is null or reenvio >= $6::timestamptz) and ($7::timestamptz is null or reenvio <= $7::timestamptz))
+           )
+         order by coalesce(reenvio, realizado) desc nulls last
+         limit 20000`,
+        [p_campanha, p_origem, p_meta, p_tipo_envio, p_mensagem, p_date_from, p_date_to]
+      );
+      const cols = ['campanha', 'origem', 'meta', 'tipo_envio', 'mensagem', 'conversa', 'status', 'banco', 'valor', 'pagas', 'interacao', 'whatsapp', 'cpf', 'realizado', 'reenvio'];
+      return sendCsv(res, cols, result.rows, `disparochat_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (type === 'entradas_export') {
+    try {
+      const p_produto = req.query.produto || null;
+      const client = getPool();
+      const result = await client.query(
+        `select campanha, origem, produto, interacao, aprovadas, pagas, valor, banco, whatsapp, cpf, created_at
+         from total_produtos
+         where ($1::text is null or campanha = $1::text)
+           and ($2::text is null or origem = $2::text)
+           and ($3::text is null or produto = $3::text)
+           and ($4::timestamptz is null or created_at >= $4::timestamptz)
+           and ($5::timestamptz is null or created_at <= $5::timestamptz)
+         order by created_at desc nulls last
+         limit 20000`,
+        [p_campanha, p_origem, p_produto, p_date_from, p_date_to]
+      );
+      const cols = ['campanha', 'origem', 'produto', 'interacao', 'aprovadas', 'pagas', 'valor', 'banco', 'whatsapp', 'cpf', 'created_at'];
+      return sendCsv(res, cols, result.rows, `total_produtos_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (type === 'vendedoras_export') {
+    try {
+      const p_vendedor = req.query.vendedor || null;
+      const client = getPool();
+      const result = await client.query(
+        `select data_status, vendedor, banco, tabela, adesao, cpf, nome, valor, parcelas, seguro, data_pagamento
+         from vendedoras_analise
+         where ($1::text is null or vendedor = $1::text)
+           and ($2::date is null or data_status >= $2::date)
+           and ($3::date is null or data_status <= $3::date)
+         order by data_status desc nulls last
+         limit 20000`,
+        [p_vendedor, p_date_from, p_date_to]
+      );
+      const cols = ['data_status', 'vendedor', 'banco', 'tabela', 'adesao', 'cpf', 'nome', 'valor', 'parcelas', 'seguro', 'data_pagamento'];
+      return sendCsv(res, cols, result.rows, `vendedoras_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
