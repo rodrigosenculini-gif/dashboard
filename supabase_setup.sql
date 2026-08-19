@@ -1382,6 +1382,55 @@ grant execute on function dashboard_vendedoras_filtros to anon;
 -- projeção (regra de três simples: total ÷ dias úteis passados × dias úteis
 -- do mês inteiro) e o valor da semana atual (meta de R$100.000/semana).
 -- "Dia útil" aqui = segunda a sexta (não desconta feriados).
+-- Mesma conta de dias_uteis_passados/dias_uteis_mes/projecao da função
+-- individual, só que somando TODAS as vendedoras — usado na visão geral
+-- pra mostrar média diária/semanal e projeção diária/semanal do time.
+create or replace function dashboard_vendedoras_medias_geral()
+returns table (
+  total_mes_atual numeric,
+  dias_uteis_passados int,
+  dias_uteis_mes int,
+  projecao_mes numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with hoje as (
+    select (now() at time zone 'America/Sao_Paulo')::date as d
+  ),
+  mes as (
+    select
+      date_trunc('month', d)::date as inicio,
+      (date_trunc('month', d) + interval '1 month - 1 day')::date as fim
+    from hoje
+  ),
+  du_passados as (
+    select count(*) as n
+    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+    where extract(isodow from g.dia) < 6
+  ),
+  du_mes as (
+    select count(*) as n
+    from generate_series((select inicio from mes), (select fim from mes), interval '1 day') g(dia)
+    where extract(isodow from g.dia) < 6
+  ),
+  total_mes as (
+    select coalesce(sum(valor), 0) as v
+    from vendedoras_analise, mes, hoje
+    where data_status >= mes.inicio
+      and data_status <= hoje.d
+  )
+  select
+    (select v from total_mes),
+    (select n from du_passados),
+    (select n from du_mes),
+    case when (select n from du_passados) > 0
+      then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end;
+$$;
+
 create or replace function dashboard_vendedoras_meta(p_vendedor text)
 returns table (
   total_mes_atual numeric,
@@ -1553,6 +1602,7 @@ end;
 $$;
 
 grant execute on function dashboard_vendedoras_meta to anon;
+grant execute on function dashboard_vendedoras_medias_geral to anon;
 grant execute on function dashboard_vendedoras_semanas_mes to anon;
 grant execute on function dashboard_vendedoras_add_venda to anon;
 
