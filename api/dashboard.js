@@ -275,6 +275,9 @@ export default async function handler(req, res) {
   } else if (type === 'vendedoras_meta') {
     sql = 'select * from dashboard_vendedoras_meta($1::text)';
     params = [req.query.vendedor || null];
+  } else if (type === 'vendedoras_medias_geral') {
+    sql = 'select * from dashboard_vendedoras_medias_geral()';
+    params = [];
   } else if (type === 'vendedoras_semanas_mes') {
     sql = 'select * from dashboard_vendedoras_semanas_mes($1::text)';
     params = [req.query.vendedor || null];
