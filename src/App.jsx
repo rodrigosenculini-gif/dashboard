@@ -274,7 +274,10 @@ function SearchSelect({ value, onChange, options, label, allLabel }) {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
 
-  const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase())).slice(0, 50)
+  const filtered = options
+    .filter((o) => o != null && String(o).trim() !== '')
+    .filter((o) => String(o).toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 50)
 
   return (
     <div className="campanha-search" ref={ref}>
