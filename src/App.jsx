@@ -1220,6 +1220,66 @@ function MilestoneDot(props) {
   )
 }
 
+// Bancos com peso calculado por código de tabela (a vendedora escolhe o
+// código certo em vez de digitar parcela/seguro)
+const BANCOS_POR_CODIGO = ['FACTA']
+
+// Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
+const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESEN\u00c7A', 'SOMA', 'V8']
+
+const FACTA_CODIGOS = [
+  { codigo: '69205', label: '69205 \u2014 Novo Gold, 60x (1,45)' },
+  { codigo: '69191', label: '69191 \u2014 Novo Gold, 36/48x (1,35)' },
+  { codigo: '69183', label: '69183 \u2014 Novo Gold, 36/48x (1,35)' },
+  { codigo: '69035', label: '69035 \u2014 Novo Gold, 36/48x (1,35)' },
+  { codigo: '69027', label: '69027 \u2014 Novo Gold, 36/48x (1,35)' },
+  { codigo: '69043', label: '69043 \u2014 Novo Gold, 36/48x (1,35)' },
+  { codigo: '69051', label: '69051 \u2014 Novo Gold, 36/48x (1,35)' },
+  { codigo: '69167', label: '69167 \u2014 Novo Gold, 24/60x (1,25)' },
+  { codigo: '69175', label: '69175 \u2014 Novo Gold, 24/60x (1,25)' },
+  { codigo: '69159', label: '69159 \u2014 Novo Gold, 48x (1,20)' },
+  { codigo: '69140', label: '69140 \u2014 Novo Gold, 24/36x (1,15)' },
+  { codigo: '69060', label: '69060 \u2014 Novo Gold, 24/36x (1,15)' },
+  { codigo: '69132', label: '69132 \u2014 Novo Gold, 24x (1,10)' },
+  { codigo: '692213', label: '692213 \u2014 Novo Smart, 24-60x (1,10)' },
+  { codigo: '69221', label: '69221 \u2014 Novo Smart, 24-60x (1,10)' },
+  { codigo: '69230', label: '69230 \u2014 Novo Smart, 24-60x (1,10)' },
+  { codigo: '69078', label: '69078 \u2014 Novo Gold, 36/48x (0,90)' },
+  { codigo: '69086', label: '69086 \u2014 Novo Gold, 36/48x (0,90)' },
+  { codigo: '69213', label: '69213 \u2014 Novo Smart, 24x (0,90)' },
+  { codigo: '69116', label: '69116 \u2014 Novo Smart, 24-48x (0,90)' },
+  { codigo: '69019', label: '69019 \u2014 Novo Gold, 24x (0,80)' },
+  { codigo: '69094', label: '69094 \u2014 Novo Gold, 24x (0,80)' },
+  { codigo: '69272', label: '69272 \u2014 Refin Gold Power, 36-60x (0,90)' },
+  { codigo: '69264', label: '69264 \u2014 Refin Gold Plus, 36-60x (0,80)' },
+  { codigo: '69256', label: '69256 \u2014 Refin Gold Prime, 36-60x (0,70)' },
+  { codigo: '69280', label: '69280 \u2014 Refin, 36-60x (0,60)' },
+  { codigo: '61107', label: '61107 \u2014 Portabilidade >12 pagas, 1-48x (0,35)' },
+  { codigo: '61093', label: '61093 \u2014 Portabilidade >12 pagas, 1-48x (0,35)' },
+  { codigo: '61085', label: '61085 \u2014 Portabilidade >12 pagas, 1-48x (0,35)' },
+  { codigo: '69299', label: '69299 \u2014 Refin da Port, 36/60x (0,35)' },
+  { codigo: '69302', label: '69302 \u2014 Refin da Port, 36/60x (0,35)' },
+  { codigo: '64815', label: '64815 \u2014 Portabilidade <12 pagas, 1-48x (0,00)' },
+  { codigo: '64823', label: '64823 \u2014 Portabilidade <12 pagas, 1-48x (0,00)' },
+  { codigo: '64831', label: '64831 \u2014 Portabilidade <12 pagas, 1-48x (0,00)' },
+  { codigo: '66036', label: '66036 \u2014 Novo Gold, 60x (1,15) / 48x com 66010 (1,00)' },
+  { codigo: '66028', label: '66028 \u2014 Novo Gold, 60x (1,15) / 48x com 66010 (1,00)' },
+  { codigo: '66010', label: '66010 \u2014 Novo Gold, 48x (1,00) / 36x (0,90)' },
+  { codigo: '66060', label: '66060 \u2014 Novo Gold, 36x (0,90)' },
+  { codigo: '66052', label: '66052 \u2014 Novo Gold, 36x (0,90)' },
+  { codigo: '65951', label: '65951 \u2014 Novo Gold, 36x (0,90)' },
+  { codigo: '66044', label: '66044 \u2014 Novo Gold, 24x (0,75)' },
+  { codigo: '65943', label: '65943 \u2014 Novo Gold, 24x (0,75)' },
+  { codigo: '66095', label: '66095 \u2014 Novo Smart, 48/60x (0,80) / 36x (0,65)' },
+  { codigo: '66087', label: '66087 \u2014 Novo Smart, 48/60x (0,80) / 36x (0,65)' },
+  { codigo: '66079', label: '66079 \u2014 Novo Smart, 36x (0,65) / 24x (0,55)' },
+  { codigo: '65935', label: '65935 \u2014 Novo Smart, 36x (0,65) / 24x (0,55)' },
+  { codigo: '641130', label: '641130 \u2014 Refin Gold, 36/48x (0,75)' },
+  { codigo: '64181', label: '64181 \u2014 Refin, 36-60x (0,60)' },
+  { codigo: '61433', label: '61433 \u2014 Refin da Port CLT, 36/48x (0,30)' },
+  { codigo: '64785', label: '64785 \u2014 Refin da Port CLT, 36/48x (0,30)' },
+]
+
 function VendedoraPortal({ vendedor, onLogout }) {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [kpis, setKpis] = useState(null)
@@ -1234,7 +1294,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const [lastUpdate, setLastUpdate] = useState(null)
 
   const [showAdd, setShowAdd] = useState(false)
-  const [addForm, setAddForm] = useState({ adesao: '', cpf: '', nome: '', valor: '', banco: '' })
+  const [addForm, setAddForm] = useState({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', dataPagamento: '', parcelas: '', seguro: '' })
   const [addMsg, setAddMsg] = useState('')
   const [adding, setAdding] = useState(false)
 
@@ -1335,6 +1395,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
     setAdding(true)
     setAddMsg('')
     try {
+      const ehPorCodigo = BANCOS_POR_CODIGO.includes(addForm.banco)
       const result = await postApi('vendedoras_add_venda', {
         vendedor,
         adesao: addForm.adesao,
@@ -1342,11 +1403,15 @@ function VendedoraPortal({ vendedor, onLogout }) {
         nome: addForm.nome,
         valor: addForm.valor.replace(',', '.'),
         banco: addForm.banco,
+        tabela: ehPorCodigo ? addForm.codigo : '',
+        data_pagamento: addForm.dataPagamento,
+        parcelas: addForm.parcelas,
+        seguro: addForm.seguro,
       })
       const r = result?.[0]
       if (r?.ok) {
         setAddMsg('Venda adicionada. Sincronizando...')
-        setAddForm({ adesao: '', cpf: '', nome: '', valor: '', banco: '' })
+        setAddForm({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', dataPagamento: '', parcelas: '', seguro: '' })
         await callApi('vendedoras_sync', {})
         await load()
         setAddMsg('Conclu\u00eddo!')
@@ -1472,7 +1537,46 @@ function VendedoraPortal({ vendedor, onLogout }) {
               <label>CPF<input required value={addForm.cpf} onChange={(e) => setAddForm({ ...addForm, cpf: e.target.value })} /></label>
               <label>Nome<input required value={addForm.nome} onChange={(e) => setAddForm({ ...addForm, nome: e.target.value })} /></label>
               <label>Valor<input required value={addForm.valor} onChange={(e) => setAddForm({ ...addForm, valor: e.target.value })} placeholder="0,00" /></label>
-              <label>Banco<input required value={addForm.banco} onChange={(e) => setAddForm({ ...addForm, banco: e.target.value })} /></label>
+              <label>Banco
+                <select required value={addForm.banco} onChange={(e) => setAddForm({ ...addForm, banco: e.target.value, codigo: '', parcelas: '', seguro: '' })}>
+                  <option value="">selecione o banco</option>
+                  {BANCOS_VENDA.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </label>
+
+              {addForm.banco && BANCOS_POR_CODIGO.includes(addForm.banco) && (
+                <label>C&oacute;digo da tabela
+                  <select required value={addForm.codigo} onChange={(e) => setAddForm({ ...addForm, codigo: e.target.value })}>
+                    <option value="">selecione o c&oacute;digo</option>
+                    {FACTA_CODIGOS.map((c) => <option key={c.codigo} value={c.codigo}>{c.label}</option>)}
+                  </select>
+                </label>
+              )}
+              {addForm.banco && BANCOS_POR_CODIGO.includes(addForm.banco) && (
+                <label>Parcelas <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(s&oacute; necess&aacute;rio pra alguns c&oacute;digos)</span>
+                  <input value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 36" />
+                </label>
+              )}
+
+              {addForm.banco && !BANCOS_POR_CODIGO.includes(addForm.banco) && (
+                <>
+                  <label>Parcelas
+                    <input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 24" />
+                  </label>
+                  <label>Seguro
+                    <select value={addForm.seguro} onChange={(e) => setAddForm({ ...addForm, seguro: e.target.value })}>
+                      <option value="">n&atilde;o informado</option>
+                      <option value="sim">Com seguro</option>
+                      <option value="nao">Sem seguro</option>
+                    </select>
+                  </label>
+                </>
+              )}
+
+              <label>Data de pagamento <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(vazio = hoje)</span>
+                <input type="date" value={addForm.dataPagamento} onChange={(e) => setAddForm({ ...addForm, dataPagamento: e.target.value })} />
+              </label>
+
               {addMsg && <p className="state-msg" style={{ margin: '4px 0' }}>{addMsg}</p>}
               <button type="submit" className="refresh-btn" disabled={adding}>{adding ? 'Enviando...' : 'Adicionar'}</button>
             </form>
