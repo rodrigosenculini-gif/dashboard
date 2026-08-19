@@ -1490,13 +1490,23 @@ $$;
 
 -- Adicionar uma venda avulsa (portal da vendedora). data_status e vendedor
 -- são sempre definidos automaticamente pelo servidor — nunca pelo cliente.
+-- garante as colunas novas (parcelas/seguro você já criou; data_pagamento
+-- fica aqui por segurança, sem custo se já existir)
+alter table vendedoras_analise add column if not exists data_pagamento date;
+
+drop function if exists dashboard_vendedoras_add_venda(text, bigint, text, text, numeric, text);
+
 create or replace function dashboard_vendedoras_add_venda(
   p_vendedor text,
   p_adesao bigint,
   p_cpf text,
   p_nome text,
   p_valor numeric,
-  p_banco text
+  p_banco text,
+  p_tabela text default null,
+  p_data_pagamento date default null,
+  p_parcelas int default null,
+  p_seguro text default null
 )
 returns table (ok boolean, mensagem text)
 language plpgsql
@@ -1505,6 +1515,7 @@ set search_path = public
 as $$
 declare
   v_cpf text;
+  v_data date;
 begin
   if p_vendedor is null or p_adesao is null or p_cpf is null or p_nome is null
      or p_valor is null or p_banco is null or trim(p_cpf) = '' or trim(p_nome) = '' or trim(p_banco) = '' then
@@ -1513,6 +1524,8 @@ begin
   end if;
 
   v_cpf := norm_cpf(p_cpf);
+  -- se não vier preenchida, a data de pagamento é hoje
+  v_data := coalesce(p_data_pagamento, (now() at time zone 'America/Sao_Paulo')::date);
 
   if exists (
     select 1 from vendedoras_analise
@@ -1522,16 +1535,17 @@ begin
     return;
   end if;
 
-  insert into vendedoras_analise (data_status, banco, adesao, cpf, nome, vendedor, valor)
-  values ((now() at time zone 'America/Sao_Paulo')::date, p_banco, p_adesao, v_cpf, p_nome, p_vendedor, p_valor);
+  insert into vendedoras_analise (data_status, banco, adesao, cpf, nome, vendedor, valor, tabela, data_pagamento, parcelas, seguro)
+  values ((now() at time zone 'America/Sao_Paulo')::date, p_banco, p_adesao, v_cpf, p_nome, p_vendedor, p_valor, p_tabela, v_data, p_parcelas, p_seguro);
 
-  -- espelha também na visão geral de Vendas (se ainda não existir lá)
+  -- espelha também na visão geral de Vendas (se ainda não existir lá) — já
+  -- levando tabela/parcelas/seguro, pro gatilho calcular o peso certo
   if not exists (
     select 1 from vendas_gerais
     where norm_cpf(cpf) = v_cpf and coalesce(adesao, -1) = p_adesao
   ) then
-    insert into vendas_gerais (data, banco, adesao, cpf, nome, valor)
-    values ((now() at time zone 'America/Sao_Paulo')::date, p_banco, p_adesao, v_cpf, p_nome, p_valor);
+    insert into vendas_gerais (data, banco, adesao, cpf, nome, valor, tabela, parcelas, seguro)
+    values ((now() at time zone 'America/Sao_Paulo')::date, p_banco, p_adesao, v_cpf, p_nome, p_valor, p_tabela, p_parcelas, p_seguro);
   end if;
 
   return query select true, 'Venda adicionada com sucesso.';
