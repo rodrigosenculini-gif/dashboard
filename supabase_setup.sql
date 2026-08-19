@@ -1542,6 +1542,16 @@ declare
   tabela_norm text := upper(coalesce(p_tabela, ''));
   codigo text;
   tem_seguro boolean := upper(coalesce(p_seguro, '')) in ('SIM', 'S', 'TRUE', '1', 'COM SEGURO', 'COM');
+  -- fallback: quando a coluna vem vazia, tenta extrair do texto da tabela
+  -- (ex: "V8 CLT S/SEGURO 36") — exige que o número não esteja colado a uma
+  -- letra, pra não confundir o "8" de "V8" com a quantidade de parcelas
+  parcelas_texto int := nullif(substring(upper(coalesce(p_tabela, '')) from '[^0-9A-Za-z]([0-9]{1,2})(?:[^0-9]|$)'), '')::int;
+  tem_seguro_efetivo boolean := case
+    when p_seguro is not null and trim(p_seguro) <> '' then tem_seguro
+    when upper(coalesce(p_tabela, '')) like '%S/SEGURO%' or upper(coalesce(p_tabela, '')) like '%SEM SEGURO%' then false
+    when upper(coalesce(p_tabela, '')) like '%C/SEGURO%' or upper(coalesce(p_tabela, '')) like '%COM SEGURO%' then true
+    else tem_seguro
+  end;
 begin
   -- extrai um código numérico de 4 a 6 dígitos do texto da tabela (se houver)
   codigo := substring(tabela_norm from '[0-9]{4,6}');
@@ -1690,8 +1700,8 @@ begin
 
   -- V8 (consignado privado)
   if banco_norm like '%V8%' then
-    if tem_seguro then
-      return case p_parcelas
+    if tem_seguro_efetivo then
+      return case coalesce(p_parcelas, parcelas_texto)
         when 46 then 2.40
         when 36 then 2.20
         when 24 then 1.60
@@ -1703,7 +1713,7 @@ begin
         else null
       end;
     else
-      return case p_parcelas
+      return case coalesce(p_parcelas, parcelas_texto)
         when 46 then 1.40
         when 36 then 1.20
         when 24 then 1.00
