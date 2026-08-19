@@ -352,7 +352,7 @@ as $$
 $$;
 
 -- 3d) Distribuição de leads por valor de "mensagem"
-drop function if exists dashboard_por_mensagem(text, text, text, timestamptz, timestamptz);
+drop function if exists dashboard_por_mensagem(text, text, text, timestamptz, timestamptz, text);
 
 create or replace function dashboard_por_mensagem(
   p_campanha text default null,
@@ -364,7 +364,8 @@ create or replace function dashboard_por_mensagem(
 )
 returns table (
   valor text,
-  leads bigint
+  leads bigint,
+  interacoes bigint
 )
 language sql
 security definer
@@ -373,7 +374,8 @@ stable
 as $$
   select
     mensagem as valor,
-    count(*) as leads
+    count(*) as leads,
+    count(*) filter (where interacao = 1) as interacoes
   from disparochat
   where mensagem is not null
     and (p_campanha is null or efetiva_campanha(campanha, campanha_reenvio, reenvio) = p_campanha)
@@ -1091,6 +1093,8 @@ $$;
 -- KPIs gerais (sem filtro de vendedor)
 drop function if exists dashboard_vendedoras_kpis_geral(timestamptz, timestamptz);
 
+drop function if exists dashboard_vendedoras_kpis_geral(date, date);
+
 create or replace function dashboard_vendedoras_kpis_geral(
   p_date_from date default null,
   p_date_to date default null
@@ -1103,7 +1107,9 @@ returns table (
   banco_top text,
   banco_top_qtd bigint,
   dia_maior_valor date,
-  dia_maior_valor_total numeric
+  dia_maior_valor_total numeric,
+  valor_total numeric,
+  qtd_total bigint
 )
 language sql
 security definer
@@ -1142,7 +1148,9 @@ as $$
     (select banco from por_banco order by qtd desc limit 1),
     (select qtd from por_banco order by qtd desc limit 1),
     (select dia from por_dia order by total desc limit 1),
-    (select total from por_dia order by total desc limit 1);
+    (select total from por_dia order by total desc limit 1),
+    (select coalesce(sum(valor), 0) from base),
+    (select count(*) from base);
 $$;
 
 -- KPIs de um vendedor específico
@@ -1385,12 +1393,16 @@ grant execute on function dashboard_vendedoras_filtros to anon;
 -- Mesma conta de dias_uteis_passados/dias_uteis_mes/projecao da função
 -- individual, só que somando TODAS as vendedoras — usado na visão geral
 -- pra mostrar média diária/semanal e projeção diária/semanal do time.
+drop function if exists dashboard_vendedoras_medias_geral();
+
 create or replace function dashboard_vendedoras_medias_geral()
 returns table (
   total_mes_atual numeric,
   dias_uteis_passados int,
   dias_uteis_mes int,
-  projecao_mes numeric
+  projecao_mes numeric,
+  projecao_diaria numeric,
+  projecao_semanal numeric
 )
 language sql
 security definer
@@ -1421,6 +1433,30 @@ as $$
     from vendedoras_analise, mes, hoje
     where data_status >= mes.inicio
       and data_status <= hoje.d
+  ),
+  agora as (
+    select
+      extract(hour from now() at time zone 'America/Sao_Paulo')
+        + extract(minute from now() at time zone 'America/Sao_Paulo') / 60.0 as h,
+      extract(isodow from now() at time zone 'America/Sao_Paulo')::int as dow
+  ),
+  horas_hoje as (
+    select case when dow between 1 and 5 then greatest(0, least(h - 8, 10)) else 0 end as passadas
+    from agora
+  ),
+  horas_semana as (
+    select (least(greatest((select dow from agora) - 1, 0), 5) * 10) + (select passadas from horas_hoje) as passadas
+  ),
+  valor_hoje as (
+    select coalesce(sum(valor), 0) as v
+    from vendedoras_analise, hoje
+    where data_status = hoje.d
+  ),
+  valor_semana as (
+    select coalesce(sum(valor), 0) as v
+    from vendedoras_analise, hoje
+    where data_status >= (hoje.d - (extract(isodow from hoje.d)::int - 1))
+      and data_status <= hoje.d
   )
   select
     (select v from total_mes),
@@ -1428,8 +1464,16 @@ as $$
     (select n from du_mes),
     case when (select n from du_passados) > 0
       then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end,
+    case when (select passadas from horas_hoje) > 0
+      then round((select v from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
+      else 0 end,
+    case when (select passadas from horas_semana) > 0
+      then round((select v from valor_semana) / (select passadas from horas_semana) * 50, 2)
       else 0 end;
 $$;
+
+drop function if exists dashboard_vendedoras_meta(text);
 
 create or replace function dashboard_vendedoras_meta(p_vendedor text)
 returns table (
@@ -1438,7 +1482,9 @@ returns table (
   dias_uteis_mes int,
   projecao_mes numeric,
   semana_atual_valor numeric,
-  meta_semana numeric
+  meta_semana numeric,
+  projecao_diaria numeric,
+  projecao_semanal numeric
 )
 language sql
 security definer
@@ -1477,6 +1523,27 @@ as $$
     where vendedor = p_vendedor
       and data_status >= (hoje.d - (extract(isodow from hoje.d)::int - 1))
       and data_status <= hoje.d
+  ),
+  -- ritmo por hora útil (dia útil = 8h às 18h, 10 horas) — pra projeção do
+  -- dia/semana refletir o quanto está entrando por hora, não a média do
+  -- mês inteiro (senão dá o mesmo número da média)
+  agora as (
+    select
+      extract(hour from now() at time zone 'America/Sao_Paulo')
+        + extract(minute from now() at time zone 'America/Sao_Paulo') / 60.0 as h,
+      extract(isodow from now() at time zone 'America/Sao_Paulo')::int as dow
+  ),
+  horas_hoje as (
+    select case when dow between 1 and 5 then greatest(0, least(h - 8, 10)) else 0 end as passadas
+    from agora
+  ),
+  horas_semana as (
+    select (least(greatest((select dow from agora) - 1, 0), 5) * 10) + (select passadas from horas_hoje) as passadas
+  ),
+  valor_hoje as (
+    select coalesce(sum(valor), 0) as v
+    from vendedoras_analise, hoje
+    where vendedor = p_vendedor and data_status = hoje.d
   )
   select
     (select v from total_mes),
@@ -1486,7 +1553,13 @@ as $$
       then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
       else 0 end,
     (select v from semana_atual),
-    100000;
+    100000,
+    case when (select passadas from horas_hoje) > 0
+      then round((select v from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
+      else 0 end,
+    case when (select passadas from horas_semana) > 0
+      then round((select v from semana_atual) / (select passadas from horas_semana) * 50, 2)
+      else 0 end;
 $$;
 
 -- Vendas por semana do mês corrente (cada semana = segunda a domingo).
