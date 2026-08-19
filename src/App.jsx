@@ -1901,7 +1901,7 @@ function VendasView() {
       const result = await postApi('vendas_import', { rows })
       const r = result?.[0]
       setImportMsg(
-        `Importa\u00e7\u00e3o conclu\u00edda \u2014 ${fmtInt(r?.inseridos)} vendas novas, ${fmtInt(r?.ignorados)} j\u00e1 existiam (mesmo CPF + ades\u00e3o). Sincronizando...`
+        `Importa\u00e7\u00e3o conclu\u00edda \u2014 ${fmtInt(r?.inseridos)} vendas novas, ${fmtInt(r?.atualizados)} atualizadas (estavam sem peso), ${fmtInt(r?.ignorados)} j\u00e1 estavam completas. Sincronizando...`
       )
       await handleSync()
     } catch (err) {
