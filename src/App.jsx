@@ -328,21 +328,21 @@ function ExpandToggle({ expanded, onToggle, hiddenCount }) {
   )
 }
 
-function BreakdownList({ title, items, loading }) {
+function BreakdownList({ title, items, loading, showInteracoes }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
   const max = Math.max(1, ...items.map((i) => Number(i.leads) || 0))
   return (
     <div className="panel table-panel breakdown">
       <p className="section-label">{title}</p>
-      <div className="breakdown-row head">
-        <span>Valor</span><span>Leads</span>
+      <div className="breakdown-row head" style={showInteracoes ? { gridTemplateColumns: '1fr 1.4fr 0.7fr' } : undefined}>
+        <span>Valor</span><span>Leads</span>{showInteracoes && <span>Intera&ccedil;&otilde;es</span>}
       </div>
       {items.length === 0 && !loading && (
         <div className="state-msg">Sem dados para os filtros selecionados.</div>
       )}
       {visible.map((i) => (
-        <div className="breakdown-row" key={i.valor}>
+        <div className="breakdown-row" key={i.valor} style={showInteracoes ? { gridTemplateColumns: '1fr 1.4fr 0.7fr' } : undefined}>
           <span className="campanha-nome">{i.valor}</span>
           <span className="bar-cell">
             <span className="bar-track">
@@ -350,6 +350,7 @@ function BreakdownList({ title, items, loading }) {
             </span>
             <span className="bar-value">{fmtInt(i.leads)}</span>
           </span>
+          {showInteracoes && <span>{fmtInt(i.interacoes)}</span>}
         </div>
       ))}
       <ExpandToggle
@@ -501,6 +502,13 @@ function LeilaoDetalhado() {
     return () => clearInterval(id)
   }, [load])
 
+  const handleDownload = () => {
+    const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
+    const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
+    const qs = new URLSearchParams({ type: 'disparos_export', campanha, date_from, date_to })
+    window.open(`/api/dashboard?${qs.toString()}`, '_blank')
+  }
+
   return (
     <>
       <div className="topbar">
@@ -514,6 +522,9 @@ function LeilaoDetalhado() {
           </span>
           <button className="reset-btn" onClick={() => { setCampanha(''); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
+          </button>
+          <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
+            &#8595; Baixar
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -717,6 +728,11 @@ function EntradasLP() {
   const chartRows = entradas.rows || []
   const chartProdutos = entradas.produtos || []
 
+  const handleDownload = () => {
+    const qs = new URLSearchParams({ type: 'entradas_export', campanha: args.campanha, origem: args.origem, produto: args.produto, date_from: args.date_from, date_to: args.date_to })
+    window.open(`/api/dashboard?${qs.toString()}`, '_blank')
+  }
+
   return (
     <>
       <div className="topbar">
@@ -727,6 +743,9 @@ function EntradasLP() {
           </span>
           <button className="reset-btn" onClick={() => { setCampanha(''); setProduto(''); setOrigem(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
+          </button>
+          <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
+            &#8595; Baixar
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -973,6 +992,29 @@ function N8nExecucoes() {
     return () => clearInterval(id)
   }, [load])
 
+  const handleDownload = () => {
+    const linhas = [
+      'metrica;valor',
+      `total;${stats?.total ?? ''}`,
+      `sucesso;${stats?.success ?? ''}`,
+      `erro;${stats?.error ?? ''}`,
+      `pendentes;${stats?.pending ?? ''}`,
+      `tempo_medio_execucao_seg;${stats?.avg_duration_sec ?? ''}`,
+      `tempo_medio_pendente_seg;${stats?.avg_pending_sec ?? ''}`,
+      '',
+      'id;status;pendente_ha_segundos',
+      ...(stats?.pending_list || []).map((p) => `${p.id};${p.status};${p.elapsedSec ?? ''}`),
+    ]
+    const csv = '\uFEFF' + linhas.join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `n8n_execucoes_${dataInicio || 'todas'}_${dataFim || 'todas'}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
       <div className="topbar">
@@ -983,6 +1025,9 @@ function N8nExecucoes() {
           </span>
           <button className="reset-btn" onClick={() => { setWorkflowId(''); setDataInicio(todayISO()); setDataFim(todayISO()) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
+          </button>
+          <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
+            &#8595; Baixar
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -1224,8 +1269,24 @@ function MilestoneDot(props) {
 // código certo em vez de digitar parcela/seguro)
 const BANCOS_POR_CODIGO = ['FACTA']
 
+// Novo Saque não é nem por código nem por parcela/seguro — o peso vem do
+// NOME da tabela (GOLD, DIAMANTE, etc), então tem um terceiro modo só pra ele
+const BANCOS_POR_TABELA_NOME = ['NOVO SAQUE']
+
+const NOVO_SAQUE_TABELAS = [
+  { valor: 'TABELA NS', label: 'TABELA NS (12,00)' },
+  { valor: 'TABELA CAMPANHA', label: 'TABELA CAMPANHA (9,50)' },
+  { valor: 'TABELA DIAMANTE', label: 'TABELA DIAMANTE (7,50)' },
+  { valor: 'TABELA GOLD', label: 'TABELA GOLD (6,00)' },
+  { valor: 'TABELA MONEY', label: 'TABELA MONEY (4,50)' },
+  { valor: 'TABELA LIGHT', label: 'TABELA LIGHT (3,50)' },
+  { valor: 'TABELA SOFT', label: 'TABELA SOFT (2,00)' },
+  { valor: 'TABELA SMART', label: 'TABELA SMART (1,10)' },
+  { valor: 'TABELA ZERO', label: 'TABELA ZERO (0,70)' },
+]
+
 // Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
-const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESEN\u00c7A', 'SOMA', 'V8']
+const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESEN\u00c7A', 'SOMA', 'V8', 'NOVO SAQUE']
 
 const FACTA_CODIGOS = [
   { codigo: '69205', label: '69205 \u2014 Novo Gold, 60x (1,45)' },
@@ -1294,7 +1355,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const [lastUpdate, setLastUpdate] = useState(null)
 
   const [showAdd, setShowAdd] = useState(false)
-  const [addForm, setAddForm] = useState({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', dataPagamento: '', parcelas: '', seguro: '' })
+  const [addForm, setAddForm] = useState({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
   const [addMsg, setAddMsg] = useState('')
   const [adding, setAdding] = useState(false)
 
@@ -1396,6 +1457,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
     setAddMsg('')
     try {
       const ehPorCodigo = BANCOS_POR_CODIGO.includes(addForm.banco)
+      const ehPorTabelaNome = BANCOS_POR_TABELA_NOME.includes(addForm.banco)
       const result = await postApi('vendedoras_add_venda', {
         vendedor,
         adesao: addForm.adesao,
@@ -1403,15 +1465,15 @@ function VendedoraPortal({ vendedor, onLogout }) {
         nome: addForm.nome,
         valor: addForm.valor.replace(',', '.'),
         banco: addForm.banco,
-        tabela: ehPorCodigo ? addForm.codigo : '',
+        tabela: ehPorCodigo ? addForm.codigo : (ehPorTabelaNome ? addForm.tabelaNome : ''),
         data_pagamento: addForm.dataPagamento,
-        parcelas: addForm.parcelas,
-        seguro: addForm.seguro,
+        parcelas: ehPorTabelaNome ? '' : addForm.parcelas,
+        seguro: ehPorTabelaNome ? '' : addForm.seguro,
       })
       const r = result?.[0]
       if (r?.ok) {
         setAddMsg('Venda adicionada. Sincronizando...')
-        setAddForm({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', dataPagamento: '', parcelas: '', seguro: '' })
+        setAddForm({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
         await callApi('vendedoras_sync', {})
         await load()
         setAddMsg('Conclu\u00eddo!')
@@ -1503,11 +1565,11 @@ function VendedoraPortal({ vendedor, onLogout }) {
             <div className="kpi">
               <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
               <p className="kpi-value kpi-split">
-                <span>{fmtMoeda(meta.dias_uteis_mes > 0 ? meta.projecao_mes / meta.dias_uteis_mes : 0)}</span>
+                <span>{fmtMoeda(meta.projecao_diaria)}</span>
                 <span className="kpi-split-bar">|</span>
-                <span className="kpi-split-proj">{fmtMoeda(meta.dias_uteis_mes > 0 ? (meta.projecao_mes / meta.dias_uteis_mes) * 5 : 0)}</span>
+                <span className="kpi-split-proj">{fmtMoeda(meta.projecao_semanal)}</span>
               </p>
-              <p className="kpi-sub">baseado na proje&ccedil;&atilde;o do m&ecirc;s</p>
+              <p className="kpi-sub">ritmo por hora &uacute;til (8h&ndash;18h) de hoje/semana</p>
             </div>
           </>
         )}
@@ -1560,7 +1622,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
               <label>Nome<input required value={addForm.nome} onChange={(e) => setAddForm({ ...addForm, nome: e.target.value })} /></label>
               <label>Valor<input required value={addForm.valor} onChange={(e) => setAddForm({ ...addForm, valor: e.target.value })} placeholder="0,00" /></label>
               <label>Banco
-                <select required value={addForm.banco} onChange={(e) => setAddForm({ ...addForm, banco: e.target.value, codigo: '', parcelas: '', seguro: '' })}>
+                <select required value={addForm.banco} onChange={(e) => setAddForm({ ...addForm, banco: e.target.value, codigo: '', tabelaNome: '', parcelas: '', seguro: '' })}>
                   <option value="">selecione o banco</option>
                   {BANCOS_VENDA.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
@@ -1580,7 +1642,16 @@ function VendedoraPortal({ vendedor, onLogout }) {
                 </label>
               )}
 
-              {addForm.banco && !BANCOS_POR_CODIGO.includes(addForm.banco) && (
+              {addForm.banco && BANCOS_POR_TABELA_NOME.includes(addForm.banco) && (
+                <label>Tabela
+                  <select required value={addForm.tabelaNome} onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })}>
+                    <option value="">selecione a tabela</option>
+                    {NOVO_SAQUE_TABELAS.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {addForm.banco && !BANCOS_POR_CODIGO.includes(addForm.banco) && !BANCOS_POR_TABELA_NOME.includes(addForm.banco) && (
                 <>
                   <label>Parcelas
                     <input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 24" />
@@ -1619,6 +1690,7 @@ function VendedorasView() {
   const [kpisGeral, setKpisGeral] = useState(null)
   const [kpisVendedor, setKpisVendedor] = useState(null)
   const [mediasGeral, setMediasGeral] = useState(null)
+  const [metaVendedor, setMetaVendedor] = useState(null)
   const [porDia, setPorDia] = useState({ rows: [], vendedoresVistos: [] })
   const [tabela, setTabela] = useState({ rows: [], total: 0 })
   const [page, setPage] = useState(0) // 0 = 10 itens, 1 = 40 itens, 2+ = pagina de 30 depois dos 40
@@ -1678,13 +1750,18 @@ function VendedorasView() {
       setTabela({ rows: tab ?? [], total: tab?.[0]?.total_count ? Number(tab[0].total_count) : 0 })
 
       if (vendedor) {
-        const kv = await callApi('vendedoras_kpis_vendedor', { vendedor, date_from, date_to })
+        const [kv, mv] = await Promise.all([
+          callApi('vendedoras_kpis_vendedor', { vendedor, date_from, date_to }),
+          callApi('vendedoras_meta', { vendedor }),
+        ])
         setKpisVendedor(kv?.[0] ?? null)
+        setMetaVendedor(mv?.[0] ?? null)
         setKpisGeral(null)
       } else {
         const kg = await callApi('vendedoras_kpis_geral', { date_from, date_to })
         setKpisGeral(kg?.[0] ?? null)
         setKpisVendedor(null)
+        setMetaVendedor(null)
       }
 
       setLastUpdate(new Date())
@@ -1752,6 +1829,11 @@ function VendedorasView() {
   const podeProximaPagina = page >= 1 && offset + limit < tabela.total
   const podePaginaAnterior = page >= 2
 
+  const handleDownload = () => {
+    const qs = new URLSearchParams({ type: 'vendedoras_export', vendedor, date_from: dataInicio || '', date_to: dataFim || '' })
+    window.open(`/api/dashboard?${qs.toString()}`, '_blank')
+  }
+
   return (
     <>
       <div className="topbar">
@@ -1762,6 +1844,9 @@ function VendedorasView() {
           </span>
           <button className="reset-btn" onClick={() => { setVendedor(''); setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
+          </button>
+          <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
+            &#8595; Baixar
           </button>
           <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras">
             &#8942;
@@ -1823,6 +1908,15 @@ function VendedorasView() {
           <div className="kpi"><p className="kpi-label">Vendedora com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_valor_vendedor || '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.top_valor_valor)}</p></div>
           <div className="kpi"><p className="kpi-label">Banco mais utilizado</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.banco_top_qtd)} vendas</p></div>
           <div className="kpi"><p className="kpi-label">Dia com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.dia_maior_valor ? fmtDataBR(kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.dia_maior_valor_total)}</p></div>
+          <div className="kpi">
+            <p className="kpi-label">Valor total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
+            <p className="kpi-value kpi-split">
+              <span>{fmtMoeda(kpisGeral?.valor_total)}</span>
+              <span className="kpi-split-bar">|</span>
+              <span className="kpi-split-proj">{fmtMoeda(mediasGeral?.projecao_mes)}</span>
+            </p>
+            <p className="kpi-sub">{fmtInt(kpisGeral?.qtd_total)} vendas no per&iacute;odo</p>
+          </div>
         </div>
       )}
       {!vendedor && mediasGeral && (
@@ -1840,11 +1934,11 @@ function VendedorasView() {
           <div className="kpi">
             <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
             <p className="kpi-value kpi-split">
-              <span>{fmtMoeda(mediasGeral.dias_uteis_mes > 0 ? mediasGeral.projecao_mes / mediasGeral.dias_uteis_mes : 0)}</span>
+              <span>{fmtMoeda(mediasGeral.projecao_diaria)}</span>
               <span className="kpi-split-bar">|</span>
-              <span className="kpi-split-proj">{fmtMoeda(mediasGeral.dias_uteis_mes > 0 ? (mediasGeral.projecao_mes / mediasGeral.dias_uteis_mes) * 5 : 0)}</span>
+              <span className="kpi-split-proj">{fmtMoeda(mediasGeral.projecao_semanal)}</span>
             </p>
-            <p className="kpi-sub">baseado na proje&ccedil;&atilde;o do m&ecirc;s</p>
+            <p className="kpi-sub">ritmo por hora &uacute;til (8h&ndash;18h) de hoje/semana</p>
           </div>
         </div>
       )}
@@ -1852,8 +1946,42 @@ function VendedorasView() {
         <div className="kpi-grid">
           <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpisVendedor?.maior_venda)}</p></div>
           <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisVendedor?.dia_mais_vendas ? fmtDataBR(kpisVendedor.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpisVendedor?.dia_mais_vendas_qtd)} vendas</p></div>
-          <div className="kpi"><p className="kpi-label">Valor total vendido</p><p className="kpi-value">{fmtMoeda(kpisVendedor?.valor_total)}</p></div>
+          <div className="kpi">
+            <p className="kpi-label">Valor total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
+            <p className="kpi-value kpi-split">
+              <span>{fmtMoeda(kpisVendedor?.valor_total)}</span>
+              <span className="kpi-split-bar">|</span>
+              <span className="kpi-split-proj">{fmtMoeda(metaVendedor?.projecao_mes)}</span>
+            </p>
+          </div>
           <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpisVendedor?.qtd_total)}</p></div>
+        </div>
+      )}
+      {vendedor && metaVendedor && (
+        <div className="kpi-grid kpi-grid-3">
+          <div className="kpi">
+            <p className="kpi-label">M&eacute;dia di&aacute;ria | semanal</p>
+            <p className="kpi-value kpi-split">
+              <span>{fmtMoeda(metaVendedor.dias_uteis_passados > 0 ? metaVendedor.total_mes_atual / metaVendedor.dias_uteis_passados : 0)}</span>
+              <span className="kpi-split-bar">|</span>
+              <span className="kpi-split-proj">{fmtMoeda(metaVendedor.dias_uteis_passados > 0 ? (metaVendedor.total_mes_atual / metaVendedor.dias_uteis_passados) * 5 : 0)}</span>
+            </p>
+            <p className="kpi-sub">m&eacute;s corrente, {vendedor}</p>
+          </div>
+          <div className="kpi">
+            <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
+            <p className="kpi-value kpi-split">
+              <span>{fmtMoeda(metaVendedor.projecao_diaria)}</span>
+              <span className="kpi-split-bar">|</span>
+              <span className="kpi-split-proj">{fmtMoeda(metaVendedor.projecao_semanal)}</span>
+            </p>
+            <p className="kpi-sub">ritmo por hora &uacute;til (8h&ndash;18h)</p>
+          </div>
+          <div className="kpi">
+            <p className="kpi-label">Semana atual</p>
+            <p className="kpi-value">{fmtMoeda(metaVendedor.semana_atual_valor)}</p>
+            <p className="kpi-sub">meta: {fmtMoeda(metaVendedor.meta_semana)}</p>
+          </div>
         </div>
       )}
 
@@ -2286,6 +2414,12 @@ function VisaoGeral() {
     return () => clearInterval(id)
   }, [loadDados])
 
+  const handleDownload = () => {
+    const qs = new URLSearchParams(apiArgsBase)
+    qs.set('type', 'disparos_export')
+    window.open(`/api/dashboard?${qs.toString()}`, '_blank')
+  }
+
   return (
     <>
       <div className="topbar">
@@ -2296,6 +2430,9 @@ function VisaoGeral() {
           </span>
           <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setTipoEnvio(''); setMensagemFiltro(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
+          </button>
+          <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
+            &#8595; Baixar
           </button>
           <button className="refresh-btn" onClick={loadDados} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -2360,7 +2497,7 @@ function VisaoGeral() {
       <div className="breakdown-grid">
         <BreakdownList title="Por Conversa" items={porConversa} loading={loading} />
         <BreakdownList title="Por Meta" items={porMeta} loading={loading} />
-        <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} />
+        <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} showInteracoes />
       </div>
 
       {showFunil && <FunilDisparos onClose={() => setShowFunil(false)} />}
