@@ -1904,49 +1904,64 @@ grant execute on function dashboard_vendas_sync to anon;
 -- entram aqui — o gatilho calcula tudo sozinho a partir de banco/tabela/
 -- parcelas/seguro, então funciona tanto se o arquivo trouxer "tabela"
 -- (nome ou código) quanto se trouxer só parcelas + seguro.
+drop function if exists dashboard_vendas_import(jsonb);
+
 create or replace function dashboard_vendas_import(p_rows jsonb)
-returns table (inseridos int, ignorados int, total int)
+returns table (inseridos int, atualizados int, ignorados int, total int)
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
   v_inseridos int := 0;
+  v_atualizados int := 0;
   v_total int := 0;
 begin
   select count(*) into v_total from jsonb_array_elements(p_rows);
 
-  with novos as (
-    select
-      nullif(r->>'adesao', '')::bigint as adesao,
-      norm_cpf(r->>'cpf') as cpf,
-      nullif(r->>'tabela', '') as tabela,
-      nullif(r->>'nome', '') as nome,
-      nullif(r->>'valor', '')::numeric as valor,
-      nullif(r->>'data', '')::date as data,
-      nullif(r->>'banco', '') as banco,
-      nullif(r->>'parcelas', '')::int as parcelas,
-      nullif(r->>'seguro', '') as seguro
-    from jsonb_array_elements(p_rows) r
-  ),
-  dedup_input as (
-    select distinct on (cpf, coalesce(adesao, -1)) *
-    from novos
-  ),
-  a_inserir as (
-    select n.* from dedup_input n
-    where not exists (
-      select 1 from vendas_gerais v
-      where norm_cpf(v.cpf) = n.cpf
-        and coalesce(v.adesao, -1) = coalesce(n.adesao, -1)
-    )
-  )
-  insert into vendas_gerais (adesao, cpf, tabela, nome, valor, data, banco, parcelas, seguro)
-  select adesao, cpf, tabela, nome, valor, data, banco, parcelas, seguro from a_inserir;
+  create temporary table tmp_vendas_import on commit drop as
+  select distinct on (norm_cpf(r->>'cpf'), coalesce(nullif(r->>'adesao', '')::bigint, -1))
+    nullif(r->>'adesao', '')::bigint as adesao,
+    norm_cpf(r->>'cpf') as cpf,
+    nullif(r->>'tabela', '') as tabela,
+    nullif(r->>'nome', '') as nome,
+    nullif(r->>'valor', '')::numeric as valor,
+    nullif(r->>'data', '')::date as data,
+    nullif(r->>'banco', '') as banco,
+    nullif(r->>'parcelas', '')::int as parcelas,
+    nullif(r->>'seguro', '') as seguro
+  from jsonb_array_elements(p_rows) r;
 
+  -- 1) quem já existe (mesmo cpf+adesão) mas está com peso vazio: atualiza
+  -- só os campos que ainda estavam nulos (nunca sobrescreve o que já tinha
+  -- valor) — isso dá ao gatilho outra chance de calcular o peso certo
+  update vendas_gerais v
+  set
+    tabela = coalesce(v.tabela, t.tabela),
+    banco = coalesce(v.banco, t.banco),
+    parcelas = coalesce(v.parcelas, t.parcelas),
+    seguro = coalesce(v.seguro, t.seguro),
+    valor = coalesce(v.valor, t.valor),
+    nome = coalesce(v.nome, t.nome),
+    data = coalesce(v.data, t.data)
+  from tmp_vendas_import t
+  where norm_cpf(v.cpf) = t.cpf
+    and coalesce(v.adesao, -1) = coalesce(t.adesao, -1)
+    and v.peso is null;
+  get diagnostics v_atualizados = row_count;
+
+  -- 2) quem ainda não existe na base: insere normalmente
+  insert into vendas_gerais (adesao, cpf, tabela, nome, valor, data, banco, parcelas, seguro)
+  select t.adesao, t.cpf, t.tabela, t.nome, t.valor, t.data, t.banco, t.parcelas, t.seguro
+  from tmp_vendas_import t
+  where not exists (
+    select 1 from vendas_gerais v
+    where norm_cpf(v.cpf) = t.cpf
+      and coalesce(v.adesao, -1) = coalesce(t.adesao, -1)
+  );
   get diagnostics v_inseridos = row_count;
 
-  return query select v_inseridos, (v_total - v_inseridos), v_total;
+  return query select v_inseridos, v_atualizados, (v_total - v_inseridos - v_atualizados), v_total;
 end;
 $$;
 
