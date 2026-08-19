@@ -936,7 +936,7 @@ alter table vendedoras_analise add column if not exists conversa_sistema text;
 -- 1) Preenche whatsapp/covnersation_id/conversa_sistema na vendedoras_analise,
 --    buscando por CPF (normalizado) recente (últimos 7 dias):
 --      - disparochat -> sistema "vendeai" (crm.vendeaitecnologia.com.br)
---      - leads_chatwoot, só quando conta = 'chatwoot' -> sistema "chatwoot"
+--      - leads_chatwoot, quando conta = 'chatwoot' OU conta = '1' -> sistema "chatwoot"
 --        (chatwoot.querosacarfgts.com.br). Se conta for outra coisa, o
 --        conversation_id dessa tabela não é usado (não sabemos o link certo).
 --      - total_produtos: só whatsapp (essa tabela não tem conversation_id).
@@ -983,7 +983,7 @@ begin
   with match_l as (
     select distinct on (norm_cpf(l.cpf))
       norm_cpf(l.cpf) as cpf_norm, l.whatsapp, l.conversation_id,
-      case when l.conta = 'chatwoot' then 'chatwoot' else 'vendeai' end as sistema
+      case when l.conta in ('chatwoot', '1') then 'chatwoot' else 'vendeai' end as sistema
     from leads_chatwoot l
     where coalesce(l.atualizacao, l.entrada_tabela) >= now() - interval '7 days'
       and l.cpf is not null
@@ -1034,7 +1034,7 @@ begin
   update vendedoras_analise v
   set conversa_sistema = coalesce(l.sistema, 'vendeai')
   from (
-    select conversation_id, case when conta = 'chatwoot' then 'chatwoot' else 'vendeai' end as sistema
+    select conversation_id, case when conta in ('chatwoot', '1') then 'chatwoot' else 'vendeai' end as sistema
     from leads_chatwoot
     where conversation_id is not null
   ) l
@@ -1899,7 +1899,7 @@ begin
   with match_l as (
     select distinct on (norm_cpf(l.cpf))
       norm_cpf(l.cpf) as cpf_norm, l.whatsapp, l.conversation_id,
-      case when l.conta = 'chatwoot' then 'chatwoot' else 'vendeai' end as sistema
+      case when l.conta in ('chatwoot', '1') then 'chatwoot' else 'vendeai' end as sistema
     from leads_chatwoot l
     where coalesce(l.atualizacao, l.entrada_tabela) >= now() - interval '7 days'
       and l.cpf is not null
