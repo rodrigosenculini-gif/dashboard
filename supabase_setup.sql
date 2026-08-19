@@ -34,7 +34,7 @@ $$;
 
 -- 1) KPIs principais (cards do topo)
 -- (precisa dropar antes: mudamos o formato do retorno, adicionando interacao_qtd e tempo_resposta_min)
-drop function if exists dashboard_kpis(text, text, text, timestamptz, timestamptz);
+drop function if exists dashboard_kpis(text, text, text, timestamptz, timestamptz, int, int);
 
 create or replace function dashboard_kpis(
   p_campanha text default null,
@@ -43,7 +43,8 @@ create or replace function dashboard_kpis(
   p_date_from timestamptz default null,
   p_date_to timestamptz default null,
   p_hora_inicio int default null,
-  p_hora_fim int default null
+  p_hora_fim int default null,
+  p_tipo_envio text default null
 )
 returns table (
   total_leads bigint,
@@ -69,6 +70,7 @@ as $$
     where (p_campanha is null or campanha = p_campanha)
       and (p_origem is null or origem = p_origem)
       and (p_meta is null or meta = p_meta)
+      and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
       and (
         p_date_from is null and p_date_to is null
         or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
@@ -120,7 +122,7 @@ $$;
 
 -- 2) Envios por dia (gráfico de barras no topo) — inclui reenvios também
 -- (precisa dropar antes: mudamos o formato do retorno, adicionando a coluna reenvios)
-drop function if exists dashboard_envios_por_dia(text, text, text, timestamptz, timestamptz);
+drop function if exists dashboard_envios_por_dia(text, text, text, timestamptz, timestamptz, int, int);
 
 create or replace function dashboard_envios_por_dia(
   p_campanha text default null,
@@ -129,7 +131,8 @@ create or replace function dashboard_envios_por_dia(
   p_date_from timestamptz default null,
   p_date_to timestamptz default null,
   p_hora_inicio int default null,
-  p_hora_fim int default null
+  p_hora_fim int default null,
+  p_tipo_envio text default null
 )
 returns table (
   dia date,
@@ -148,6 +151,7 @@ as $$
       and (p_campanha is null or campanha = p_campanha)
       and (p_origem is null or origem = p_origem)
       and (p_meta is null or meta = p_meta)
+      and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
       and (p_date_from is null or realizado >= p_date_from)
       and (p_date_to is null or realizado <= p_date_to)
       and (p_hora_inicio is null or extract(hour from realizado at time zone 'America/Sao_Paulo') >= p_hora_inicio)
@@ -161,6 +165,7 @@ as $$
       and (p_campanha is null or campanha = p_campanha)
       and (p_origem is null or origem = p_origem)
       and (p_meta is null or meta = p_meta)
+      and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
       and (p_date_from is null or reenvio >= p_date_from)
       and (p_hora_inicio is null or extract(hour from reenvio at time zone 'America/Sao_Paulo') >= p_hora_inicio)
       and (p_hora_fim is null or extract(hour from reenvio at time zone 'America/Sao_Paulo') <= p_hora_fim)
@@ -177,11 +182,14 @@ as $$
 $$;
 
 -- 3) Tabela de campanhas únicas (Leads + Reenvios)
+drop function if exists dashboard_campanhas(text, text, timestamptz, timestamptz);
+
 create or replace function dashboard_campanhas(
   p_origem text default null,
   p_meta text default null,
   p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_to timestamptz default null,
+  p_tipo_envio text default null
 )
 returns table (
   campanha text,
@@ -201,6 +209,7 @@ as $$
   where campanha is not null
     and (p_origem is null or origem = p_origem)
     and (p_meta is null or meta = p_meta)
+    and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
     and (
       p_date_from is null and p_date_to is null
       or (
@@ -217,12 +226,15 @@ as $$
 $$;
 
 -- 3b) Distribuição de leads por valor de "conversa"
+drop function if exists dashboard_por_conversa(text, text, text, timestamptz, timestamptz);
+
 create or replace function dashboard_por_conversa(
   p_campanha text default null,
   p_origem text default null,
   p_meta text default null,
   p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_to timestamptz default null,
+  p_tipo_envio text default null
 )
 returns table (
   valor text,
@@ -241,6 +253,7 @@ as $$
     and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
     and (p_meta is null or meta = p_meta)
+    and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
     and (
       p_date_from is null and p_date_to is null
       or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
@@ -252,12 +265,15 @@ as $$
 $$;
 
 -- 3c) Distribuição de leads por valor de "meta" (status de entrega da Meta/WhatsApp)
+drop function if exists dashboard_por_meta(text, text, text, timestamptz, timestamptz);
+
 create or replace function dashboard_por_meta(
   p_campanha text default null,
   p_origem text default null,
   p_meta text default null,
   p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_to timestamptz default null,
+  p_tipo_envio text default null
 )
 returns table (
   valor text,
@@ -275,6 +291,7 @@ as $$
   where meta is not null
     and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
+    and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
     and (
       p_date_from is null and p_date_to is null
       or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
@@ -286,12 +303,15 @@ as $$
 $$;
 
 -- 3d) Distribuição de leads por valor de "mensagem"
+drop function if exists dashboard_por_mensagem(text, text, text, timestamptz, timestamptz);
+
 create or replace function dashboard_por_mensagem(
   p_campanha text default null,
   p_origem text default null,
   p_meta text default null,
   p_date_from timestamptz default null,
-  p_date_to timestamptz default null
+  p_date_to timestamptz default null,
+  p_tipo_envio text default null
 )
 returns table (
   valor text,
@@ -310,6 +330,7 @@ as $$
     and (p_campanha is null or campanha = p_campanha)
     and (p_origem is null or origem = p_origem)
     and (p_meta is null or meta = p_meta)
+    and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
     and (
       p_date_from is null and p_date_to is null
       or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
@@ -784,11 +805,14 @@ as $$
 $$;
 
 -- 4) Valores distintos para popular os filtros (dropdowns)
+drop function if exists dashboard_filtros();
+
 create or replace function dashboard_filtros()
 returns table (
   campanhas text[],
   origens text[],
-  metas text[]
+  metas text[],
+  tipos_envio text[]
 )
 language sql
 security definer
@@ -798,7 +822,8 @@ as $$
   select
     (select array_agg(distinct campanha) from disparochat where campanha is not null),
     (select array_agg(distinct origem) from disparochat where origem is not null),
-    (select array_agg(distinct meta) from disparochat where meta is not null);
+    (select array_agg(distinct meta) from disparochat where meta is not null),
+    (select array_agg(distinct tipo_envio) from disparochat where tipo_envio is not null);
 $$;
 
 -- Libera a execução dessas funções para o público (chave anon)
