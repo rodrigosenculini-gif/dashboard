@@ -874,7 +874,7 @@ set search_path = public
 stable
 as $$
   select
-    (select array_agg(distinct efetiva_campanha(campanha, campanha_reenvio, reenvio)) from disparochat where campanha is not null or campanha_reenvio is not null),
+    (select array_agg(distinct x) from (select efetiva_campanha(campanha, campanha_reenvio, reenvio) as x from disparochat) s where x is not null),
     (select array_agg(distinct origem) from disparochat where origem is not null),
     (select array_agg(distinct meta) from disparochat where meta is not null),
     (select array_agg(distinct tipo_envio) from disparochat where tipo_envio is not null),
