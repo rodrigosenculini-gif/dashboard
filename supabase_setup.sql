@@ -1495,19 +1495,34 @@ create table if not exists vendas_gerais (
 --   qualquer outro caso    -> CLT
 create or replace function calc_produto_vendas(p_banco text, p_tabela text)
 returns text
-language sql
+language plpgsql
 immutable
 as $$
-  select case
-    when upper(coalesce(p_tabela, '')) like '%REFIN%' then 'REFIN'
-    when upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%CREFAZ%' then 'ENERGIA'
-    when upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%NOVO SAQUE%'
-      -- reforço: esses nomes de tabela são exclusivos da Novo Saque, então
-      -- reconhece mesmo que o campo banco venha vazio/diferente do esperado
-      or upper(coalesce(p_tabela, '')) ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
-    then 'FGTS'
-    else 'CLT'
-  end;
+declare
+  codigo text := substring(upper(coalesce(p_tabela, '')) from '[0-9]{4,6}');
+begin
+  -- reconhece REFIN pelo texto "REFIN" OU pelos códigos Facta que já são
+  -- refin mesmo quando o campo tabela só traz o número, sem a palavra
+  if upper(coalesce(p_tabela, '')) like '%REFIN%'
+     or codigo in ('69272', '69264', '69256', '69280')
+  then
+    return 'REFIN';
+  end if;
+
+  if upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%CREFAZ%' then
+    return 'ENERGIA';
+  end if;
+
+  if upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%NOVO SAQUE%'
+     -- reforço: esses nomes de tabela são exclusivos da Novo Saque, então
+     -- reconhece mesmo que o campo banco venha vazio/diferente do esperado
+     or upper(coalesce(p_tabela, '')) ~ '(^|[^A-Z])(TABELA )?(NS|CAMPANHA|DIAMANTE|GOLD|MONEY|LIGHT|SOFT|SMART|ZERO)([^A-Z]|$)'
+  then
+    return 'FGTS';
+  end if;
+
+  return 'CLT';
+end;
 $$;
 
 -- Calcula o peso automaticamente a partir de banco + tabela (código) +
@@ -1671,6 +1686,35 @@ begin
     if tabela_norm like '%ZERO%' then return 0.70; end if;
     if tabela_norm like '%NS%' or tabela_norm like '%NOVO SAQUE%' then return 12.00; end if;
     return null;
+  end if;
+
+  -- V8 (consignado privado)
+  if banco_norm like '%V8%' then
+    if tem_seguro then
+      return case p_parcelas
+        when 46 then 2.40
+        when 36 then 2.20
+        when 24 then 1.60
+        when 18 then 1.40
+        when 12 then 1.20
+        when 6 then 0.60
+        when 8 then 0.60
+        when 10 then 0.60
+        else null
+      end;
+    else
+      return case p_parcelas
+        when 46 then 1.40
+        when 36 then 1.20
+        when 24 then 1.00
+        when 12 then 0.80
+        when 18 then 0.80
+        when 6 then 0.20
+        when 8 then 0.20
+        when 10 then 0.20
+        else null
+      end;
+    end if;
   end if;
 
   return null;
