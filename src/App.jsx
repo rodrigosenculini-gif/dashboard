@@ -1060,7 +1060,7 @@ function FactaConsultaOverlay({ onClose }) {
                 <p className="card-label">{pick(p, 'cliente') || 'Cliente'} &mdash; {pick(p, 'cpf')}</p>
                 <div className="grid-2" style={{ maxWidth: '100%' }}>
                   <p><strong>Status:</strong> {pick(p, 'status', 'status_proposta')}</p>
-                  <p><strong>C\u00f3digo AF / proposta:</strong> {pick(p, 'codigo_af', 'proposta_numero')}</p>
+                  <p><strong>C&oacute;digo AF / proposta:</strong> {pick(p, 'codigo_af', 'proposta_numero')}</p>
                   <p><strong>Produto:</strong> {pick(p, 'produto') || '-'}</p>
                   <p><strong>Tabela:</strong> {pick(p, 'tabela')}</p>
                   <p><strong>Parcela:</strong> {fmtMoeda(pick(p, 'valor_parcela', 'vlrprestacao'))} &times; {pick(p, 'parcelas', 'numeroprestacao') || '-'}</p>
@@ -1069,8 +1069,8 @@ function FactaConsultaOverlay({ onClose }) {
                   <p><strong>Taxa:</strong> {pick(p, 'taxa') ? `${p.taxa}%` : '-'}</p>
                   <p><strong>Conta cadastrada:</strong> {pick(p, 'conta') || `banco ${pick(p, 'banco') || '-'} \u00b7 ag ${pick(p, 'agencia') || '-'} \u00b7 cc ${pick(p, 'contaNumero') || '-'}`}</p>
                   <p><strong>Contrato refin:</strong> {pick(p, 'numero_contrato_refin') || '-'}</p>
-                  <p><strong>Link de formaliza\u00e7\u00e3o:</strong> {pick(p, 'link_formalizacao') ? <a href={pick(p, 'link_formalizacao')} target="_blank" rel="noreferrer">abrir</a> : '-'}</p>
-                  <p><strong>Digita\u00e7\u00e3o:</strong> {pick(p, 'data_digitacao') || '-'}</p>
+                  <p><strong>Link de formaliza&ccedil;&atilde;o:</strong> {pick(p, 'link_formalizacao') || '-'}</p>
+                  <p><strong>Digita&ccedil;&atilde;o:</strong> {pick(p, 'data_digitacao') || '-'}</p>
                   <p><strong>Pagamento ao cliente:</strong> {pick(p, 'data_pgto_cliente') || '-'}</p>
                 </div>
               </div>
@@ -1088,11 +1088,11 @@ function FactaConsultaOverlay({ onClose }) {
                   <p><strong>Parcela antiga:</strong> {fmtMoeda(pick(c, 'valor_parcela'))}</p>
                   <p><strong>Saldo devedor:</strong> {fmtMoeda(pick(c, 'saldo_devedor'))}</p>
                   <p><strong>Valor liberado:</strong> {fmtMoeda(pick(c, 'valor_liberado')) || '-'}</p>
-                  <p><strong>Matr\u00edcula:</strong> {pick(c, 'matricula')}</p>
+                  <p><strong>Matr&iacute;cula:</strong> {pick(c, 'matricula')}</p>
                   <p><strong>Tabela:</strong> {pick(c, 'tabela') || c.dados?.tabela_ff || '-'}</p>
                   <p><strong>Taxa:</strong> {pick(c, 'taxa') || c.dados?.taxa_ff || '-'}</p>
                   <p><strong>Conta cadastrada:</strong> {pick(c, 'conta') || c.dados?.banco_cessao || '-'}</p>
-                  <p><strong>Link de formaliza\u00e7\u00e3o:</strong> {pick(c, 'link_formalizacao') ? <a href={pick(c, 'link_formalizacao')} target="_blank" rel="noreferrer">abrir</a> : '-'}</p>
+                  <p><strong>Link de formaliza&ccedil;&atilde;o:</strong> {pick(c, 'link_formalizacao') || '-'}</p>
                 </div>
                 {c.obs && <p style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>{c.obs}</p>}
               </div>
