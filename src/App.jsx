@@ -147,6 +147,14 @@ async function parseVendasCsv(file) {
   return rows
 }
 
+async function callFactaApi(type, params) {
+  const qs = new URLSearchParams({ type, ...params })
+  const res = await fetch(`/api/facta?${qs.toString()}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `Erro ao consultar Facta (${type})`)
+  return data
+}
+
 async function callN8nApi(type, params) {
   const qs = new URLSearchParams({ type, ...params })
   const res = await fetch(`/api/n8n?${qs.toString()}`)
@@ -941,6 +949,123 @@ function FunilProdutos({ onClose }) {
   )
 }
 
+// Consulta (somente leitura) de propostas na Facta, por CPF ou código AF.
+// "Andamento de propostas" cobre qualquer tipo de operação; a consulta de
+// refinanciamento (por CPF) só existe pra REFIN, então só aparece quando a
+// busca é feita por CPF.
+function FactaConsultaOverlay({ onClose }) {
+  const [busca, setBusca] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [propostas, setPropostas] = useState(null)
+  const [refin, setRefin] = useState(null)
+  const [buscou, setBuscou] = useState(false)
+
+  const ehCpf = (v) => v.replace(/\D/g, '').length === 11
+
+  const handleBuscar = async (e) => {
+    e.preventDefault()
+    const valor = busca.trim()
+    if (!valor) return
+    setLoading(true)
+    setError(null)
+    setPropostas(null)
+    setRefin(null)
+    setBuscou(true)
+    try {
+      const usaCpf = ehCpf(valor)
+      const params = usaCpf ? { cpf: valor } : { af: valor }
+      const chamadas = [callFactaApi('andamento', params)]
+      if (usaCpf) chamadas.push(callFactaApi('refin', { cpf: valor }))
+      const resultados = await Promise.all(chamadas)
+      setPropostas(resultados[0])
+      if (usaCpf) setRefin(resultados[1])
+    } catch (e2) {
+      setError(e2.message || 'Erro ao consultar a Facta.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const listaPropostas = propostas?.propostas || []
+  const listaRefin = refin?.lista_contratos_refin ? Object.entries(refin.lista_contratos_refin) : []
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760 }}>
+        <div className="funil-header">
+          <div>
+            <h2>Consulta Facta</h2>
+            <p className="subtitle">Busca por CPF (11 d&iacute;gitos) ou c&oacute;digo AF &mdash; somente leitura</p>
+          </div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <form onSubmit={handleBuscar} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="CPF ou c\u00f3digo AF"
+            style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 13, padding: '9px 10px', borderRadius: 7 }}
+          />
+          <button type="submit" className="refresh-btn" disabled={loading}>{loading ? 'Buscando...' : 'Buscar'}</button>
+        </form>
+
+        {error && <div className="state-msg error">Erro: {error}</div>}
+
+        {buscou && !loading && !error && listaPropostas.length === 0 && listaRefin.length === 0 && (
+          <div className="state-msg">Nenhuma proposta encontrada pra essa busca.</div>
+        )}
+
+        {listaPropostas.length > 0 && (
+          <>
+            <p className="section-label" style={{ marginTop: 8 }}>Propostas ({listaPropostas.length})</p>
+            {listaPropostas.map((p, i) => (
+              <div className="card" key={i} style={{ marginBottom: 12 }}>
+                <p className="card-label">{p.cliente} &mdash; {p.cpf}</p>
+                <div className="grid-2" style={{ maxWidth: '100%' }}>
+                  <p><strong>Status:</strong> {p.status_proposta}</p>
+                  <p><strong>C\u00f3digo AF:</strong> {p.codigo_af}</p>
+                  <p><strong>Produto:</strong> {p.produto}</p>
+                  <p><strong>Tabela:</strong> {p.tabela}</p>
+                  <p><strong>Parcela:</strong> {fmtMoeda(p.vlrprestacao)} &times; {p.numeroprestacao}</p>
+                  <p><strong>Saldo devedor:</strong> {fmtMoeda(p.saldo_devedor)}</p>
+                  <p><strong>Valor bruto:</strong> {fmtMoeda(p.valor_bruto)}</p>
+                  <p><strong>Taxa:</strong> {p.taxa}%</p>
+                  <p><strong>Conta cadastrada:</strong> banco {p.banco} &middot; ag {p.agencia} &middot; cc {p.conta}</p>
+                  <p><strong>Contrato refin:</strong> {p.numero_contrato_refin || '-'}</p>
+                  <p><strong>Digita\u00e7\u00e3o:</strong> {p.data_digitacao || '-'}</p>
+                  <p><strong>Pagamento ao cliente:</strong> {p.data_pgto_cliente || '-'}</p>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {listaRefin.length > 0 && (
+          <>
+            <p className="section-label" style={{ marginTop: 20 }}>Contratos eleg&iacute;veis a refinanciamento ({listaRefin.length})</p>
+            {listaRefin.map(([numero, c]) => (
+              <div className="card" key={numero} style={{ marginBottom: 12 }}>
+                <p className="card-label">Contrato {numero}</p>
+                <div className="grid-2" style={{ maxWidth: '100%' }}>
+                  <p><strong>Parcela antiga:</strong> {c.valor_parcela}</p>
+                  <p><strong>Saldo devedor:</strong> {c.saldo_devedor}</p>
+                  <p><strong>Matr\u00edcula:</strong> {c.matricula}</p>
+                  <p><strong>Tabela:</strong> {c.dados?.tabela_ff || '-'}</p>
+                  <p><strong>Taxa:</strong> {c.dados?.taxa_ff || '-'}</p>
+                  <p><strong>Banco de cess\u00e3o:</strong> {c.dados?.banco_cessao || '-'}</p>
+                </div>
+                {c.obs && <p style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>{c.obs}</p>}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function fmtDuracao(seg) {
   const s = Number(seg) || 0
   if (s < 60) return `${s.toFixed(0)}s`
@@ -1355,6 +1480,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const [lastUpdate, setLastUpdate] = useState(null)
 
   const [showAdd, setShowAdd] = useState(false)
+  const [showFacta, setShowFacta] = useState(false)
   const [addForm, setAddForm] = useState({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
   const [addMsg, setAddMsg] = useState('')
   const [adding, setAdding] = useState(false)
@@ -1512,6 +1638,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
           </button>
           <button className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão">
             + Adicionar adesão
+          </button>
+          <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
+            Consulta Facta
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -1676,6 +1805,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
           </div>
         </div>
       )}
+      {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
     </div>
   )
 }
@@ -1701,6 +1831,7 @@ function VendedorasView() {
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
   const [showRanking, setShowRanking] = useState(false)
+  const [showFacta, setShowFacta] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
@@ -1847,6 +1978,9 @@ function VendedorasView() {
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
             &#8595; Baixar
+          </button>
+          <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
+            Consulta Facta
           </button>
           <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras">
             &#8942;
@@ -2038,6 +2172,7 @@ function VendedorasView() {
       </div>
 
       {showRanking && <RankingOverlay onClose={() => setShowRanking(false)} />}
+      {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
     </>
   )
 }
