@@ -16,6 +16,19 @@ const FACTA_BASE = 'https://webservice.facta.com.br';
 let cachedToken = null;
 let cachedTokenExpiry = 0;
 
+// Lê a resposta com segurança: se não vier JSON de verdade (ex: página de
+// erro/bloqueio em HTML), mostra um pedaço do conteúdo real pra dar pra
+// diagnosticar, em vez de só travar com "Unexpected token '<'".
+async function parseJsonSafe(resp, contexto) {
+  const texto = await resp.text();
+  try {
+    return JSON.parse(texto);
+  } catch {
+    const amostra = texto.slice(0, 300).replace(/\s+/g, ' ').trim();
+    throw new Error(`Facta respondeu algo que não é JSON em "${contexto}" (status ${resp.status}): ${amostra}`);
+  }
+}
+
 async function getFactaToken() {
   const now = Date.now();
   if (cachedToken && now < cachedTokenExpiry) {
@@ -33,7 +46,7 @@ async function getFactaToken() {
     method: 'GET',
     headers: { Authorization: `Basic ${basic}` },
   });
-  const data = await resp.json();
+  const data = await parseJsonSafe(resp, 'gera-token');
   if (data.erro) {
     throw new Error(data.mensagem || 'Erro ao gerar token na Facta.');
   }
@@ -50,7 +63,7 @@ async function factaGet(path, params, token) {
   const resp = await fetch(`${FACTA_BASE}${path}?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return resp.json();
+  return parseJsonSafe(resp, path);
 }
 
 export default async function handler(req, res) {
