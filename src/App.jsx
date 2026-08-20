@@ -953,6 +953,41 @@ function FunilProdutos({ onClose }) {
 // "Andamento de propostas" cobre qualquer tipo de operação; a consulta de
 // refinanciamento (por CPF) só existe pra REFIN, então só aparece quando a
 // busca é feita por CPF.
+// Pega o primeiro campo que existir e não for vazio — usado pra aceitar
+// tanto os nomes de campo originais da Facta quanto nomes que você tenha
+// renomeado/achatado no seu fluxo n8n, sem quebrar nada.
+function pick(obj, ...campos) {
+  for (const c of campos) {
+    const v = obj?.[c]
+    if (v !== undefined && v !== null && v !== '') return v
+  }
+  return null
+}
+
+// Aceita tanto {propostas: [...]} (formato original da Facta) quanto um
+// objeto único já achatado (seu formato novo, sem o envelope "propostas").
+function extraiListaPropostas(resp) {
+  if (!resp) return []
+  if (Array.isArray(resp.propostas)) return resp.propostas
+  if (pick(resp, 'cliente', 'valor_parcela', 'vlrprestacao', 'tabela', 'status', 'status_proposta')) {
+    return [resp]
+  }
+  return []
+}
+
+// Idem pro refin: aceita {lista_contratos_refin: {...}} (formato original,
+// um objeto por contrato) OU um objeto único já achatado.
+function extraiListaRefin(resp) {
+  if (!resp) return []
+  if (resp.lista_contratos_refin && typeof resp.lista_contratos_refin === 'object') {
+    return Object.entries(resp.lista_contratos_refin).map(([numero, c]) => ({ numero, ...c }))
+  }
+  if (pick(resp, 'matricula', 'valor_parcela', 'saldo_devedor')) {
+    return [{ numero: pick(resp, 'proposta_numero', 'numero_contrato', 'matricula') || '-', ...resp }]
+  }
+  return []
+}
+
 function FactaConsultaOverlay({ onClose }) {
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(false)
@@ -987,8 +1022,8 @@ function FactaConsultaOverlay({ onClose }) {
     }
   }
 
-  const listaPropostas = propostas?.propostas || []
-  const listaRefin = refin?.lista_contratos_refin ? Object.entries(refin.lista_contratos_refin) : []
+  const listaPropostas = extraiListaPropostas(propostas)
+  const listaRefin = extraiListaRefin(refin)
 
   return (
     <div className="funil-overlay" onClick={onClose}>
@@ -1022,20 +1057,21 @@ function FactaConsultaOverlay({ onClose }) {
             <p className="section-label" style={{ marginTop: 8 }}>Propostas ({listaPropostas.length})</p>
             {listaPropostas.map((p, i) => (
               <div className="card" key={i} style={{ marginBottom: 12 }}>
-                <p className="card-label">{p.cliente} &mdash; {p.cpf}</p>
+                <p className="card-label">{pick(p, 'cliente') || 'Cliente'} &mdash; {pick(p, 'cpf')}</p>
                 <div className="grid-2" style={{ maxWidth: '100%' }}>
-                  <p><strong>Status:</strong> {p.status_proposta}</p>
-                  <p><strong>C\u00f3digo AF:</strong> {p.codigo_af}</p>
-                  <p><strong>Produto:</strong> {p.produto}</p>
-                  <p><strong>Tabela:</strong> {p.tabela}</p>
-                  <p><strong>Parcela:</strong> {fmtMoeda(p.vlrprestacao)} &times; {p.numeroprestacao}</p>
-                  <p><strong>Saldo devedor:</strong> {fmtMoeda(p.saldo_devedor)}</p>
-                  <p><strong>Valor bruto:</strong> {fmtMoeda(p.valor_bruto)}</p>
-                  <p><strong>Taxa:</strong> {p.taxa}%</p>
-                  <p><strong>Conta cadastrada:</strong> banco {p.banco} &middot; ag {p.agencia} &middot; cc {p.conta}</p>
-                  <p><strong>Contrato refin:</strong> {p.numero_contrato_refin || '-'}</p>
-                  <p><strong>Digita\u00e7\u00e3o:</strong> {p.data_digitacao || '-'}</p>
-                  <p><strong>Pagamento ao cliente:</strong> {p.data_pgto_cliente || '-'}</p>
+                  <p><strong>Status:</strong> {pick(p, 'status', 'status_proposta')}</p>
+                  <p><strong>C\u00f3digo AF / proposta:</strong> {pick(p, 'codigo_af', 'proposta_numero')}</p>
+                  <p><strong>Produto:</strong> {pick(p, 'produto') || '-'}</p>
+                  <p><strong>Tabela:</strong> {pick(p, 'tabela')}</p>
+                  <p><strong>Parcela:</strong> {fmtMoeda(pick(p, 'valor_parcela', 'vlrprestacao'))} &times; {pick(p, 'parcelas', 'numeroprestacao') || '-'}</p>
+                  <p><strong>Saldo devedor:</strong> {fmtMoeda(pick(p, 'saldo_devedor'))}</p>
+                  <p><strong>Valor liberado/bruto:</strong> {fmtMoeda(pick(p, 'valor_liberado', 'valor_af', 'valor_bruto'))}</p>
+                  <p><strong>Taxa:</strong> {pick(p, 'taxa') ? `${p.taxa}%` : '-'}</p>
+                  <p><strong>Conta cadastrada:</strong> {pick(p, 'conta') || `banco ${pick(p, 'banco') || '-'} \u00b7 ag ${pick(p, 'agencia') || '-'} \u00b7 cc ${pick(p, 'contaNumero') || '-'}`}</p>
+                  <p><strong>Contrato refin:</strong> {pick(p, 'numero_contrato_refin') || '-'}</p>
+                  <p><strong>Link de formaliza\u00e7\u00e3o:</strong> {pick(p, 'link_formalizacao') ? <a href={pick(p, 'link_formalizacao')} target="_blank" rel="noreferrer">abrir</a> : '-'}</p>
+                  <p><strong>Digita\u00e7\u00e3o:</strong> {pick(p, 'data_digitacao') || '-'}</p>
+                  <p><strong>Pagamento ao cliente:</strong> {pick(p, 'data_pgto_cliente') || '-'}</p>
                 </div>
               </div>
             ))}
@@ -1045,16 +1081,18 @@ function FactaConsultaOverlay({ onClose }) {
         {listaRefin.length > 0 && (
           <>
             <p className="section-label" style={{ marginTop: 20 }}>Contratos eleg&iacute;veis a refinanciamento ({listaRefin.length})</p>
-            {listaRefin.map(([numero, c]) => (
-              <div className="card" key={numero} style={{ marginBottom: 12 }}>
-                <p className="card-label">Contrato {numero}</p>
+            {listaRefin.map((c, i) => (
+              <div className="card" key={c.numero || i} style={{ marginBottom: 12 }}>
+                <p className="card-label">{pick(c, 'cliente') ? `${c.cliente} \u2014 ` : ''}Contrato {c.numero}</p>
                 <div className="grid-2" style={{ maxWidth: '100%' }}>
-                  <p><strong>Parcela antiga:</strong> {c.valor_parcela}</p>
-                  <p><strong>Saldo devedor:</strong> {c.saldo_devedor}</p>
-                  <p><strong>Matr\u00edcula:</strong> {c.matricula}</p>
-                  <p><strong>Tabela:</strong> {c.dados?.tabela_ff || '-'}</p>
-                  <p><strong>Taxa:</strong> {c.dados?.taxa_ff || '-'}</p>
-                  <p><strong>Banco de cess\u00e3o:</strong> {c.dados?.banco_cessao || '-'}</p>
+                  <p><strong>Parcela antiga:</strong> {fmtMoeda(pick(c, 'valor_parcela'))}</p>
+                  <p><strong>Saldo devedor:</strong> {fmtMoeda(pick(c, 'saldo_devedor'))}</p>
+                  <p><strong>Valor liberado:</strong> {fmtMoeda(pick(c, 'valor_liberado')) || '-'}</p>
+                  <p><strong>Matr\u00edcula:</strong> {pick(c, 'matricula')}</p>
+                  <p><strong>Tabela:</strong> {pick(c, 'tabela') || c.dados?.tabela_ff || '-'}</p>
+                  <p><strong>Taxa:</strong> {pick(c, 'taxa') || c.dados?.taxa_ff || '-'}</p>
+                  <p><strong>Conta cadastrada:</strong> {pick(c, 'conta') || c.dados?.banco_cessao || '-'}</p>
+                  <p><strong>Link de formaliza\u00e7\u00e3o:</strong> {pick(c, 'link_formalizacao') ? <a href={pick(c, 'link_formalizacao')} target="_blank" rel="noreferrer">abrir</a> : '-'}</p>
                 </div>
                 {c.obs && <p style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>{c.obs}</p>}
               </div>
