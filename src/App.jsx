@@ -2080,6 +2080,10 @@ function VendedorasView() {
           <div className="kpi"><p className="kpi-label">Vendedora com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_valor_vendedor || '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.top_valor_valor)}</p></div>
           <div className="kpi"><p className="kpi-label">Banco mais utilizado</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.banco_top_qtd)} vendas</p></div>
           <div className="kpi"><p className="kpi-label">Dia com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.dia_maior_valor ? fmtDataBR(kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.dia_maior_valor_total)}</p></div>
+        </div>
+      )}
+      {!vendedor && mediasGeral && (
+        <div className="kpi-grid">
           <div className="kpi">
             <p className="kpi-label">Valor total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
             <p className="kpi-value kpi-split">
@@ -2089,10 +2093,6 @@ function VendedorasView() {
             </p>
             <p className="kpi-sub">{fmtInt(kpisGeral?.qtd_total)} vendas no per&iacute;odo</p>
           </div>
-        </div>
-      )}
-      {!vendedor && mediasGeral && (
-        <div className="kpi-grid kpi-grid-3">
           <div className="kpi">
             <p className="kpi-label">M&eacute;dia di&aacute;ria (time todo)</p>
             <p className="kpi-value">{fmtMoeda(mediasGeral.dias_uteis_passados > 0 ? mediasGeral.total_mes_atual / mediasGeral.dias_uteis_passados : 0)}</p>
