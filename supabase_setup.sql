@@ -2473,3 +2473,12 @@ as $$
 $$;
 
 grant execute on function dashboard_debug_peso_nulo to anon;
+
+-- Guarda a sessão de login do Chatwoot (cookies), pro serverless (Vercel)
+-- reaproveitar entre execuções, já que não tem disco persistente lá.
+create table if not exists chatwoot_sessao (
+  id int primary key default 1,
+  dados jsonb not null,
+  atualizado_em timestamptz not null default now(),
+  constraint um_registro_so check (id = 1)
+);
