@@ -1010,11 +1010,8 @@ function FactaConsultaOverlay({ onClose }) {
     try {
       const usaCpf = ehCpf(valor)
       const params = usaCpf ? { cpf: valor } : { af: valor }
-      const chamadas = [callFactaApi('andamento', params)]
-      if (usaCpf) chamadas.push(callFactaApi('refin', { cpf: valor }))
-      const resultados = await Promise.all(chamadas)
-      setPropostas(resultados[0])
-      if (usaCpf) setRefin(resultados[1])
+      const resultado = await callFactaApi('andamento', params)
+      setPropostas(resultado)
     } catch (e2) {
       setError(e2.message || 'Erro ao consultar a Facta.')
     } finally {
