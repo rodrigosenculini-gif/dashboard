@@ -2558,3 +2558,28 @@ create table if not exists chatwoot_sessao (
   atualizado_em timestamptz not null default now(),
   constraint um_registro_so check (id = 1)
 );
+
+-- ============================================================
+-- Trava contra dados corrompidos em vendas_gerais (CPF sem normalizar,
+-- valor/ponto com resíduo de ponto flutuante, e duplicatas de
+-- CPF+adesão) — normaliza tudo automaticamente em qualquer insert/update,
+-- não importa de onde venha (import manual, sync, ou webhook externo).
+create or replace function vendas_gerais_normalize()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.cpf := norm_cpf(new.cpf);
+  if new.valor is not null then new.valor := round(new.valor, 2); end if;
+  if new.ponto is not null then new.ponto := round(new.ponto, 2); end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_vendas_gerais_normalize on vendas_gerais;
+create trigger trg_vendas_gerais_normalize
+  before insert or update on vendas_gerais
+  for each row execute function vendas_gerais_normalize();
+
+create unique index if not exists vendas_gerais_cpf_adesao_uidx
+  on vendas_gerais (cpf, coalesce(adesao, -1));
