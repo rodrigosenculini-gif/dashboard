@@ -2899,21 +2899,21 @@ function VendasView() {
 
       <div className="kpi-grid kpi-grid-4">
         <div className="kpi">
-          <p className="kpi-label">Valor total | Qtd total</p>
-          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(kpis?.qtd_total)}</span></p>
+          <p className="kpi-label">Soma de pontos | Qtd total</p>
+          <p className="kpi-value kpi-split"><span>{fmtInt(Math.round(kpis?.pontos_total ?? 0))}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(kpis?.qtd_total)}</span></p>
         </div>
         <div className="kpi">
-          <p className="kpi-label">Proje&ccedil;&atilde;o do m&ecirc;s</p>
-          <p className="kpi-value" style={{ color: corAtual }}>{fmtMoeda(kpis?.projecao_mes)}</p>
+          <p className="kpi-label">Proje&ccedil;&atilde;o do m&ecirc;s (pontos)</p>
+          <p className="kpi-value" style={{ color: corAtual }}>{fmtInt(Math.round(kpis?.pontos_projecao_mes ?? 0))}</p>
         </div>
         <div className="kpi">
-          <p className="kpi-label">Soma de pontos | Proje&ccedil;&atilde;o</p>
-          <p className="kpi-value kpi-split"><span>{fmtInt(Math.round(kpis?.pontos_total ?? 0))}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(Math.round(kpis?.pontos_projecao_mes ?? 0))}</span></p>
+          <p className="kpi-label">Soma de valor | Proje&ccedil;&atilde;o valor</p>
+          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_mes)}</span></p>
         </div>
         <div className="kpi">
           <p className="kpi-label">% vendas de vendedoras</p>
           <p className="kpi-value" style={{ fontSize: 20 }}>{fmtPct2(kpis?.qtd_total > 0 ? (Number(kpis.qtd_vendedor) / Number(kpis.qtd_total)) * 100 : 0)}</p>
-          <p className="kpi-sub">{fmtInt(kpis?.qtd_vendedor)} de {fmtInt(kpis?.qtd_total)} vendas &middot; {fmtMoeda(kpis?.valor_vendedor)}</p>
+          <p className="kpi-sub">{fmtInt(kpis?.qtd_vendedor)} de {fmtInt(kpis?.qtd_total)} vendas &middot; {fmtInt(Math.round(kpis?.pontos_vendedor ?? 0))} pontos &middot; {fmtMoeda(kpis?.valor_vendedor)}</p>
         </div>
       </div>
 
@@ -2927,45 +2927,45 @@ function VendasView() {
             title="Clique para filtrar por esse produto"
           >
             <p className="kpi-label">{p.produto}</p>
-            <p className="kpi-value" style={{ color: VENDAS_CORES[i % VENDAS_CORES.length] }}>{fmtMoeda(p.valor_total)}</p>
-            <p className="kpi-sub">{fmtInt(p.qtd_total)} vendas &middot; {fmtInt(Math.round(p.pontos_total))} pontos</p>
-            <p className="kpi-sub">proje&ccedil;&atilde;o: {fmtMoeda(p.projecao_mes)}</p>
+            <p className="kpi-value" style={{ color: VENDAS_CORES[i % VENDAS_CORES.length] }}>{fmtInt(Math.round(p.pontos_total))} pts</p>
+            <p className="kpi-sub">{fmtInt(p.qtd_total)} vendas &middot; {fmtMoeda(p.valor_total)}</p>
+            <p className="kpi-sub">proje&ccedil;&atilde;o: {fmtInt(Math.round(p.pontos_projecao_mes ?? 0))} pts &middot; {fmtMoeda(p.projecao_mes)}</p>
           </div>
         ))}
       </div>
 
       <div className="kpi-grid kpi-grid-4">
         <div className="kpi">
-          <p className="kpi-label">M&eacute;dia di&aacute;ria &mdash; valor | pontos</p>
+          <p className="kpi-label">M&eacute;dia di&aacute;ria &mdash; pontos | valor</p>
           <p className="kpi-value kpi-split">
-            <span>{fmtMoeda(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_valor / kpis.dias_uteis_passados : 0)}</span>
+            <span>{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_pontos / kpis.dias_uteis_passados : 0))}</span>
             <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_pontos / kpis.dias_uteis_passados : 0))}</span>
+            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_valor / kpis.dias_uteis_passados : 0)}</span>
           </p>
         </div>
         <div className="kpi">
-          <p className="kpi-label">M&eacute;dia semanal &mdash; valor | pontos</p>
+          <p className="kpi-label">M&eacute;dia semanal &mdash; pontos | valor</p>
           <p className="kpi-value kpi-split">
-            <span>{fmtMoeda(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_valor / kpis.dias_uteis_passados) * 5 : 0)}</span>
+            <span>{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_pontos / kpis.dias_uteis_passados) * 5 : 0))}</span>
             <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_pontos / kpis.dias_uteis_passados) * 5 : 0))}</span>
+            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_valor / kpis.dias_uteis_passados) * 5 : 0)}</span>
           </p>
         </div>
         <div className="kpi">
-          <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria &mdash; valor | pontos</p>
+          <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria &mdash; pontos | valor</p>
           <p className="kpi-value kpi-split">
-            <span>{fmtMoeda(kpis?.projecao_diaria_valor)}</span>
+            <span>{fmtInt(Math.round(kpis?.projecao_diaria_pontos ?? 0))}</span>
             <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.projecao_diaria_pontos ?? 0))}</span>
+            <span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_diaria_valor)}</span>
           </p>
           <p className="kpi-sub">ritmo por hora &uacute;til (8h-18h) de hoje</p>
         </div>
         <div className="kpi">
-          <p className="kpi-label">Proje&ccedil;&atilde;o semanal &mdash; valor | pontos</p>
+          <p className="kpi-label">Proje&ccedil;&atilde;o semanal &mdash; pontos | valor</p>
           <p className="kpi-value kpi-split">
-            <span>{fmtMoeda(kpis?.projecao_semanal_valor)}</span>
+            <span>{fmtInt(Math.round(kpis?.projecao_semanal_pontos ?? 0))}</span>
             <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.projecao_semanal_pontos ?? 0))}</span>
+            <span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_semanal_valor)}</span>
           </p>
           <p className="kpi-sub">ritmo por hora &uacute;til (8h-18h) da semana</p>
         </div>
@@ -2973,15 +2973,16 @@ function VendasView() {
 
       <div className="panel table-panel">
         <p className="section-label">Por campanha</p>
-        <div className="template-row head" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
-          <span>Campanha</span><span>Qtd</span><span>Valor</span>
+        <div className="template-row head" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr' }}>
+          <span>Campanha</span><span>Qtd</span><span>Pontos</span><span>Valor</span>
         </div>
         <div className="scroll-table">
           {porCampanha.length === 0 && !loading && <div className="state-msg">Nenhum dado encontrado.</div>}
           {porCampanha.map((r, i) => (
-            <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+            <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr' }}>
               <span className="campanha-nome">{r.campanha}</span>
               <span>{fmtInt(r.qtd)}</span>
+              <span>{fmtInt(Math.round(r.pontos ?? 0))}</span>
               <span>{fmtMoeda(r.valor)}</span>
             </div>
           ))}
@@ -2990,15 +2991,16 @@ function VendasView() {
 
       <div className="panel table-panel">
         <p className="section-label">Por origem</p>
-        <div className="template-row head" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
-          <span>Origem</span><span>Qtd</span><span>Valor</span>
+        <div className="template-row head" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr' }}>
+          <span>Origem</span><span>Qtd</span><span>Pontos</span><span>Valor</span>
         </div>
         <div className="scroll-table">
           {porOrigem.length === 0 && !loading && <div className="state-msg">Nenhum dado encontrado.</div>}
           {porOrigem.map((r, i) => (
-            <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+            <div className="template-row" key={i} style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr' }}>
               <span className="campanha-nome">{r.origem}</span>
               <span>{fmtInt(r.qtd)}</span>
+              <span>{fmtInt(Math.round(r.pontos ?? 0))}</span>
               <span>{fmtMoeda(r.valor)}</span>
             </div>
           ))}
