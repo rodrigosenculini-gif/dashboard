@@ -1578,7 +1578,7 @@ const IA_WEBHOOK_URL = 'https://hotn8n.querosacarfgts.com.br/webhook/vendedoras-
 
 // Botão com símbolo de IA: abre um chat moderno (gradiente animado) que
 // consulta o webhook do n8n. Nunca fecha sozinho -- só no X.
-function AIChatButton() {
+function AIChatButton({ vendedor }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -1596,7 +1596,7 @@ function AIChatButton() {
     setMessages((m) => [...m, { role: 'user', text: pergunta }])
     setSending(true)
     try {
-      const url = `${IA_WEBHOOK_URL}?Pergunta=${encodeURIComponent(pergunta)}`
+      const url = `${IA_WEBHOOK_URL}?Pergunta=${encodeURIComponent(pergunta)}&Vendedora=${encodeURIComponent(vendedor || 'geral')}`
       const res = await fetch(url)
       const data = await res.json()
       const resposta = data?.resposta || 'Não consegui consultar agora. Tente novamente em instantes.'
@@ -1820,7 +1820,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <PlaybookMenuButton />
-          <AIChatButton />
+          <AIChatButton vendedor={vendedor} />
           <button className="reset-btn" onClick={onLogout} title="Sair">Sair</button>
         </div>
       </div>
