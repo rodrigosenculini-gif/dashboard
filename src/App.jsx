@@ -1572,6 +1572,94 @@ function PlaybookMenuButton() {
   )
 }
 
+
+// URL do webhook n8n que consulta o FAQ via IA.
+const IA_WEBHOOK_URL = 'https://hotn8n.querosacarfgts.com.br/webhook/vendedoras-ia'
+
+// Botão com símbolo de IA: abre um chat moderno (gradiente animado) que
+// consulta o webhook do n8n. Nunca fecha sozinho -- só no X.
+function AIChatButton() {
+  const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const listRef = useRef(null)
+
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
+  }, [messages, sending])
+
+  async function send() {
+    const pergunta = input.trim()
+    if (!pergunta || sending) return
+    setInput('')
+    setMessages((m) => [...m, { role: 'user', text: pergunta }])
+    setSending(true)
+    try {
+      const url = `${IA_WEBHOOK_URL}?Pergunta=${encodeURIComponent(pergunta)}`
+      const res = await fetch(url)
+      const data = await res.json()
+      const resposta = data?.resposta || 'Não consegui consultar agora. Tente novamente em instantes.'
+      setMessages((m) => [...m, { role: 'ia', text: resposta }])
+    } catch (e) {
+      setMessages((m) => [...m, { role: 'ia', text: 'Erro ao consultar a IA. Verifique a conexão e tente de novo.' }])
+    } finally {
+      setSending(false)
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      send()
+    }
+  }
+
+  return (
+    <>
+      <button className="reset-btn ai-trigger-btn" title="Consultar IA" onClick={() => setOpen(true)}>
+        <span className="ai-trigger-dot" /> IA
+      </button>
+      {open && (
+        <div className="ai-chat-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false) }}>
+          <div className="ai-chat-sheet">
+            <div className="ai-chat-gradient" />
+            <div className="ai-chat-header">
+              <div>
+                <div className="ai-chat-title">Consulta rápida · IA</div>
+                <div className="ai-chat-subtitle">Pergunte sobre qualquer produto — a resposta vem direto do FAQ oficial.</div>
+              </div>
+              <button className="ai-chat-close" onClick={() => setOpen(false)}>Encerrar ✕</button>
+            </div>
+
+            <div className="ai-chat-messages" ref={listRef}>
+              {messages.length === 0 && (
+                <div className="ai-chat-empty">Digite sua dúvida abaixo. Ex: "Cliente negativado pode contratar o CLT?"</div>
+              )}
+              {messages.map((m, i) => (
+                <div key={i} className={`ai-msg ai-msg-${m.role}`}>{m.text}</div>
+              ))}
+              {sending && <div className="ai-msg ai-msg-ia ai-msg-loading">Consultando...</div>}
+            </div>
+
+            <div className="ai-chat-inputbar">
+              <textarea
+                className="ai-chat-input"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Escreva sua dúvida..."
+                rows={1}
+              />
+              <button className="ai-chat-send" onClick={send} disabled={sending || !input.trim()}>Enviar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function VendedoraPortal({ vendedor, onLogout }) {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [kpis, setKpis] = useState(null)
@@ -1732,6 +1820,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <PlaybookMenuButton />
+          <AIChatButton />
           <button className="reset-btn" onClick={onLogout} title="Sair">Sair</button>
         </div>
       </div>
