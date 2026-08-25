@@ -399,37 +399,6 @@ export default async function handler(req, res) {
   } else if (type === 'debug_peso_nulo') {
     sql = 'select * from dashboard_debug_peso_nulo()';
     params = [];
-  } else if (type === 'vendas_debug_adesao') {
-    sql = 'select id, adesao, cpf, nome, tabela, valor, peso, ponto, produto, data, vendedor, created_at from vendas_gerais where adesao::text like $1 or cpf like $1 order by created_at';
-    params = [`%${req.query.adesao || ''}%`];
-  } else if (type === 'vendas_debug_duplicatas') {
-    sql = `select norm_cpf(cpf) as cpf_norm, adesao, count(*) as qtd, sum(valor) as soma_valor, array_agg(id) as ids, array_agg(cpf) as cpfs_originais
-           from vendas_gerais
-           group by norm_cpf(cpf), adesao
-           having count(*) > 1
-           order by sum(valor) desc
-           limit 50`;
-    params = [];
-  } else if (type === 'vendas_debug_total_bruto') {
-    sql = `select count(*) as total_linhas, sum(valor) as soma_valor,
-             count(*) filter (where valor is null) as sem_valor,
-             count(distinct (cpf, adesao)) as combinacoes_unicas
-           from vendas_gerais`;
-    params = [];
-  } else if (type === 'vendas_debug_outliers') {
-    sql = `select id, adesao, cpf, nome, tabela, valor, peso, ponto, produto, data, created_at
-           from vendas_gerais
-           where valor is not null
-           order by valor desc
-           limit 25`;
-    params = [];
-  } else if (type === 'vendas_debug_decimais') {
-    sql = `select id, adesao, cpf, nome, valor, peso, ponto, produto, data
-           from vendas_gerais
-           where valor::text ~ '\\.\\d{3,}$'
-           order by valor desc
-           limit 25`;
-    params = [];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
