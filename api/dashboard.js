@@ -66,8 +66,49 @@ export default async function handler(req, res) {
     if (type === 'auth_login') {
       const senha = (req.body?.senha || '').toString().trim();
       const found = SENHAS[senha];
-      if (!found) return res.status(401).json({ error: 'Senha incorreta.' });
-      return res.status(200).json(found);
+      if (found) return res.status(200).json(found);
+      // Nao esta nas senhas fixas: tenta as vendedoras cadastradas dinamicamente
+      // (primeiro acesso feito pela Trilha do Especialista)
+      try {
+        const client = getPool();
+        const result = await client.query(
+          'select nome_completo from vendedoras_login where senha = $1 limit 1',
+          [senha]
+        );
+        if (result.rows[0]) {
+          return res.status(200).json({ role: 'vendedora', vendedor: result.rows[0].nome_completo });
+        }
+      } catch (e) {
+        // tabela pode nao existir ainda; ignora e cai no erro padrao abaixo
+      }
+      return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+
+    if (type === 'vendedoras_register') {
+      try {
+        const nome = (req.body?.nome || '').toString().trim();
+        const senha = (req.body?.senha || '').toString().trim();
+        const nomePattern = /^[A-ZÀ-Ý][a-zà-ÿ]+(?:\s[A-ZÀ-Ý][a-zà-ÿ]+)+$/u;
+        if (!nomePattern.test(nome)) {
+          return res.status(400).json({ error: 'Use o formato Nome Sobrenome (com iniciais maiúsculas).' });
+        }
+        if (senha.length < 4) {
+          return res.status(400).json({ error: 'A senha precisa ter pelo menos 4 caracteres.' });
+        }
+        if (SENHAS[senha]) {
+          return res.status(400).json({ error: 'Essa senha já está em uso. Escolha outra.' });
+        }
+        const client = getPool();
+        await client.query(
+          `insert into vendedoras_login (nome_completo, senha)
+           values ($1, $2)
+           on conflict (nome_completo) do update set senha = excluded.senha`,
+          [nome, senha]
+        );
+        return res.status(200).json({ ok: true, vendedor: nome });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
     }
 
     if (type === 'vendedoras_add_venda') {
