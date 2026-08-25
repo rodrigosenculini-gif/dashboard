@@ -1554,9 +1554,9 @@ function PlaybookMenuButton() {
             {step === 'mode' && (
               <>
                 <div className="playbook-dropdown-title">{selectedProduct.icon} {selectedProduct.name}</div>
-                <button className="playbook-dropdown-item" onClick={() => pickMode('info')}>\uD83D\uDCD8 Completo</button>
-                <button className="playbook-dropdown-item" onClick={() => pickMode('tips')}>\uD83D\uDCA1 Dicas</button>
-                <button className="playbook-dropdown-item playbook-dropdown-back" onClick={() => setStep('products')}>\u2190 Voltar</button>
+                <button className="playbook-dropdown-item" onClick={() => pickMode('info')}>📘 Completo</button>
+                <button className="playbook-dropdown-item" onClick={() => pickMode('tips')}>💡 Dicas</button>
+                <button className="playbook-dropdown-item playbook-dropdown-back" onClick={() => setStep('products')}>← Voltar</button>
               </>
             )}
           </div>
@@ -1618,7 +1618,28 @@ function AIChatButton({ vendedor }) {
   return (
     <>
       <button className="reset-btn ai-trigger-btn" title="Consultar IA" onClick={() => setOpen(true)}>
-        <span className="ai-trigger-dot" /> IA
+        <svg viewBox="0 0 64 64" className="ai-trigger-icon" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="aiTigerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="var(--gold)" />
+              <stop offset="50%" stopColor="var(--lime)" />
+              <stop offset="100%" stopColor="var(--rose)" />
+              <animateTransform attributeName="gradientTransform" type="translate" values="-0.6 0; 0.6 0; -0.6 0" dur="4s" repeatCount="indefinite" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M32 6c-3.4 0-6.2 2.6-7.4 6.3-3-1.7-6.6-2.4-9.4-1-1 4.1 0.4 8 2.6 10.7C13.4 24.6 11 28.6 11 33.2 11 45 20.5 54 32 54s21-9 21-20.8c0-4.6-2.4-8.6-6.8-11.2 2.2-2.7 3.6-6.6 2.6-10.7-2.8-1.4-6.4-0.7-9.4 1C38.2 8.6 35.4 6 32 6z"
+            fill="none"
+            stroke="url(#aiTigerGrad)"
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <g fill="url(#aiTigerGrad)">
+            <path d="M32 21l2.1 6.4L40.5 30l-6.4 2.1L32 38.5l-2.1-6.4L23.5 30l6.4-2.1L32 21z" />
+            <path d="M43 27l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z" />
+            <path d="M23 35l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z" />
+          </g>
+        </svg>
       </button>
       {open && (
         <div className="ai-chat-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false) }}>
