@@ -180,6 +180,17 @@ async function callFactaApi(type, params) {
   return data
 }
 
+async function cancelarPropostaFacta(codigoAf) {
+  const res = await fetch('/api/facta?type=cancelamento', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codigo_af: codigoAf }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Erro ao cancelar proposta')
+  return data
+}
+
 async function callN8nApi(type, params) {
   const qs = new URLSearchParams({ type, ...params })
   const res = await fetch(`/api/n8n?${qs.toString()}`)
@@ -1058,6 +1069,12 @@ function FactaConsultaOverlay({ onClose }) {
   const [refin, setRefin] = useState(null)
   const [buscou, setBuscou] = useState(false)
 
+  const [showCancelar, setShowCancelar] = useState(false)
+  const [codigoAfCancelar, setCodigoAfCancelar] = useState('')
+  const [confirmarCancelar, setConfirmarCancelar] = useState(false)
+  const [cancelando, setCancelando] = useState(false)
+  const [resultadoCancelamento, setResultadoCancelamento] = useState(null)
+
   const ehCpf = (v) => v.replace(/\D/g, '').length === 11
 
   const handleBuscar = async (e) => {
@@ -1081,8 +1098,35 @@ function FactaConsultaOverlay({ onClose }) {
     }
   }
 
+  const abrirCancelar = () => {
+    setResultadoCancelamento(null)
+    setConfirmarCancelar(false)
+    // já sugere o AF da última proposta encontrada, se houver
+    const sugestao = pick(listaPropostas[0], 'proposta_numero', 'codigo_af') || busca.trim()
+    setCodigoAfCancelar(usaCpfNaBusca ? '' : sugestao)
+    setShowCancelar(true)
+  }
+
+  const handleCancelar = async (e) => {
+    e.preventDefault()
+    const af = codigoAfCancelar.trim()
+    if (!af) return
+    if (!confirmarCancelar) return
+    setCancelando(true)
+    setResultadoCancelamento(null)
+    try {
+      const resultado = await cancelarPropostaFacta(af)
+      setResultadoCancelamento({ ok: !resultado.erro, mensagem: resultado.mensagem || (resultado.erro ? 'Erro ao cancelar.' : 'Cancelamento solicitado com sucesso.') })
+    } catch (e2) {
+      setResultadoCancelamento({ ok: false, mensagem: e2.message || 'Erro ao cancelar proposta.' })
+    } finally {
+      setCancelando(false)
+    }
+  }
+
   const listaPropostas = selecionarPropostas(extraiListaPropostas(propostas))
   const listaRefin = extraiListaRefin(refin)
+  const usaCpfNaBusca = ehCpf(busca.trim())
 
   return (
     <div className="funil-overlay" onClick={onClose}>
@@ -1092,8 +1136,43 @@ function FactaConsultaOverlay({ onClose }) {
             <h2>Consulta Facta</h2>
             <p className="subtitle">Busca por CPF (11 d&iacute;gitos) ou c&oacute;digo AF &mdash; somente leitura</p>
           </div>
-          <button className="funil-close" onClick={onClose}>&times;</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="refresh-btn" onClick={abrirCancelar} title="Cancelar uma proposta na Facta">Cancelar Proposta</button>
+            <button className="funil-close" onClick={onClose}>&times;</button>
+          </div>
         </div>
+
+        {showCancelar && (
+          <div className="card" style={{ marginBottom: 16, borderColor: 'var(--rose)' }}>
+            <p className="card-label" style={{ color: 'var(--rose)' }}>Cancelar proposta na Facta</p>
+            {!resultadoCancelamento ? (
+              <form onSubmit={handleCancelar} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <label style={{ fontSize: 12.5, color: 'var(--muted)' }}>C&oacute;digo AF da proposta</label>
+                <input
+                  value={codigoAfCancelar}
+                  onChange={(e) => setCodigoAfCancelar(e.target.value)}
+                  placeholder="C\u00f3digo AF"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 13, padding: '9px 10px', borderRadius: 7 }}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--muted)' }}>
+                  <input type="checkbox" checked={confirmarCancelar} onChange={(e) => setConfirmarCancelar(e.target.checked)} />
+                  Confirmo que quero cancelar essa proposta na Facta (a&ccedil;&atilde;o pode ser irrevers&iacute;vel).
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="submit" className="refresh-btn" disabled={cancelando || !codigoAfCancelar.trim() || !confirmarCancelar} style={{ background: 'var(--rose)' }}>
+                    {cancelando ? 'Cancelando...' : 'Confirmar cancelamento'}
+                  </button>
+                  <button type="button" className="reset-btn" onClick={() => setShowCancelar(false)}>Fechar</button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <p style={{ color: resultadoCancelamento.ok ? 'var(--lime)' : 'var(--rose)', fontSize: 13.5 }}>{resultadoCancelamento.mensagem}</p>
+                <button className="reset-btn" onClick={() => setShowCancelar(false)}>Fechar</button>
+              </div>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleBuscar} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <input
