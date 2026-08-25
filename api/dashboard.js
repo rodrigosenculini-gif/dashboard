@@ -400,8 +400,22 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_debug_peso_nulo()';
     params = [];
   } else if (type === 'vendas_debug_adesao') {
-    sql = 'select id, adesao, cpf, nome, tabela, valor, peso, ponto, produto, data, vendedor, created_at from vendas_gerais where adesao = $1::bigint order by created_at';
-    params = [req.query.adesao || null];
+    sql = 'select id, adesao, cpf, nome, tabela, valor, peso, ponto, produto, data, vendedor, created_at from vendas_gerais where adesao::text like $1 or cpf like $1 order by created_at';
+    params = [`%${req.query.adesao || ''}%`];
+  } else if (type === 'vendas_debug_duplicatas') {
+    sql = `select cpf, adesao, count(*) as qtd, sum(valor) as soma_valor, array_agg(id) as ids
+           from vendas_gerais
+           group by cpf, adesao
+           having count(*) > 1
+           order by sum(valor) desc
+           limit 30`;
+    params = [];
+  } else if (type === 'vendas_debug_total_bruto') {
+    sql = `select count(*) as total_linhas, sum(valor) as soma_valor,
+             count(*) filter (where valor is null) as sem_valor,
+             count(distinct (cpf, adesao)) as combinacoes_unicas
+           from vendas_gerais`;
+    params = [];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
