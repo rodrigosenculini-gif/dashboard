@@ -1501,6 +1501,77 @@ const FACTA_CODIGOS = [
   { codigo: '64785', label: '64785 \u2014 Refin da Port CLT, 36/48x (0,30)' },
 ]
 
+
+// URL do site de playbooks (projeto separado, "hotline-playbook").
+const PLAYBOOK_BASE_URL = 'https://hotline-playbook.vercel.app'
+const PLAYBOOK_PRODUCTS = [
+  { id: 'clt', name: 'Crédito CLT', icon: '\uD83D\uDCBC' },
+  { id: 'refin', name: 'Refinanciamento CLT', icon: '\uD83D\uDD04' },
+  { id: 'energia', name: 'Empréstimo Conta de Luz', icon: '\uD83D\uDCA1' },
+  { id: 'fgts', name: 'FGTS Saque-Aniversário', icon: '\uD83C\uDFE6' },
+  { id: 'trabalhador', name: 'Crédito do Trabalhador', icon: '\uD83D\uDCF1' },
+]
+
+// Botão de três pontinhos: abre lista de produtos -> Completo/Dicas ->
+// mostra o playbook (site separado) num iframe em cima de tudo.
+function PlaybookMenuButton() {
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState('products') // 'products' | 'mode'
+  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [iframeUrl, setIframeUrl] = useState(null)
+
+  function closeMenu() {
+    setOpen(false)
+    setStep('products')
+    setSelectedProduct(null)
+  }
+
+  function pickProduct(p) {
+    setSelectedProduct(p)
+    setStep('mode')
+  }
+
+  function pickMode(mode) {
+    setIframeUrl(`${PLAYBOOK_BASE_URL}?product=${selectedProduct.id}&mode=${mode}`)
+    closeMenu()
+  }
+
+  return (
+    <>
+      <div style={{ position: 'relative' }}>
+        <button
+          className="reset-btn"
+          title="Playbooks"
+          onClick={() => setOpen((v) => !v)}
+        >⋮</button>
+        {open && (
+          <div className="playbook-dropdown">
+            {step === 'products' && PLAYBOOK_PRODUCTS.map((p) => (
+              <button key={p.id} className="playbook-dropdown-item" onClick={() => pickProduct(p)}>
+                <span>{p.icon}</span> {p.name}
+              </button>
+            ))}
+            {step === 'mode' && (
+              <>
+                <div className="playbook-dropdown-title">{selectedProduct.icon} {selectedProduct.name}</div>
+                <button className="playbook-dropdown-item" onClick={() => pickMode('info')}>\uD83D\uDCD8 Completo</button>
+                <button className="playbook-dropdown-item" onClick={() => pickMode('tips')}>\uD83D\uDCA1 Dicas</button>
+                <button className="playbook-dropdown-item playbook-dropdown-back" onClick={() => setStep('products')}>\u2190 Voltar</button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      {iframeUrl && (
+        <div className="playbook-iframe-overlay">
+          <button className="playbook-iframe-close" onClick={() => setIframeUrl(null)}>\u2715 Fechar</button>
+          <iframe src={iframeUrl} title="Playbook" className="playbook-iframe" />
+        </div>
+      )}
+    </>
+  )
+}
+
 function VendedoraPortal({ vendedor, onLogout }) {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [kpis, setKpis] = useState(null)
@@ -1659,7 +1730,10 @@ function VendedoraPortal({ vendedor, onLogout }) {
       <div className="app-header">
         <img src="/tiger-icon.png" alt="" className="app-logo" />
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
-        <button className="reset-btn" onClick={onLogout} title="Sair" style={{ marginLeft: 'auto' }}>Sair</button>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <PlaybookMenuButton />
+          <button className="reset-btn" onClick={onLogout} title="Sair">Sair</button>
+        </div>
       </div>
 
       <div className="topbar">
