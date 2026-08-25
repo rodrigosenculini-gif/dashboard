@@ -403,12 +403,12 @@ export default async function handler(req, res) {
     sql = 'select id, adesao, cpf, nome, tabela, valor, peso, ponto, produto, data, vendedor, created_at from vendas_gerais where adesao::text like $1 or cpf like $1 order by created_at';
     params = [`%${req.query.adesao || ''}%`];
   } else if (type === 'vendas_debug_duplicatas') {
-    sql = `select cpf, adesao, count(*) as qtd, sum(valor) as soma_valor, array_agg(id) as ids
+    sql = `select norm_cpf(cpf) as cpf_norm, adesao, count(*) as qtd, sum(valor) as soma_valor, array_agg(id) as ids, array_agg(cpf) as cpfs_originais
            from vendas_gerais
-           group by cpf, adesao
+           group by norm_cpf(cpf), adesao
            having count(*) > 1
            order by sum(valor) desc
-           limit 30`;
+           limit 50`;
     params = [];
   } else if (type === 'vendas_debug_total_bruto') {
     sql = `select count(*) as total_linhas, sum(valor) as soma_valor,
