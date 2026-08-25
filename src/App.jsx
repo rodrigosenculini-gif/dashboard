@@ -172,6 +172,9 @@ function fmtMoney(n) {
 function fmtPct(n) {
   return `${(n ?? 0).toString().replace('.', ',')}%`
 }
+function fmtPct2(n) {
+  return `${(n ?? 0).toFixed(2).replace('.', ',')}%`
+}
 function fmtMin(n) {
   return `${(n ?? 0).toString().replace('.', ',')} min`
 }
@@ -2703,7 +2706,7 @@ function VendasView() {
         </ResponsiveContainer>
       </div>
 
-      <div className="kpi-grid kpi-grid-3">
+      <div className="kpi-grid kpi-grid-4">
         <div className="kpi">
           <p className="kpi-label">Valor total | Qtd total</p>
           <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(kpis?.qtd_total)}</span></p>
@@ -2716,44 +2719,9 @@ function VendasView() {
           <p className="kpi-label">Soma de pontos | Proje&ccedil;&atilde;o</p>
           <p className="kpi-value kpi-split"><span>{fmtInt(Math.round(kpis?.pontos_total ?? 0))}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtInt(Math.round(kpis?.pontos_projecao_mes ?? 0))}</span></p>
         </div>
-      </div>
-
-      <div className="kpi-grid kpi-grid-5">
-        <div className="kpi">
-          <p className="kpi-label">M&eacute;dia di&aacute;ria &mdash; valor | pontos</p>
-          <p className="kpi-value kpi-split">
-            <span>{fmtMoeda(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_valor / kpis.dias_uteis_passados : 0)}</span>
-            <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_pontos / kpis.dias_uteis_passados : 0))}</span>
-          </p>
-        </div>
-        <div className="kpi">
-          <p className="kpi-label">M&eacute;dia semanal &mdash; valor | pontos</p>
-          <p className="kpi-value kpi-split">
-            <span>{fmtMoeda(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_valor / kpis.dias_uteis_passados) * 5 : 0)}</span>
-            <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_pontos / kpis.dias_uteis_passados) * 5 : 0))}</span>
-          </p>
-        </div>
-        <div className="kpi">
-          <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria &mdash; valor | pontos</p>
-          <p className="kpi-value kpi-split">
-            <span>{fmtMoeda(kpis?.dias_uteis_mes > 0 ? kpis.projecao_mes / kpis.dias_uteis_mes : 0)}</span>
-            <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.dias_uteis_mes > 0 ? kpis.pontos_projecao_mes / kpis.dias_uteis_mes : 0))}</span>
-          </p>
-        </div>
-        <div className="kpi">
-          <p className="kpi-label">Proje&ccedil;&atilde;o semanal &mdash; valor | pontos</p>
-          <p className="kpi-value kpi-split">
-            <span>{fmtMoeda(kpis?.dias_uteis_mes > 0 ? (kpis.projecao_mes / kpis.dias_uteis_mes) * 5 : 0)}</span>
-            <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.dias_uteis_mes > 0 ? (kpis.pontos_projecao_mes / kpis.dias_uteis_mes) * 5 : 0))}</span>
-          </p>
-        </div>
         <div className="kpi">
           <p className="kpi-label">% vendas de vendedoras</p>
-          <p className="kpi-value" style={{ fontSize: 20 }}>{fmtPct(kpis?.qtd_total > 0 ? (Number(kpis.qtd_vendedor) / Number(kpis.qtd_total)) * 100 : 0)}</p>
+          <p className="kpi-value" style={{ fontSize: 20 }}>{fmtPct2(kpis?.qtd_total > 0 ? (Number(kpis.qtd_vendedor) / Number(kpis.qtd_total)) * 100 : 0)}</p>
           <p className="kpi-sub">{fmtInt(kpis?.qtd_vendedor)} de {fmtInt(kpis?.qtd_total)} vendas &middot; {fmtMoeda(kpis?.valor_vendedor)}</p>
         </div>
       </div>
@@ -2773,6 +2741,43 @@ function VendasView() {
             <p className="kpi-sub">proje&ccedil;&atilde;o: {fmtMoeda(p.projecao_mes)}</p>
           </div>
         ))}
+      </div>
+
+      <div className="kpi-grid kpi-grid-4">
+        <div className="kpi">
+          <p className="kpi-label">M&eacute;dia di&aacute;ria &mdash; valor | pontos</p>
+          <p className="kpi-value kpi-split">
+            <span>{fmtMoeda(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_valor / kpis.dias_uteis_passados : 0)}</span>
+            <span className="kpi-split-bar">|</span>
+            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_pontos / kpis.dias_uteis_passados : 0))}</span>
+          </p>
+        </div>
+        <div className="kpi">
+          <p className="kpi-label">M&eacute;dia semanal &mdash; valor | pontos</p>
+          <p className="kpi-value kpi-split">
+            <span>{fmtMoeda(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_valor / kpis.dias_uteis_passados) * 5 : 0)}</span>
+            <span className="kpi-split-bar">|</span>
+            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_pontos / kpis.dias_uteis_passados) * 5 : 0))}</span>
+          </p>
+        </div>
+        <div className="kpi">
+          <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria &mdash; valor | pontos</p>
+          <p className="kpi-value kpi-split">
+            <span>{fmtMoeda(kpis?.projecao_diaria_valor)}</span>
+            <span className="kpi-split-bar">|</span>
+            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.projecao_diaria_pontos ?? 0))}</span>
+          </p>
+          <p className="kpi-sub">ritmo por hora &uacute;til (8h-18h) de hoje</p>
+        </div>
+        <div className="kpi">
+          <p className="kpi-label">Proje&ccedil;&atilde;o semanal &mdash; valor | pontos</p>
+          <p className="kpi-value kpi-split">
+            <span>{fmtMoeda(kpis?.projecao_semanal_valor)}</span>
+            <span className="kpi-split-bar">|</span>
+            <span className="kpi-split-proj">{fmtInt(Math.round(kpis?.projecao_semanal_pontos ?? 0))}</span>
+          </p>
+          <p className="kpi-sub">ritmo por hora &uacute;til (8h-18h) da semana</p>
+        </div>
       </div>
 
       <div className="panel table-panel">
