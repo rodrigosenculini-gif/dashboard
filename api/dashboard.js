@@ -416,6 +416,20 @@ export default async function handler(req, res) {
              count(distinct (cpf, adesao)) as combinacoes_unicas
            from vendas_gerais`;
     params = [];
+  } else if (type === 'vendas_debug_outliers') {
+    sql = `select id, adesao, cpf, nome, tabela, valor, peso, ponto, produto, data, created_at
+           from vendas_gerais
+           where valor is not null
+           order by valor desc
+           limit 25`;
+    params = [];
+  } else if (type === 'vendas_debug_decimais') {
+    sql = `select id, adesao, cpf, nome, valor, peso, ponto, produto, data
+           from vendas_gerais
+           where valor::text ~ '\\.\\d{3,}$'
+           order by valor desc
+           limit 25`;
+    params = [];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
