@@ -42,20 +42,23 @@ export default async function handler(req, res) {
   }
 
   // POST: ações que alteram algo na Facta (hoje só cancelamento de proposta).
+  // Aceita código AF direto OU CPF — nesse caso o n8n consulta sozinho a
+  // proposta mais recente desse CPF e cancela ela, sem passo intermediário.
   if (req.method === 'POST') {
     const { type } = req.query;
     if (type !== 'cancelamento') {
       return res.status(400).json({ error: `type inválido: ${type}` });
     }
     const codigoAf = req.body?.codigo_af;
-    if (!codigoAf) {
-      return res.status(400).json({ error: 'Informe o código AF da proposta.' });
+    const cpfLimpo = req.body?.cpf ? String(req.body.cpf).replace(/\D/g, '') : '';
+    if (!codigoAf && !cpfLimpo) {
+      return res.status(400).json({ error: 'Informe o código AF ou o CPF da proposta.' });
     }
     try {
       const resp = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'cancelamento', af: codigoAf }),
+        body: JSON.stringify({ type: 'cancelamento', af: codigoAf || undefined, cpf: cpfLimpo || undefined }),
       });
       const texto = await resp.text();
       let data;
