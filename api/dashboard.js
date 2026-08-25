@@ -399,6 +399,9 @@ export default async function handler(req, res) {
   } else if (type === 'debug_peso_nulo') {
     sql = 'select * from dashboard_debug_peso_nulo()';
     params = [];
+  } else if (type === 'vendas_debug_adesao') {
+    sql = 'select id, adesao, cpf, nome, tabela, valor, peso, ponto, produto, data, vendedor, created_at from vendas_gerais where adesao = $1::bigint order by created_at';
+    params = [req.query.adesao || null];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
