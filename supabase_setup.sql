@@ -2223,7 +2223,11 @@ returns table (
   dias_uteis_passados int,
   dias_uteis_mes int,
   total_mes_valor numeric,
-  total_mes_pontos numeric
+  total_mes_pontos numeric,
+  projecao_diaria_valor numeric,
+  projecao_diaria_pontos numeric,
+  projecao_semanal_valor numeric,
+  projecao_semanal_pontos numeric
 )
 language sql
 security definer
@@ -2267,6 +2271,32 @@ as $$
     from vendas_gerais, mes, hoje
     where data >= mes.inicio and data <= hoje.d
       and (p_produto is null or produto = p_produto)
+  ),
+  agora as (
+    select
+      extract(hour from now() at time zone 'America/Sao_Paulo')
+        + extract(minute from now() at time zone 'America/Sao_Paulo') / 60.0 as h,
+      extract(isodow from now() at time zone 'America/Sao_Paulo')::int as dow
+  ),
+  horas_hoje as (
+    select case when dow between 1 and 5 then greatest(0, least(h - 8, 10)) else 0 end as passadas
+    from agora
+  ),
+  horas_semana as (
+    select (least(greatest((select dow from agora) - 1, 0), 5) * 10) + (select passadas from horas_hoje) as passadas
+  ),
+  valor_hoje_real as (
+    select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
+    from vendas_gerais, hoje
+    where data = hoje.d
+      and (p_produto is null or produto = p_produto)
+  ),
+  valor_semana_real as (
+    select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
+    from vendas_gerais, hoje
+    where data >= (hoje.d - (extract(isodow from hoje.d)::int - 1))
+      and data <= hoje.d
+      and (p_produto is null or produto = p_produto)
   )
   select
     (select valor_total from periodo),
@@ -2284,7 +2314,19 @@ as $$
     (select n from du_passados),
     (select n from du_mes),
     (select v from total_mes),
-    (select p from total_mes);
+    (select p from total_mes),
+    case when (select passadas from horas_hoje) > 0
+      then round((select v from valor_hoje_real) / (select passadas from horas_hoje) * 10, 2)
+      else 0 end,
+    case when (select passadas from horas_hoje) > 0
+      then round((select p from valor_hoje_real) / (select passadas from horas_hoje) * 10, 2)
+      else 0 end,
+    case when (select passadas from horas_semana) > 0
+      then round((select v from valor_semana_real) / (select passadas from horas_semana) * 50, 2)
+      else 0 end,
+    case when (select passadas from horas_semana) > 0
+      then round((select p from valor_semana_real) / (select passadas from horas_semana) * 50, 2)
+      else 0 end;
 $$;
 
 grant execute on function dashboard_vendas_kpis to anon;
