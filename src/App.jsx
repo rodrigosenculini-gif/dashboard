@@ -1022,7 +1022,7 @@ function FactaConsultaOverlay({ onClose }) {
     }
   }
 
-  const listaPropostas = extraiListaPropostas(propostas)
+  const listaPropostas = selecionarPropostas(extraiListaPropostas(propostas))
   const listaRefin = extraiListaRefin(refin)
 
   return (
@@ -1267,6 +1267,63 @@ function fmtDataBR(d) {
   const dt = new Date(datePart + 'T00:00:00')
   if (isNaN(dt.getTime())) return '-'
   return dt.toLocaleDateString('pt-BR')
+}
+
+// Aceita tanto "AAAA-MM-DD[THH:MM]" (ISO) quanto "DD/MM/AAAA[ HH:MM]" (formato
+// que a Facta costuma mandar em data_digitacao) e devolve um timestamp
+// numérico pra dar pra ordenar por recência. Datas inválidas/vazias viram
+// -Infinity, pra sempre ficarem por último.
+function parseDataFlexivel(str) {
+  if (!str) return -Infinity
+  const s = String(str).trim()
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (isoMatch) {
+    const t = new Date(s).getTime()
+    return isNaN(t) ? -Infinity : t
+  }
+  const brMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)
+  if (brMatch) {
+    const [, dd, mm, yyyy, hh = '00', min = '00', ss = '00'] = brMatch
+    const t = new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`).getTime()
+    return isNaN(t) ? -Infinity : t
+  }
+  return -Infinity
+}
+
+// Regra de sele\u00e7\u00e3o das propostas a mostrar (a Facta pode devolver v\u00e1rias
+// pro mesmo CPF/AF):
+// 1) Sempre olha a mais recente primeiro (por data_digitacao).
+// 2) Se existir alguma com "pago" no status (n\u00e3o precisa ser exatamente esse
+//    status, s\u00f3 conter a palavra) \u2014 prioridade m\u00e1xima: mostra s\u00f3 ela
+//    (a mais recente entre as pagas).
+// 3) Sen\u00e3o, se existir uma "cancelada" e outra em "assinatura" (mesma l\u00f3gica
+//    de conter a palavra, n\u00e3o precisa ser o status exato) \u2014 mostra as duas.
+// 4) Em qualquer outro caso \u2014 mostra as duas mais recentes.
+function contemPalavra(p, palavra) {
+  const status = (pick(p, 'status', 'status_proposta') || '').toString().toLowerCase()
+  return status.includes(palavra)
+}
+
+function selecionarPropostas(lista) {
+  if (!lista || lista.length === 0) return []
+  const ordenada = [...lista].sort(
+    (a, b) => parseDataFlexivel(pick(b, 'data_digitacao')) - parseDataFlexivel(pick(a, 'data_digitacao'))
+  )
+
+  const pagas = ordenada.filter((p) => contemPalavra(p, 'pago'))
+  if (pagas.length > 0) {
+    return [pagas[0]]
+  }
+
+  const canceladas = ordenada.filter((p) => contemPalavra(p, 'cancelad'))
+  const emAssinatura = ordenada.filter((p) => contemPalavra(p, 'assinatura'))
+  if (canceladas.length > 0 && emAssinatura.length > 0) {
+    const cancelada = canceladas[0]
+    const assinatura = emAssinatura.find((p) => p !== cancelada) || emAssinatura[0]
+    return assinatura === cancelada ? [cancelada] : [cancelada, assinatura]
+  }
+
+  return ordenada.slice(0, 2)
 }
 
 function RankingOverlay({ onClose }) {
