@@ -992,28 +992,64 @@ function pick(obj, ...campos) {
   return null
 }
 
-// Aceita tanto {propostas: [...]} (formato original da Facta) quanto um
-// objeto único já achatado (seu formato novo, sem o envelope "propostas").
+// Aceita qualquer formato que a Facta mandar: array direto, envelope
+// {propostas: [...]} ou {data: [...]}, ou um objeto único já achatado —
+// sem exigir nenhum campo específico. Assim, campo novo nunca quebra isso.
 function extraiListaPropostas(resp) {
   if (!resp) return []
+  if (Array.isArray(resp)) return resp
   if (Array.isArray(resp.propostas)) return resp.propostas
-  if (pick(resp, 'cliente', 'valor_parcela', 'vlrprestacao', 'tabela', 'status', 'status_proposta')) {
-    return [resp]
+  if (Array.isArray(resp.data)) return resp.data
+  if (typeof resp === 'object' && Object.keys(resp).length > 0) return [resp]
+  return []
+}
+
+// Idem pro refin: aceita array direto, {lista_contratos_refin: {...}}
+// (formato original, um objeto por contrato) ou um objeto único já achatado.
+function extraiListaRefin(resp) {
+  if (!resp) return []
+  if (Array.isArray(resp)) {
+    return resp.map((c, i) => ({ numero: pick(c, 'proposta_numero', 'numero_contrato', 'matricula') || i, ...c }))
+  }
+  if (resp.lista_contratos_refin && typeof resp.lista_contratos_refin === 'object') {
+    return Object.entries(resp.lista_contratos_refin).map(([numero, c]) => ({ numero, ...c }))
+  }
+  if (typeof resp === 'object' && Object.keys(resp).length > 0) {
+    return [{ numero: pick(resp, 'proposta_numero', 'numero_contrato', 'matricula') || '-', ...resp }]
   }
   return []
 }
 
-// Idem pro refin: aceita {lista_contratos_refin: {...}} (formato original,
-// um objeto por contrato) OU um objeto único já achatado.
-function extraiListaRefin(resp) {
-  if (!resp) return []
-  if (resp.lista_contratos_refin && typeof resp.lista_contratos_refin === 'object') {
-    return Object.entries(resp.lista_contratos_refin).map(([numero, c]) => ({ numero, ...c }))
-  }
-  if (pick(resp, 'matricula', 'valor_parcela', 'saldo_devedor')) {
-    return [{ numero: pick(resp, 'proposta_numero', 'numero_contrato', 'matricula') || '-', ...resp }]
-  }
-  return []
+function humanizeLabel(key) {
+  return String(key)
+    .replace(/_/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase())
+}
+
+// Renderiza QUALQUER campo presente no objeto, sem lista fixa — assim,
+// se a Facta mandar um campo novo amanh\u00e3, ele j\u00e1 aparece aqui sozinho,
+// sem precisar mexer no c\u00f3digo.
+function CamposGenericos({ obj, prefix }) {
+  if (!obj || typeof obj !== 'object') return null
+  const entries = Object.entries(obj).filter(
+    ([, v]) => v !== null && v !== undefined && v !== '' && typeof v !== 'function'
+  )
+  if (entries.length === 0) return null
+  return (
+    <>
+      {entries.map(([k, v]) => {
+        const label = prefix ? `${prefix} \u2013 ${humanizeLabel(k)}` : humanizeLabel(k)
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          return <CamposGenericos key={k} obj={v} prefix={label} />
+        }
+        const valorExibido = Array.isArray(v)
+          ? (v.length === 0 ? '-' : v.map((item) => (typeof item === 'object' ? JSON.stringify(item) : String(item))).join(', '))
+          : String(v)
+        return <p key={k}><strong>{label}:</strong> {valorExibido}</p>
+      })}
+    </>
+  )
 }
 
 function FactaConsultaOverlay({ onClose }) {
@@ -1098,6 +1134,12 @@ function FactaConsultaOverlay({ onClose }) {
                   <p><strong>Digita&ccedil;&atilde;o:</strong> {pick(p, 'data_digitacao') || '-'}</p>
                   <p><strong>Pagamento ao cliente:</strong> {pick(p, 'data_pgto_cliente') || '-'}</p>
                 </div>
+                <details style={{ marginTop: 10 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--muted)' }}>Ver todos os campos retornados</summary>
+                  <div className="grid-2" style={{ maxWidth: '100%', marginTop: 8 }}>
+                    <CamposGenericos obj={p} />
+                  </div>
+                </details>
               </div>
             ))}
           </>
@@ -1120,6 +1162,12 @@ function FactaConsultaOverlay({ onClose }) {
                   <p><strong>Link de formaliza&ccedil;&atilde;o:</strong> {pick(c, 'link_formalizacao') || '-'}</p>
                 </div>
                 {c.obs && <p style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>{c.obs}</p>}
+                <details style={{ marginTop: 10 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--muted)' }}>Ver todos os campos retornados</summary>
+                  <div className="grid-2" style={{ maxWidth: '100%', marginTop: 8 }}>
+                    <CamposGenericos obj={c} />
+                  </div>
+                </details>
               </div>
             ))}
           </>
