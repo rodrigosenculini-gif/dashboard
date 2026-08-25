@@ -2220,6 +2220,7 @@ returns table (
   pontos_projecao_mes numeric,
   qtd_vendedor bigint,
   valor_vendedor numeric,
+  pontos_vendedor numeric,
   dias_uteis_passados int,
   dias_uteis_mes int,
   total_mes_valor numeric,
@@ -2244,7 +2245,8 @@ as $$
       count(*) as qtd_total,
       coalesce(sum(ponto), 0) as pontos_total,
       count(*) filter (where vendedor is not null) as qtd_vendedor,
-      coalesce(sum(valor) filter (where vendedor is not null), 0) as valor_vendedor
+      coalesce(sum(valor) filter (where vendedor is not null), 0) as valor_vendedor,
+      coalesce(sum(ponto) filter (where vendedor is not null), 0) as pontos_vendedor
     from vendas_gerais
     where (p_date_from is null or data >= p_date_from)
       and (p_date_to is null or data <= p_date_to)
@@ -2311,6 +2313,7 @@ as $$
       else 0 end,
     (select qtd_vendedor from periodo),
     (select valor_vendedor from periodo),
+    (select pontos_vendedor from periodo),
     (select n from du_passados),
     (select n from du_mes),
     (select v from total_mes),
@@ -2345,7 +2348,8 @@ returns table (
   valor_total numeric,
   qtd_total bigint,
   pontos_total numeric,
-  projecao_mes numeric
+  projecao_mes numeric,
+  pontos_projecao_mes numeric
 )
 language sql
 security definer
@@ -2376,7 +2380,7 @@ as $$
     group by produto
   ),
   mes_por_produto as (
-    select produto, coalesce(sum(valor), 0) as v
+    select produto, coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, mes, hoje
     where data >= mes.inicio and data <= hoje.d
     group by produto
@@ -2388,10 +2392,13 @@ as $$
     a.pontos_total,
     case when (select n from du_passados) > 0
       then round(coalesce(m.v, 0) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end,
+    case when (select n from du_passados) > 0
+      then round(coalesce(m.p, 0) / (select n from du_passados) * (select n from du_mes), 2)
       else 0 end
   from agg a
   left join mes_por_produto m on m.produto is not distinct from a.produto
-  order by a.valor_total desc;
+  order by a.pontos_total desc;
 $$;
 
 -- Vendas por dia (gráfico realizado x projeção — mesmo estilo do portal da
@@ -2461,7 +2468,8 @@ create or replace function dashboard_vendas_por_campanha(
 returns table (
   campanha text,
   qtd bigint,
-  valor numeric
+  valor numeric,
+  pontos numeric
 )
 language sql
 security definer
@@ -2471,14 +2479,15 @@ as $$
   select
     campanha,
     count(*),
-    coalesce(sum(valor), 0)
+    coalesce(sum(valor), 0),
+    coalesce(sum(ponto), 0)
   from vendas_gerais
   where campanha is not null
     and (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
     and (p_produto is null or produto = p_produto)
   group by campanha
-  order by coalesce(sum(valor), 0) desc
+  order by coalesce(sum(ponto), 0) desc
   limit 300;
 $$;
 
@@ -2491,7 +2500,8 @@ create or replace function dashboard_vendas_por_origem(
 returns table (
   origem text,
   qtd bigint,
-  valor numeric
+  valor numeric,
+  pontos numeric
 )
 language sql
 security definer
@@ -2501,14 +2511,15 @@ as $$
   select
     origem,
     count(*),
-    coalesce(sum(valor), 0)
+    coalesce(sum(valor), 0),
+    coalesce(sum(ponto), 0)
   from vendas_gerais
   where origem is not null
     and (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
     and (p_produto is null or produto = p_produto)
   group by origem
-  order by coalesce(sum(valor), 0) desc
+  order by coalesce(sum(ponto), 0) desc
   limit 300;
 $$;
 
