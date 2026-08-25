@@ -1995,6 +1995,9 @@ grant execute on function calc_peso_vendas to anon;
 -- Sincronização manual da visão Vendas (botão "Sincronizar") — igual à de
 -- vendedoras_analise, mas também traz campanha/origem (usados nas tabelas
 -- "Por Campanha"/"Por Origem") e não mexe em vendedor algum.
+-- Coluna nova: marca quando a venda tambem esta em vendedoras_analise
+alter table vendas_gerais add column if not exists vendedor text;
+
 create or replace function dashboard_vendas_sync()
 returns table (
   atualizados_vendas int,
@@ -2068,6 +2071,20 @@ begin
   from match_t m
   where norm_cpf(v.cpf) = m.cpf_norm
     and (v.covnersation_id is null or v.whatsapp is null or v.campanha is null or v.origem is null);
+
+  -- 1d) mantém a coluna "vendedor" em dia, cruzando com vendedoras_analise
+  with match_v as (
+    select distinct on (norm_cpf(va.cpf))
+      norm_cpf(va.cpf) as cpf_norm, va.vendedor
+    from vendedoras_analise va
+    where va.cpf is not null and va.vendedor is not null
+    order by norm_cpf(va.cpf), va.data_status desc
+  )
+  update vendas_gerais v
+  set vendedor = m.vendedor
+  from match_v m
+  where norm_cpf(v.cpf) = m.cpf_norm
+    and v.vendedor is null;
 
   select count(*) into v1 from vendas_gerais where covnersation_id is not null or whatsapp is not null;
 
@@ -2182,14 +2199,12 @@ begin
 end;
 $$;
 
--- KPIs gerais: valor/qtd total do período + projeção do dia (valor de hoje)
--- e projeção geral (regra de três: total do mês ÷ dias úteis passados ×
--- dias úteis do mês inteiro — mesma fórmula do portal da vendedora)
+-- KPIs gerais: valor/qtd total do período + projeção do mês (regra de três:
+-- total do mês ÷ dias úteis passados × dias úteis do mês inteiro) + médias/
+-- projeções diária e semanal + % de vendas atribuídas a vendedoras
 drop function if exists dashboard_vendas_kpis(date, date);
 
-drop function if exists dashboard_vendas_kpis(date, date);
-
-drop function if exists dashboard_vendas_kpis(date, date);
+drop function if exists dashboard_vendas_kpis(date, date, text);
 
 create or replace function dashboard_vendas_kpis(
   p_date_from date default null,
@@ -2202,7 +2217,13 @@ returns table (
   valor_hoje numeric,
   projecao_mes numeric,
   pontos_total numeric,
-  pontos_projecao_mes numeric
+  pontos_projecao_mes numeric,
+  qtd_vendedor bigint,
+  valor_vendedor numeric,
+  dias_uteis_passados int,
+  dias_uteis_mes int,
+  total_mes_valor numeric,
+  total_mes_pontos numeric
 )
 language sql
 security definer
@@ -2214,7 +2235,12 @@ as $$
     select date_trunc('month', d)::date as inicio from hoje
   ),
   periodo as (
-    select coalesce(sum(valor), 0) as valor_total, count(*) as qtd_total, coalesce(sum(ponto), 0) as pontos_total
+    select
+      coalesce(sum(valor), 0) as valor_total,
+      count(*) as qtd_total,
+      coalesce(sum(ponto), 0) as pontos_total,
+      count(*) filter (where vendedor is not null) as qtd_vendedor,
+      coalesce(sum(valor) filter (where vendedor is not null), 0) as valor_vendedor
     from vendas_gerais
     where (p_date_from is null or data >= p_date_from)
       and (p_date_to is null or data <= p_date_to)
@@ -2252,8 +2278,16 @@ as $$
     (select pontos_total from periodo),
     case when (select n from du_passados) > 0
       then round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
-      else 0 end;
+      else 0 end,
+    (select qtd_vendedor from periodo),
+    (select valor_vendedor from periodo),
+    (select n from du_passados),
+    (select n from du_mes),
+    (select v from total_mes),
+    (select p from total_mes);
 $$;
+
+grant execute on function dashboard_vendas_kpis to anon;
 
 -- KPI por produto (dinâmico — um card por produto existente)
 drop function if exists dashboard_vendas_por_produto(date, date);
