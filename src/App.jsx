@@ -1564,7 +1564,7 @@ function PlaybookMenuButton() {
       </div>
       {iframeUrl && (
         <div className="playbook-iframe-overlay">
-          <button className="playbook-iframe-close" onClick={() => setIframeUrl(null)}>\u2715 Fechar</button>
+          <button className="playbook-iframe-close" onClick={() => setIframeUrl(null)}>✕ Fechar</button>
           <iframe src={iframeUrl} title="Playbook" className="playbook-iframe" />
         </div>
       )}
@@ -1618,7 +1618,7 @@ function AIChatButton({ vendedor }) {
   return (
     <>
       <button className="reset-btn ai-trigger-btn" title="Consultar IA" onClick={() => setOpen(true)}>
-        <svg viewBox="0 0 64 64" className="ai-trigger-icon" xmlns="http://www.w3.org/2000/svg">
+        <svg viewBox="0 0 200 200" className="ai-trigger-icon" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="aiTigerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="var(--gold)" />
@@ -1627,17 +1627,12 @@ function AIChatButton({ vendedor }) {
               <animateTransform attributeName="gradientTransform" type="translate" values="-0.6 0; 0.6 0; -0.6 0" dur="4s" repeatCount="indefinite" />
             </linearGradient>
           </defs>
-          <path
-            d="M32 6c-3.4 0-6.2 2.6-7.4 6.3-3-1.7-6.6-2.4-9.4-1-1 4.1 0.4 8 2.6 10.7C13.4 24.6 11 28.6 11 33.2 11 45 20.5 54 32 54s21-9 21-20.8c0-4.6-2.4-8.6-6.8-11.2 2.2-2.7 3.6-6.6 2.6-10.7-2.8-1.4-6.4-0.7-9.4 1C38.2 8.6 35.4 6 32 6z"
-            fill="none"
-            stroke="url(#aiTigerGrad)"
-            strokeWidth="2.4"
-            strokeLinejoin="round"
-          />
+          <polygon points="30,20 58,58 100,40 142,58 170,20 186,56 176,110 150,150 100,178 50,150 24,110 14,56"
+            fill="none" stroke="url(#aiTigerGrad)" strokeWidth="6" strokeLinejoin="round" />
           <g fill="url(#aiTigerGrad)">
-            <path d="M32 21l2.1 6.4L40.5 30l-6.4 2.1L32 38.5l-2.1-6.4L23.5 30l6.4-2.1L32 21z" />
-            <path d="M43 27l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z" />
-            <path d="M23 35l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z" />
+            <path d="M100 78l6 18 18 6-18 6-6 18-6-18-18-6 18-6 6-18z" />
+            <path d="M138 88l3 9 9 3-9 3-3 9-3-9-9-3 9-3 3-9z" />
+            <path d="M62 96l3 9 9 3-9 3-3 9-3-9-9-3 9-3 3-9z" />
           </g>
         </svg>
       </button>
@@ -1681,6 +1676,74 @@ function AIChatButton({ vendedor }) {
   )
 }
 
+
+const MASCOT_IMG_URL = 'https://hotlinesolucoes.com.br/wp-content/uploads/2024/08/macote.png'
+
+function unionRect(a, b) {
+  if (!a) return b
+  if (!b) return a
+  const left = Math.min(a.left, b.left)
+  const top = Math.min(a.top, b.top)
+  const right = Math.max(a.right, b.right)
+  const bottom = Math.max(a.bottom, b.bottom)
+  return { left, top, right, bottom, width: right - left, height: bottom - top }
+}
+
+const ONBOARDING_MESSAGES = [
+  'Seja bem-vindo ao seu Dashboard de Vendas!',
+  'Aqui você pode acompanhar suas vendas todos os dias',
+  'Aqui você pode consultar propostas no Facta, diretamente',
+  'Aqui você adiciona suas vendas diariamente',
+  'Aqui você conversa com uma IA para tirar suas dúvidas do seu dia a dia',
+]
+
+function OnboardingTour({ step, onNext, targets }) {
+  const [rect, setRect] = useState(null)
+
+  useEffect(() => {
+    function measure() {
+      const t = targets[step]
+      if (!t || t.length === 0) { setRect(null); return }
+      if (t.length === 1) {
+        setRect(t[0].current ? t[0].current.getBoundingClientRect() : null)
+      } else {
+        const r1 = t[0].current ? t[0].current.getBoundingClientRect() : null
+        const r2 = t[1].current ? t[1].current.getBoundingClientRect() : null
+        setRect(unionRect(r1, r2))
+      }
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
+    }
+  }, [step, targets])
+
+  const pad = 10
+  return (
+    <div className="onboarding-overlay">
+      {rect && (
+        <div
+          className="onboarding-spotlight"
+          style={{
+            left: rect.left - pad,
+            top: rect.top - pad,
+            width: rect.width + pad * 2,
+            height: rect.height + pad * 2,
+          }}
+        />
+      )}
+      <div className="onboarding-bubble">
+        <img src={MASCOT_IMG_URL} alt="Esquentadinho" />
+        <div className="onboarding-text">{ONBOARDING_MESSAGES[step]}</div>
+        <button className="onboarding-next" onClick={onNext}>Próximo →</button>
+      </div>
+    </div>
+  )
+}
+
 function VendedoraPortal({ vendedor, onLogout }) {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [kpis, setKpis] = useState(null)
@@ -1696,6 +1759,28 @@ function VendedoraPortal({ vendedor, onLogout }) {
 
   const [showAdd, setShowAdd] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState(() => (
+    new URLSearchParams(window.location.search).get('onboarding') === '1' ? 0 : -1
+  ))
+  const tourChartRef = useRef(null)
+  const tourKpiRef = useRef(null)
+  const tourFactaRef = useRef(null)
+  const tourAddRef = useRef(null)
+  const tourAiRef = useRef(null)
+  const ONBOARDING_TARGETS = [null, [tourChartRef, tourKpiRef], [tourFactaRef], [tourAddRef], [tourAiRef]]
+  function nextOnboardingStep() {
+    if (onboardingStep >= ONBOARDING_MESSAGES.length - 1) {
+      setOnboardingStep(5)
+    } else {
+      setOnboardingStep((s) => s + 1)
+    }
+  }
+  function finishOnboarding() {
+    setOnboardingStep(-1)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('onboarding')
+    window.history.replaceState({}, '', url.toString())
+  }
   const [addForm, setAddForm] = useState({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
   const [addMsg, setAddMsg] = useState('')
   const [adding, setAdding] = useState(false)
@@ -1841,7 +1926,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <PlaybookMenuButton />
-          <AIChatButton vendedor={vendedor} />
+          <span ref={tourAiRef} style={{ display: 'inline-flex' }}><AIChatButton vendedor={vendedor} /></span>
           <button className="reset-btn" onClick={onLogout} title="Sair">Sair</button>
         </div>
       </div>
@@ -1855,10 +1940,10 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <button className="reset-btn" onClick={() => { setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
-          <button className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão">
+          <button ref={tourAddRef} className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão">
             + Adicionar adesão
           </button>
-          <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
+          <button ref={tourFactaRef} className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
@@ -1871,7 +1956,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
-      <div className="panel chart-panel tall">
+      <div ref={tourChartRef} className="panel chart-panel tall">
         <p className="section-label">Vendas por semana &mdash; meta e proje&ccedil;&atilde;o</p>
         <p className="section-sub">meta de {fmtMoeda(META_SEMANA)}/semana &middot; linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s</p>
         <ResponsiveContainer width="100%" height="65%">
@@ -1885,7 +1970,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         </ResponsiveContainer>
       </div>
 
-      <div className="kpi-grid kpi-grid-3">
+      <div ref={tourKpiRef} className="kpi-grid kpi-grid-3">
         <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpis?.maior_venda)}</p></div>
         <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.dia_mais_vendas ? fmtDataBR(kpis.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpis?.dia_mais_vendas_qtd)} vendas</p></div>
         <div className="kpi">
@@ -2025,10 +2110,23 @@ function VendedoraPortal({ vendedor, onLogout }) {
         </div>
       )}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
+
+      {onboardingStep >= 0 && onboardingStep < 5 && (
+        <OnboardingTour step={onboardingStep} onNext={nextOnboardingStep} targets={ONBOARDING_TARGETS} />
+      )}
+      {onboardingStep === 5 && (
+        <div className="onboarding-final-overlay">
+          <div className="onboarding-bubble onboarding-bubble-top">
+            <img src={MASCOT_IMG_URL} alt="Esquentadinho" />
+            <div className="onboarding-text">E, por fim, aqui você aprende mais informações sobre nossos produtos</div>
+            <button className="onboarding-next" onClick={finishOnboarding}>Concluir →</button>
+          </div>
+          <iframe src="https://hotline-playbook.vercel.app" title="Playbooks" className="playbook-iframe onboarding-final-iframe" />
+        </div>
+      )}
     </div>
   )
 }
-
 function VendedorasView() {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [vendedores, setVendedores] = useState([])
@@ -2912,6 +3010,28 @@ export default function App() {
       return null
     }
   })
+
+  // Primeiro acesso vindo da Trilha do Especialista: a URL chega com
+  // ?onboarding=1&senha=... -- faz login automático e limpa a senha da URL.
+  useEffect(() => {
+    if (auth) return
+    const params = new URLSearchParams(window.location.search)
+    const senhaAuto = params.get('senha')
+    if (!senhaAuto) return
+    ;(async () => {
+      try {
+        const data = await postApi('auth_login', { senha: senhaAuto })
+        try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data)) } catch { /* ignora */ }
+        setAuth(data)
+      } catch (e) {
+        // senha inválida: usuário cai na tela de login normal
+      } finally {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('senha')
+        window.history.replaceState({}, '', url.toString())
+      }
+    })()
+  }, [auth])
 
   const logout = () => {
     try { localStorage.removeItem(AUTH_STORAGE_KEY) } catch { /* ignora */ }
