@@ -180,11 +180,12 @@ async function callFactaApi(type, params) {
   return data
 }
 
-async function cancelarPropostaFacta(codigoAf) {
+async function cancelarPropostaFacta(valor, ehCpfValor) {
+  const body = ehCpfValor ? { cpf: valor } : { codigo_af: valor }
   const res = await fetch('/api/facta?type=cancelamento', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ codigo_af: codigoAf }),
+    body: JSON.stringify(body),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Erro ao cancelar proposta')
@@ -1109,13 +1110,13 @@ function FactaConsultaOverlay({ onClose }) {
 
   const handleCancelar = async (e) => {
     e.preventDefault()
-    const af = codigoAfCancelar.trim()
-    if (!af) return
+    const valor = codigoAfCancelar.trim()
+    if (!valor) return
     if (!confirmarCancelar) return
     setCancelando(true)
     setResultadoCancelamento(null)
     try {
-      const resultado = await cancelarPropostaFacta(af)
+      const resultado = await cancelarPropostaFacta(valor, ehCpf(valor))
       setResultadoCancelamento({ ok: !resultado.erro, mensagem: resultado.mensagem || (resultado.erro ? 'Erro ao cancelar.' : 'Cancelamento solicitado com sucesso.') })
     } catch (e2) {
       setResultadoCancelamento({ ok: false, mensagem: e2.message || 'Erro ao cancelar proposta.' })
@@ -1147,13 +1148,18 @@ function FactaConsultaOverlay({ onClose }) {
             <p className="card-label" style={{ color: 'var(--rose)' }}>Cancelar proposta na Facta</p>
             {!resultadoCancelamento ? (
               <form onSubmit={handleCancelar} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <label style={{ fontSize: 12.5, color: 'var(--muted)' }}>C&oacute;digo AF da proposta</label>
+                <label style={{ fontSize: 12.5, color: 'var(--muted)' }}>C&oacute;digo AF ou CPF (11 d&iacute;gitos)</label>
                 <input
                   value={codigoAfCancelar}
                   onChange={(e) => setCodigoAfCancelar(e.target.value)}
-                  placeholder="C\u00f3digo AF"
+                  placeholder="C\u00f3digo AF ou CPF"
                   style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 13, padding: '9px 10px', borderRadius: 7 }}
                 />
+                {ehCpf(codigoAfCancelar.trim()) && (
+                  <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+                    Voc&ecirc; digitou um CPF &mdash; a proposta mais recente desse cliente ser&aacute; localizada e cancelada automaticamente.
+                  </p>
+                )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--muted)' }}>
                   <input type="checkbox" checked={confirmarCancelar} onChange={(e) => setConfirmarCancelar(e.target.checked)} />
                   Confirmo que quero cancelar essa proposta na Facta (a&ccedil;&atilde;o pode ser irrevers&iacute;vel).
