@@ -34,6 +34,31 @@ async function postApi(type, body) {
 
 // L\u00ea o CSV de vendedoras (arquivo exportado em Latin-1, separado por ";"),
 // corta s\u00f3 as colunas necess\u00e1rias e normaliza cpf/data/valor.
+// Detecta o formato do número (brasileiro "1.234,56" ou americano "1234.56")
+// e sempre devolve no padrão que o Postgres numeric espera (ponto decimal,
+// sem separador de milhar) — sem inventar nem cortar dígito nenhum.
+function parseValorFlexivel(raw) {
+  if (!raw) return ''
+  let s = String(raw).trim()
+  if (!s) return ''
+  const hasComma = s.includes(',')
+  const hasDot = s.includes('.')
+  if (hasComma && hasDot) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      // formato BR: 1.234,56 -> tira os pontos de milhar, troca a vírgula por ponto
+      s = s.replace(/\./g, '').replace(',', '.')
+    } else {
+      // formato US: 1,234.56 -> tira as vírgulas de milhar, mantém o ponto
+      s = s.replace(/,/g, '')
+    }
+  } else if (hasComma) {
+    // só tem vírgula: é o separador decimal (formato BR "1311,35")
+    s = s.replace(',', '.')
+  }
+  // só tem ponto (ou nenhum separador): já está no formato certo, não mexe
+  return s
+}
+
 async function parseVendedorasCsv(file) {
   const buf = await file.arrayBuffer()
   const text = new TextDecoder('iso-8859-1').decode(buf)
@@ -64,7 +89,7 @@ async function parseVendedorasCsv(file) {
     const [dd, mm, yyyy] = dataRaw.split('/')
     const dataIso = dd && mm && yyyy ? `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}` : ''
 
-    const valorRaw = (cols[iValor] || '').trim().replace(/\./g, '').replace(',', '.')
+    const valorRaw = parseValorFlexivel(cols[iValor] || '')
     const valor = valorRaw && !isNaN(Number(valorRaw)) ? valorRaw : ''
 
     rows.push({
@@ -129,7 +154,7 @@ async function parseVendasCsv(file) {
       }
     }
 
-    const valorRaw = iValor !== -1 ? (cols[iValor] || '').trim().replace(/\./g, '').replace(',', '.') : ''
+    const valorRaw = iValor !== -1 ? parseValorFlexivel(cols[iValor] || '') : ''
     const valor = valorRaw && !isNaN(Number(valorRaw)) ? valorRaw : ''
 
     rows.push({
