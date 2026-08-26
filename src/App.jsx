@@ -2437,8 +2437,10 @@ function VendedorasView() {
       for (const row of dia ?? []) {
         vendedoresVistos.add(row.vendedor)
         if (!porDiaMap[row.dia]) porDiaMap[row.dia] = { dia: row.dia }
-        porDiaMap[row.dia][row.vendedor] = Number(row.vendas)
+        porDiaMap[row.dia][`${row.vendedor}__vendas`] = Number(row.vendas)
+        porDiaMap[row.dia][row.vendedor] = modo === 'ponto' ? Number(row.pontos_total) : Number(row.valor_total)
         porDiaMap[row.dia][`${row.vendedor}__valor`] = Number(row.valor_total)
+        porDiaMap[row.dia][`${row.vendedor}__pontos`] = Number(row.pontos_total)
       }
       setPorDia({
         rows: Object.values(porDiaMap).sort((a, b) => (a.dia > b.dia ? 1 : -1)),
@@ -2468,7 +2470,7 @@ function VendedorasView() {
     } finally {
       setLoading(false)
     }
-  }, [vendedor, dataInicio, dataFim, limit, offset])
+  }, [vendedor, dataInicio, dataFim, limit, offset, modo])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -2590,7 +2592,7 @@ function VendedorasView() {
       <div className="panel chart-panel">
         <p className="section-label">Vendas por dia</p>
         {metas && (() => {
-          const ehPonto = metas.tipo_ativo === 'ponto'
+          const ehPonto = modo === 'ponto'
           const periodo = metas.periodo_ativo
           const metaAtiva = ehPonto
             ? (periodo === 'diario' ? metas.ponto_diaria : periodo === 'mensal' ? metas.ponto_mensal : metas.ponto_semanal)
@@ -2602,11 +2604,11 @@ function VendedorasView() {
           const fmt = ehPonto ? (v) => `${fmtInt(Math.round(v ?? 0))} pts` : fmtMoeda
           const periodoLabel = periodo === 'diario' ? 'di\u00e1ria' : periodo === 'mensal' ? 'mensal' : 'semanal'
           return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+            <div style={{ marginBottom: 10, width: '100%' }}>
+              <span style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 Meta {periodoLabel}{vendedor ? ` \u00b7 ${vendedor}` : ''}: {fmt(realizado)} / {fmt(metaAtiva)} ({pct.toFixed(0)}%)
               </span>
-              <div style={{ flex: 1, background: 'var(--border)', borderRadius: 99, height: 4, overflow: 'hidden' }}>
+              <div style={{ width: '100%', background: 'var(--border)', borderRadius: 99, height: 4, overflow: 'hidden' }}>
                 <div style={{ width: `${pct}%`, background: pct >= 100 ? '#a9d97f' : '#d9b877', height: '100%' }} />
               </div>
             </div>
@@ -2620,8 +2622,11 @@ function VendedorasView() {
               labelStyle={{ color: '#8a978f', marginBottom: 4 }}
               labelFormatter={fmtDataBR}
               formatter={(value, name, item) => {
-                const valor = item?.payload?.[`${name}__valor`]
-                return [`${fmtInt(value)} vendas${valor != null ? ` (${fmtMoeda(valor)})` : ''}`, name]
+                const vendas = item?.payload?.[`${name}__vendas`]
+                const outro = modo === 'ponto' ? item?.payload?.[`${name}__valor`] : item?.payload?.[`${name}__pontos`]
+                const outroLabel = modo === 'ponto' ? fmtMoeda(outro) : `${fmtInt(Math.round(outro ?? 0))} pts`
+                const valorFmt = modo === 'ponto' ? `${fmtInt(value)} pts` : fmtMoeda(value)
+                return [`${valorFmt}${vendas != null ? ` \u00b7 ${fmtInt(vendas)} vendas` : ''}${outro != null ? ` \u00b7 ${outroLabel}` : ''}`, name]
               }}
             />
             <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
