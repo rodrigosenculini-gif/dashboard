@@ -1231,19 +1231,24 @@ returns table (
   dia date,
   vendedor text,
   vendas bigint,
-  valor_total numeric
+  valor_total numeric,
+  pontos_total numeric
 )
 language sql
 security definer
 set search_path = public
 stable
 as $$
-  select data_status as dia, vendedor, count(*) as vendas, coalesce(sum(valor), 0) as valor_total
-  from vendedoras_analise
-  where data_status is not null
-    and (p_vendedor is null or vendedor = p_vendedor)
-    and (p_date_from is null or data_status >= p_date_from)
-    and (p_date_to is null or data_status <= p_date_to)
+  select va.data_status as dia, va.vendedor, count(*) as vendas,
+    coalesce(sum(va.valor), 0) as valor_total,
+    coalesce(sum(vg.ponto), 0) as pontos_total
+  from vendedoras_analise va
+  left join vendas_gerais vg
+    on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
+  where va.data_status is not null
+    and (p_vendedor is null or va.vendedor = p_vendedor)
+    and (p_date_from is null or va.data_status >= p_date_from)
+    and (p_date_to is null or va.data_status <= p_date_to)
   group by 1, 2
   order by 1;
 $$;
