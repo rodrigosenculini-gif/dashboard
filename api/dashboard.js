@@ -84,6 +84,24 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Senha incorreta.' });
     }
 
+    if (type === 'metas_set') {
+      try {
+        const b = req.body || {};
+        const client = getPool();
+        const result = await client.query(
+          `select * from dashboard_metas_set($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            b.valor_diaria ?? null, b.valor_semanal ?? null, b.valor_mensal ?? null,
+            b.ponto_diaria ?? null, b.ponto_semanal ?? null, b.ponto_mensal ?? null,
+            b.tipo_ativo ?? null, b.periodo_ativo ?? null,
+          ]
+        );
+        return res.status(200).json(result.rows);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type === 'vendedoras_register') {
       try {
         const nome = (req.body?.nome || '').toString().trim();
@@ -398,6 +416,9 @@ export default async function handler(req, res) {
     params = [req.query.vendedor || null];
   } else if (type === 'debug_peso_nulo') {
     sql = 'select * from dashboard_debug_peso_nulo()';
+    params = [];
+  } else if (type === 'metas_progresso') {
+    sql = 'select * from dashboard_metas_progresso()';
     params = [];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
