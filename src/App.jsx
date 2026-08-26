@@ -1629,9 +1629,9 @@ function MilestoneDot(props) {
 // código certo em vez de digitar parcela/seguro)
 const BANCOS_POR_CODIGO = ['FACTA']
 
-// Novo Saque não é nem por código nem por parcela/seguro — o peso vem do
-// NOME da tabela (GOLD, DIAMANTE, etc), então tem um terceiro modo só pra ele
-const BANCOS_POR_TABELA_NOME = ['NOVO SAQUE']
+// Novo Saque e V8 (linha Acelera/FGTS) não são nem por código nem por
+// parcela/seguro — o peso vem do NOME da tabela, então usam esse terceiro modo
+const BANCOS_POR_TABELA_NOME = ['NOVO SAQUE', 'V8']
 
 const NOVO_SAQUE_TABELAS = [
   { valor: 'TABELA NS', label: 'TABELA NS (12,00)' },
@@ -1643,6 +1643,16 @@ const NOVO_SAQUE_TABELAS = [
   { valor: 'TABELA SOFT', label: 'TABELA SOFT (2,00)' },
   { valor: 'TABELA SMART', label: 'TABELA SMART (1,10)' },
   { valor: 'TABELA ZERO', label: 'TABELA ZERO (0,70)' },
+]
+
+// V8 - linha FGTS (Acelera): peso pelo nome da tabela, 1 a 5 parcelas
+const V8_TABELAS = [
+  { valor: 'ACELERA 2.0', label: 'ACELERA 2.0 (12,00)' },
+  { valor: 'COMETA EXCLUSIVA BMP', label: 'COMETA EXCLUSIVA BMP (9,00)' },
+  { valor: 'GRID', label: 'GRID (6,00)' },
+  { valor: 'TURBO', label: 'TURBO (5,50)' },
+  { valor: 'NORMAL', label: 'NORMAL (4,50)' },
+  { valor: 'PIT STOP', label: 'PIT STOP (1,80)' },
 ]
 
 // Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
@@ -2285,7 +2295,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
                 <label>Tabela
                   <select required value={addForm.tabelaNome} onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })}>
                     <option value="">selecione a tabela</option>
-                    {NOVO_SAQUE_TABELAS.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+                    {(addForm.banco === 'V8' ? V8_TABELAS : NOVO_SAQUE_TABELAS).map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
                   </select>
                 </label>
               )}
