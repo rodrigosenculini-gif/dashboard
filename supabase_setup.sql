@@ -1447,9 +1447,9 @@ as $$
     from hoje
   ),
   du_passados as (
-    select count(*) as n
+    select count(distinct g.dia) as n
     from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
-    where extract(isodow from g.dia) < 6
+    where exists (select 1 from vendedoras_analise x where x.data_status = g.dia)
   ),
   du_mes as (
     select count(*) as n
@@ -1541,9 +1541,9 @@ as $$
     from hoje
   ),
   du_passados as (
-    select count(*) as n
+    select count(distinct g.dia) as n
     from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
-    where extract(isodow from g.dia) < 6
+    where exists (select 1 from vendedoras_analise x where x.data_status = g.dia and x.vendedor = p_vendedor)
   ),
   du_mes as (
     select count(*) as n
@@ -2343,9 +2343,12 @@ as $$
       and (p_produto is null or produto = p_produto)
   ),
   du_passados as (
-    select count(*) as n
+    select count(distinct g.dia) as n
     from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
-    where extract(isodow from g.dia) < 6
+    where exists (
+      select 1 from vendas_gerais x
+      where x.data = g.dia and (p_produto is null or x.produto = p_produto)
+    )
   ),
   du_mes as (
     select count(*) as n
@@ -2442,11 +2445,6 @@ stable
 as $$
   with hoje as (select (now() at time zone 'America/Sao_Paulo')::date as d),
   mes as (select date_trunc('month', d)::date as inicio from hoje),
-  du_passados as (
-    select count(*) as n
-    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
-    where extract(isodow from g.dia) < 6
-  ),
   du_mes as (
     select count(*) as n
     from generate_series((select inicio from mes), (date_trunc('month', (select d from hoje)) + interval '1 month - 1 day')::date, interval '1 day') g(dia)
@@ -2474,11 +2472,23 @@ as $$
     a.valor_total,
     a.qtd_total,
     a.pontos_total,
-    case when (select n from du_passados) > 0
-      then round(coalesce(m.v, 0) / (select n from du_passados) * (select n from du_mes), 2)
+    case when (
+      select count(distinct g.dia) from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+      where exists (select 1 from vendas_gerais x, hoje where x.data = g.dia and x.produto is not distinct from a.produto)
+    ) > 0
+      then round(coalesce(m.v, 0) / (
+        select count(distinct g.dia) from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+        where exists (select 1 from vendas_gerais x, hoje where x.data = g.dia and x.produto is not distinct from a.produto)
+      ) * (select n from du_mes), 2)
       else 0 end,
-    case when (select n from du_passados) > 0
-      then round(coalesce(m.p, 0) / (select n from du_passados) * (select n from du_mes), 2)
+    case when (
+      select count(distinct g.dia) from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+      where exists (select 1 from vendas_gerais x, hoje where x.data = g.dia and x.produto is not distinct from a.produto)
+    ) > 0
+      then round(coalesce(m.p, 0) / (
+        select count(distinct g.dia) from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+        where exists (select 1 from vendas_gerais x, hoje where x.data = g.dia and x.produto is not distinct from a.produto)
+      ) * (select n from du_mes), 2)
       else 0 end
   from agg a
   left join mes_por_produto m on m.produto is not distinct from a.produto
