@@ -1488,7 +1488,7 @@ as $$
     (select n from du_passados),
     (select n from du_mes),
     case when (select n from du_passados) > 0
-      then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
       else 0 end,
     case when (select passadas from horas_hoje) > 0
       then round((select v from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
@@ -1498,7 +1498,7 @@ as $$
       else 0 end,
     (select p from total_mes),
     case when (select n from du_passados) > 0
-      then round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
       else 0 end,
     case when (select passadas from horas_hoje) > 0
       then round((select p from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
@@ -1589,7 +1589,7 @@ as $$
     (select n from du_passados),
     (select n from du_mes),
     case when (select n from du_passados) > 0
-      then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
       else 0 end,
     (select v from semana_atual),
     100000,
@@ -1601,7 +1601,7 @@ as $$
       else 0 end,
     (select p from total_mes),
     case when (select n from du_passados) > 0
-      then round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
       else 0 end,
     (select p from semana_atual),
     case when (select passadas from horas_hoje) > 0
@@ -2392,11 +2392,11 @@ as $$
     (select qtd_total from periodo),
     (select v from hoje_valor),
     case when (select n from du_passados) > 0
-      then round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
       else 0 end,
     (select pontos_total from periodo),
     case when (select n from du_passados) > 0
-      then round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
       else 0 end,
     (select qtd_vendedor from periodo),
     (select valor_vendedor from periodo),
@@ -2476,19 +2476,19 @@ as $$
       select count(distinct g.dia) from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
       where exists (select 1 from vendas_gerais x, hoje where x.data = g.dia and x.produto is not distinct from a.produto)
     ) > 0
-      then round(coalesce(m.v, 0) / (
+      then greatest(coalesce(m.v, 0), round(coalesce(m.v, 0) / (
         select count(distinct g.dia) from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
         where exists (select 1 from vendas_gerais x, hoje where x.data = g.dia and x.produto is not distinct from a.produto)
-      ) * (select n from du_mes), 2)
+      ) * (select n from du_mes), 2))
       else 0 end,
     case when (
       select count(distinct g.dia) from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
       where exists (select 1 from vendas_gerais x, hoje where x.data = g.dia and x.produto is not distinct from a.produto)
     ) > 0
-      then round(coalesce(m.p, 0) / (
+      then greatest(coalesce(m.p, 0), round(coalesce(m.p, 0) / (
         select count(distinct g.dia) from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
         where exists (select 1 from vendas_gerais x, hoje where x.data = g.dia and x.produto is not distinct from a.produto)
-      ) * (select n from du_mes), 2)
+      ) * (select n from du_mes), 2))
       else 0 end
   from agg a
   left join mes_por_produto m on m.produto is not distinct from a.produto
