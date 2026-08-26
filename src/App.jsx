@@ -3419,8 +3419,10 @@ export default function App() {
 
   // Primeiro acesso vindo da Trilha do Especialista: a URL chega com
   // ?onboarding=1&senha=... -- faz login automático e limpa a senha da URL.
+  // Precisa SEMPRE processar isso, mesmo se já existir uma sessão salva
+  // (senão uma sessão antiga no navegador "vence" e o vendedor cai no
+  // dashboard errado).
   useEffect(() => {
-    if (auth) return
     const params = new URLSearchParams(window.location.search)
     const senhaAuto = params.get('senha')
     if (!senhaAuto) return
@@ -3437,7 +3439,7 @@ export default function App() {
         window.history.replaceState({}, '', url.toString())
       }
     })()
-  }, [auth])
+  }, [])
 
   const logout = () => {
     try { localStorage.removeItem(AUTH_STORAGE_KEY) } catch { /* ignora */ }
