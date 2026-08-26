@@ -418,8 +418,8 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_debug_peso_nulo()';
     params = [];
   } else if (type === 'metas_progresso') {
-    sql = 'select * from dashboard_metas_progresso()';
-    params = [];
+    sql = 'select * from dashboard_metas_progresso($1)';
+    params = [req.query.vendedor || null];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];
