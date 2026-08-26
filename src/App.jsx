@@ -1629,9 +1629,10 @@ function MilestoneDot(props) {
 // código certo em vez de digitar parcela/seguro)
 const BANCOS_POR_CODIGO = ['FACTA']
 
-// Novo Saque e V8 (linha Acelera/FGTS) não são nem por código nem por
-// parcela/seguro — o peso vem do NOME da tabela, então usam esse terceiro modo
-const BANCOS_POR_TABELA_NOME = ['NOVO SAQUE', 'V8']
+// Novo Saque e FGTSV8 (linha Acelera) não são nem por código nem por
+// parcela/seguro — o peso vem do NOME da tabela, então usam esse terceiro modo.
+// V8 (consignado CLT) continua no modo parcela + seguro, como sempre foi.
+const BANCOS_POR_TABELA_NOME = ['NOVO SAQUE', 'FGTSV8']
 
 const NOVO_SAQUE_TABELAS = [
   { valor: 'TABELA NS', label: 'TABELA NS (12,00)' },
@@ -1645,8 +1646,8 @@ const NOVO_SAQUE_TABELAS = [
   { valor: 'TABELA ZERO', label: 'TABELA ZERO (0,70)' },
 ]
 
-// V8 - linha FGTS (Acelera): peso pelo nome da tabela, 1 a 5 parcelas
-const V8_TABELAS = [
+// FGTSV8 - linha Acelera: peso pelo nome da tabela, 1 a 5 parcelas
+const FGTSV8_TABELAS = [
   { valor: 'ACELERA 2.0', label: 'ACELERA 2.0 (12,00)' },
   { valor: 'COMETA EXCLUSIVA BMP', label: 'COMETA EXCLUSIVA BMP (9,00)' },
   { valor: 'GRID', label: 'GRID (6,00)' },
@@ -1656,7 +1657,7 @@ const V8_TABELAS = [
 ]
 
 // Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
-const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESEN\u00c7A', 'SOMA', 'V8', 'NOVO SAQUE']
+const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESEN\u00c7A', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE']
 
 const FACTA_CODIGOS = [
   { codigo: '69205', label: '69205 \u2014 Novo Gold, 60x (1,45)' },
@@ -2295,7 +2296,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
                 <label>Tabela
                   <select required value={addForm.tabelaNome} onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })}>
                     <option value="">selecione a tabela</option>
-                    {(addForm.banco === 'V8' ? V8_TABELAS : NOVO_SAQUE_TABELAS).map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+                    {(addForm.banco === 'FGTSV8' ? FGTSV8_TABELAS : NOVO_SAQUE_TABELAS).map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
                   </select>
                 </label>
               )}
