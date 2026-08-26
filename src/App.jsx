@@ -2173,36 +2173,40 @@ function VendedoraPortal({ vendedor, onLogout }) {
       </div>
 
       <div ref={tourKpiRef} className="kpi-grid kpi-grid-3">
-        <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpis?.maior_venda)}</p></div>
+        <div className="kpi"><p className="kpi-label">Maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'venda'}</p><p className="kpi-value">{fmtV(modo === 'ponto' ? kpis?.maior_pontuacao : kpis?.maior_venda)}</p></div>
         <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.dia_mais_vendas ? fmtDataBR(kpis.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpis?.dia_mais_vendas_qtd)} vendas</p></div>
         <div className="kpi">
-          <p className="kpi-label">Valor total vendido</p>
-          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(meta?.projecao_mes)}</span></p>
+          <p className="kpi-label">{modo === 'ponto' ? 'Pontos totais' : 'Valor total vendido'}</p>
+          <p className="kpi-value kpi-split"><span>{fmtV(modo === 'ponto' ? kpis?.pontos_total : kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtV(modo === 'ponto' ? meta?.pontos_projecao_mes : meta?.projecao_mes)}</span></p>
           <p className="kpi-sub">realizado | proje&ccedil;&atilde;o do m&ecirc;s</p>
         </div>
         <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpis?.qtd_total)}</p></div>
         <div className="kpi"><p className="kpi-label">Banco mais vendido</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpis?.banco_top_qtd)} vendas</p></div>
-        <div className="kpi"><p className="kpi-label">Semanas com meta batida</p><p className="kpi-value">{fmtInt(semanasBatidas.length)}</p></div>
-        {semanasBatidas.slice(0, 3).map((s) => (
-          <div className="kpi" key={s.semana}><p className="kpi-label">Semana {s.semana_label}</p><p className="kpi-value" style={{ fontSize: 16 }}>{fmtMoeda(s.valor_semana)}</p></div>
-        ))}
+        {modo !== 'ponto' && (
+          <>
+            <div className="kpi"><p className="kpi-label">Semanas com meta batida</p><p className="kpi-value">{fmtInt(semanasBatidas.length)}</p></div>
+            {semanasBatidas.slice(0, 3).map((s) => (
+              <div className="kpi" key={s.semana}><p className="kpi-label">Semana {s.semana_label}</p><p className="kpi-value" style={{ fontSize: 16 }}>{fmtMoeda(s.valor_semana)}</p></div>
+            ))}
+          </>
+        )}
         {meta && (
           <>
             <div className="kpi">
               <p className="kpi-label">M&eacute;dia di&aacute;ria | semanal</p>
               <p className="kpi-value kpi-split">
-                <span>{fmtMoeda(meta.dias_uteis_passados > 0 ? meta.total_mes_atual / meta.dias_uteis_passados : 0)}</span>
+                <span>{fmtV(meta.dias_uteis_passados > 0 ? (modo === 'ponto' ? meta.pontos_mes_atual : meta.total_mes_atual) / meta.dias_uteis_passados : 0)}</span>
                 <span className="kpi-split-bar">|</span>
-                <span className="kpi-split-proj">{fmtMoeda(meta.dias_uteis_passados > 0 ? (meta.total_mes_atual / meta.dias_uteis_passados) * 5 : 0)}</span>
+                <span className="kpi-split-proj">{fmtV(meta.dias_uteis_passados > 0 ? ((modo === 'ponto' ? meta.pontos_mes_atual : meta.total_mes_atual) / meta.dias_uteis_passados) * 5 : 0)}</span>
               </p>
               <p className="kpi-sub">m&eacute;dia semanal = di&aacute;ria &times; 5 dias &uacute;teis</p>
             </div>
             <div className="kpi">
               <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
               <p className="kpi-value kpi-split">
-                <span>{fmtMoeda(meta.projecao_diaria)}</span>
+                <span>{fmtV(modo === 'ponto' ? meta.pontos_projecao_diaria : meta.projecao_diaria)}</span>
                 <span className="kpi-split-bar">|</span>
-                <span className="kpi-split-proj">{fmtMoeda(meta.projecao_semanal)}</span>
+                <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? meta.pontos_projecao_semanal : meta.projecao_semanal)}</span>
               </p>
               <p className="kpi-sub">ritmo por hora &uacute;til (8h&ndash;18h) de hoje/semana</p>
             </div>
@@ -2365,10 +2369,10 @@ function VendedorasView() {
 
   const loadMetas = useCallback(async () => {
     try {
-      const m = await callApi('metas_progresso', {})
+      const m = await callApi('metas_progresso', { vendedor })
       setMetas(m?.[0] ?? null)
     } catch { /* silencioso */ }
-  }, [])
+  }, [vendedor])
 
   useEffect(() => { loadMetas() }, [loadMetas])
 
@@ -2585,6 +2589,29 @@ function VendedorasView() {
 
       <div className="panel chart-panel">
         <p className="section-label">Vendas por dia</p>
+        {metas && (() => {
+          const ehPonto = metas.tipo_ativo === 'ponto'
+          const periodo = metas.periodo_ativo
+          const metaAtiva = ehPonto
+            ? (periodo === 'diario' ? metas.ponto_diaria : periodo === 'mensal' ? metas.ponto_mensal : metas.ponto_semanal)
+            : (periodo === 'diario' ? metas.valor_diaria : periodo === 'mensal' ? metas.valor_mensal : metas.valor_semanal)
+          const realizado = ehPonto
+            ? (periodo === 'diario' ? metas.realizado_dia_ponto : periodo === 'mensal' ? metas.realizado_mes_ponto : metas.realizado_semana_ponto)
+            : (periodo === 'diario' ? metas.realizado_dia_valor : periodo === 'mensal' ? metas.realizado_mes_valor : metas.realizado_semana_valor)
+          const pct = metaAtiva > 0 ? Math.min(100, (Number(realizado) / Number(metaAtiva)) * 100) : 0
+          const fmt = ehPonto ? (v) => `${fmtInt(Math.round(v ?? 0))} pts` : fmtMoeda
+          const periodoLabel = periodo === 'diario' ? 'di\u00e1ria' : periodo === 'mensal' ? 'mensal' : 'semanal'
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                Meta {periodoLabel}{vendedor ? ` \u00b7 ${vendedor}` : ''}: {fmt(realizado)} / {fmt(metaAtiva)} ({pct.toFixed(0)}%)
+              </span>
+              <div style={{ flex: 1, background: 'var(--border)', borderRadius: 99, height: 4, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, background: pct >= 100 ? '#a9d97f' : '#d9b877', height: '100%' }} />
+              </div>
+            </div>
+          )
+        })()}
         <ResponsiveContainer width="100%" height="80%">
           <BarChart data={porDia.rows}>
             <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} tickFormatter={fmtDataBR} />
@@ -2645,34 +2672,6 @@ function VendedorasView() {
           </div>
         </div>
       )}
-      {!vendedor && metas && (
-        <div className="kpi-grid">
-          {(() => {
-            const ehPonto = metas.tipo_ativo === 'ponto'
-            const periodo = metas.periodo_ativo
-            const metaAtiva = ehPonto
-              ? (periodo === 'diario' ? metas.ponto_diaria : periodo === 'mensal' ? metas.ponto_mensal : metas.ponto_semanal)
-              : (periodo === 'diario' ? metas.valor_diaria : periodo === 'mensal' ? metas.valor_mensal : metas.valor_semanal)
-            const realizado = ehPonto
-              ? (periodo === 'diario' ? metas.realizado_dia_ponto : periodo === 'mensal' ? metas.realizado_mes_ponto : metas.realizado_semana_ponto)
-              : (periodo === 'diario' ? metas.realizado_dia_valor : periodo === 'mensal' ? metas.realizado_mes_valor : metas.realizado_semana_valor)
-            const pct = metaAtiva > 0 ? Math.min(100, (Number(realizado) / Number(metaAtiva)) * 100) : 0
-            const fmt = ehPonto ? (v) => fmtInt(Math.round(v ?? 0)) : fmtMoeda
-            const periodoLabel = periodo === 'diario' ? 'di\u00e1ria' : periodo === 'mensal' ? 'mensal' : 'semanal'
-            return (
-              <div className="kpi" style={{ gridColumn: 'span 2' }}>
-                <p className="kpi-label">Meta {periodoLabel} ({ehPonto ? 'pontos' : 'valor'})</p>
-                <p className="kpi-value kpi-split"><span>{fmt(realizado)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmt(metaAtiva)}</span></p>
-                <div style={{ background: 'var(--border)', borderRadius: 99, height: 6, marginTop: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, background: pct >= 100 ? '#a9d97f' : '#d9b877', height: '100%' }} />
-                </div>
-                <p className="kpi-sub" style={{ marginTop: 6 }}>{pct.toFixed(0)}% da meta {periodoLabel}</p>
-              </div>
-            )
-          })()}
-        </div>
-      )}
-
       {vendedor && (
         <div className="kpi-grid">
           <div className="kpi"><p className="kpi-label">Maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'venda'}</p><p className="kpi-value">{fmtV(modo === 'ponto' ? kpisVendedor?.maior_pontuacao : kpisVendedor?.maior_venda)}</p></div>
