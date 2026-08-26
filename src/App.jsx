@@ -2353,6 +2353,47 @@ function VendedorasView() {
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
 
+  const [showMetaConfig, setShowMetaConfig] = useState(false)
+  const [metas, setMetas] = useState(null)
+  const [metaForm, setMetaForm] = useState(null)
+  const [salvandoMeta, setSalvandoMeta] = useState(false)
+
+  const loadMetas = useCallback(async () => {
+    try {
+      const m = await callApi('metas_progresso', {})
+      setMetas(m?.[0] ?? null)
+    } catch { /* silencioso */ }
+  }, [])
+
+  useEffect(() => { loadMetas() }, [loadMetas])
+
+  const abrirMetaConfig = () => {
+    setMetaForm({
+      valor_diaria: metas?.valor_diaria ?? 0,
+      valor_semanal: metas?.valor_semanal ?? 0,
+      valor_mensal: metas?.valor_mensal ?? 0,
+      ponto_diaria: metas?.ponto_diaria ?? 0,
+      ponto_semanal: metas?.ponto_semanal ?? 0,
+      ponto_mensal: metas?.ponto_mensal ?? 0,
+      tipo_ativo: metas?.tipo_ativo ?? 'valor',
+      periodo_ativo: metas?.periodo_ativo ?? 'semanal',
+    })
+    setShowMetaConfig(true)
+  }
+
+  const salvarMeta = async () => {
+    setSalvandoMeta(true)
+    try {
+      await postApi('metas_set', metaForm)
+      await loadMetas()
+      setShowMetaConfig(false)
+    } catch (e) {
+      alert('Erro ao salvar meta: ' + (e.message || ''))
+    } finally {
+      setSalvandoMeta(false)
+    }
+  }
+
   useEffect(() => {
     callApi('vendedoras_filtros', {})
       .then((d) => setVendedores(d?.[0]?.vendedores || []))
@@ -2502,6 +2543,9 @@ function VendedorasView() {
           <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras">
             &#8942;
           </button>
+          <button className="refresh-btn" onClick={abrirMetaConfig} title="Configurar meta">
+            &#9881; Meta
+          </button>
           <input
             type="file"
             accept=".csv"
@@ -2593,6 +2637,34 @@ function VendedorasView() {
           </div>
         </div>
       )}
+      {!vendedor && metas && (
+        <div className="kpi-grid">
+          {(() => {
+            const ehPonto = metas.tipo_ativo === 'ponto'
+            const periodo = metas.periodo_ativo
+            const metaAtiva = ehPonto
+              ? (periodo === 'diario' ? metas.ponto_diaria : periodo === 'mensal' ? metas.ponto_mensal : metas.ponto_semanal)
+              : (periodo === 'diario' ? metas.valor_diaria : periodo === 'mensal' ? metas.valor_mensal : metas.valor_semanal)
+            const realizado = ehPonto
+              ? (periodo === 'diario' ? metas.realizado_dia_ponto : periodo === 'mensal' ? metas.realizado_mes_ponto : metas.realizado_semana_ponto)
+              : (periodo === 'diario' ? metas.realizado_dia_valor : periodo === 'mensal' ? metas.realizado_mes_valor : metas.realizado_semana_valor)
+            const pct = metaAtiva > 0 ? Math.min(100, (Number(realizado) / Number(metaAtiva)) * 100) : 0
+            const fmt = ehPonto ? (v) => fmtInt(Math.round(v ?? 0)) : fmtMoeda
+            const periodoLabel = periodo === 'diario' ? 'di\u00e1ria' : periodo === 'mensal' ? 'mensal' : 'semanal'
+            return (
+              <div className="kpi" style={{ gridColumn: 'span 2' }}>
+                <p className="kpi-label">Meta {periodoLabel} ({ehPonto ? 'pontos' : 'valor'})</p>
+                <p className="kpi-value kpi-split"><span>{fmt(realizado)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmt(metaAtiva)}</span></p>
+                <div style={{ background: 'var(--border)', borderRadius: 99, height: 6, marginTop: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, background: pct >= 100 ? '#a9d97f' : '#d9b877', height: '100%' }} />
+                </div>
+                <p className="kpi-sub" style={{ marginTop: 6 }}>{pct.toFixed(0)}% da meta {periodoLabel}</p>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
       {vendedor && (
         <div className="kpi-grid">
           <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpisVendedor?.maior_venda)}</p></div>
@@ -2690,6 +2762,70 @@ function VendedorasView() {
 
       {showRanking && <RankingOverlay onClose={() => setShowRanking(false)} />}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
+
+      {showMetaConfig && metaForm && (
+        <div className="funil-overlay" onClick={() => setShowMetaConfig(false)}>
+          <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="funil-header">
+              <div><h2>Configurar meta</h2></div>
+              <button className="funil-close" onClick={() => setShowMetaConfig(false)}>&times;</button>
+            </div>
+
+            <div className="card" style={{ marginBottom: 14 }}>
+              <p className="card-label">Qual meta acompanhar</p>
+              <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                  <input type="radio" checked={metaForm.tipo_ativo === 'valor'} onChange={() => setMetaForm({ ...metaForm, tipo_ativo: 'valor' })} /> Valor
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                  <input type="radio" checked={metaForm.tipo_ativo === 'ponto'} onChange={() => setMetaForm({ ...metaForm, tipo_ativo: 'ponto' })} /> Pontos
+                </label>
+              </div>
+              <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
+                {['diario', 'semanal', 'mensal'].map((p) => (
+                  <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, textTransform: 'capitalize' }}>
+                    <input type="radio" checked={metaForm.periodo_ativo === p} onChange={() => setMetaForm({ ...metaForm, periodo_ativo: p })} /> {p}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="card">
+              <p className="card-label">Metas em valor (R$)</p>
+              {['valor_diaria', 'valor_semanal', 'valor_mensal'].map((campo) => (
+                <div key={campo} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <label style={{ fontSize: 12.5, color: 'var(--muted)', width: 90, textTransform: 'capitalize' }}>{campo.split('_')[1]}</label>
+                  <input
+                    type="number"
+                    value={metaForm[campo]}
+                    onChange={(e) => setMetaForm({ ...metaForm, [campo]: e.target.value })}
+                    style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 10px', borderRadius: 7, fontFamily: 'var(--font-mono)' }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="card" style={{ marginTop: 10 }}>
+              <p className="card-label">Metas em pontos</p>
+              {['ponto_diaria', 'ponto_semanal', 'ponto_mensal'].map((campo) => (
+                <div key={campo} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <label style={{ fontSize: 12.5, color: 'var(--muted)', width: 90, textTransform: 'capitalize' }}>{campo.split('_')[1]}</label>
+                  <input
+                    type="number"
+                    value={metaForm[campo]}
+                    onChange={(e) => setMetaForm({ ...metaForm, [campo]: e.target.value })}
+                    style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 10px', borderRadius: 7, fontFamily: 'var(--font-mono)' }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button className="refresh-btn" onClick={salvarMeta} disabled={salvandoMeta} style={{ marginTop: 14, width: '100%' }}>
+              {salvandoMeta ? 'Salvando...' : 'Salvar meta'}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   )
 }
