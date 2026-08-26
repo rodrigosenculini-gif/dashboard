@@ -1109,7 +1109,12 @@ returns table (
   dia_maior_valor date,
   dia_maior_valor_total numeric,
   valor_total numeric,
-  qtd_total bigint
+  qtd_total bigint,
+  pontos_total numeric,
+  top_ponto_vendedor text,
+  top_ponto_valor numeric,
+  dia_maior_ponto date,
+  dia_maior_ponto_total numeric
 )
 language sql
 security definer
@@ -1117,13 +1122,16 @@ set search_path = public
 stable
 as $$
   with base as (
-    select vendedor, banco, valor, data_status as dia
-    from vendedoras_analise
-    where (p_date_from is null or data_status >= p_date_from)
-      and (p_date_to is null or data_status <= p_date_to)
+    select va.vendedor, va.banco, va.valor, va.data_status as dia,
+      coalesce(vg.ponto, 0) as ponto
+    from vendedoras_analise va
+    left join vendas_gerais vg
+      on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
+    where (p_date_from is null or va.data_status >= p_date_from)
+      and (p_date_to is null or va.data_status <= p_date_to)
   ),
   por_vendedor as (
-    select vendedor, count(*) as qtd, coalesce(sum(valor), 0) as total
+    select vendedor, count(*) as qtd, coalesce(sum(valor), 0) as total, coalesce(sum(ponto), 0) as total_ponto
     from base
     where vendedor is not null
     group by vendedor
@@ -1135,7 +1143,7 @@ as $$
     group by banco
   ),
   por_dia as (
-    select dia, coalesce(sum(valor), 0) as total
+    select dia, coalesce(sum(valor), 0) as total, coalesce(sum(ponto), 0) as total_ponto
     from base
     where dia is not null
     group by dia
@@ -1150,7 +1158,12 @@ as $$
     (select dia from por_dia order by total desc limit 1),
     (select total from por_dia order by total desc limit 1),
     (select coalesce(sum(valor), 0) from base),
-    (select count(*) from base);
+    (select count(*) from base),
+    (select coalesce(sum(ponto), 0) from base),
+    (select vendedor from por_vendedor order by total_ponto desc limit 1),
+    (select total_ponto from por_vendedor order by total_ponto desc limit 1),
+    (select dia from por_dia order by total_ponto desc limit 1),
+    (select total_ponto from por_dia order by total_ponto desc limit 1);
 $$;
 
 -- KPIs de um vendedor específico
@@ -1170,7 +1183,9 @@ returns table (
   valor_total numeric,
   qtd_total bigint,
   banco_top text,
-  banco_top_qtd bigint
+  banco_top_qtd bigint,
+  pontos_total numeric,
+  maior_pontuacao numeric
 )
 language sql
 security definer
@@ -1178,11 +1193,13 @@ set search_path = public
 stable
 as $$
   with base as (
-    select valor, banco, data_status as dia
-    from vendedoras_analise
-    where vendedor = p_vendedor
-      and (p_date_from is null or data_status >= p_date_from)
-      and (p_date_to is null or data_status <= p_date_to)
+    select va.valor, va.banco, va.data_status as dia, coalesce(vg.ponto, 0) as ponto
+    from vendedoras_analise va
+    left join vendas_gerais vg
+      on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
+    where va.vendedor = p_vendedor
+      and (p_date_from is null or va.data_status >= p_date_from)
+      and (p_date_to is null or va.data_status <= p_date_to)
   ),
   por_dia as (
     select dia, count(*) as qtd from base where dia is not null group by dia
@@ -1197,7 +1214,9 @@ as $$
     (select coalesce(sum(valor), 0) from base),
     (select count(*) from base),
     (select banco from por_banco order by qtd desc limit 1),
-    (select qtd from por_banco order by qtd desc limit 1);
+    (select qtd from por_banco order by qtd desc limit 1),
+    (select coalesce(sum(ponto), 0) from base),
+    (select coalesce(max(ponto), 0) from base);
 $$;
 
 -- Vendas por dia e por vendedora (gráfico) — formato longo
@@ -1402,7 +1421,11 @@ returns table (
   dias_uteis_mes int,
   projecao_mes numeric,
   projecao_diaria numeric,
-  projecao_semanal numeric
+  projecao_semanal numeric,
+  pontos_mes_atual numeric,
+  pontos_projecao_mes numeric,
+  pontos_projecao_diaria numeric,
+  pontos_projecao_semanal numeric
 )
 language sql
 security definer
@@ -1428,12 +1451,15 @@ as $$
     from generate_series((select inicio from mes), (select fim from mes), interval '1 day') g(dia)
     where extract(isodow from g.dia) < 6
   ),
-  total_mes as (
-    select coalesce(sum(valor), 0) as v
-    from vendedoras_analise, mes, hoje
-    where data_status >= mes.inicio
-      and data_status <= hoje.d
+  base_mes as (
+    select va.valor, coalesce(vg.ponto, 0) as ponto, va.data_status as dia
+    from vendedoras_analise va
+    left join vendas_gerais vg
+      on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
+    , mes, hoje
+    where va.data_status >= mes.inicio and va.data_status <= hoje.d
   ),
+  total_mes as (select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes),
   agora as (
     select
       extract(hour from now() at time zone 'America/Sao_Paulo')
@@ -1447,16 +1473,10 @@ as $$
   horas_semana as (
     select (least(greatest((select dow from agora) - 1, 0), 5) * 10) + (select passadas from horas_hoje) as passadas
   ),
-  valor_hoje as (
-    select coalesce(sum(valor), 0) as v
-    from vendedoras_analise, hoje
-    where data_status = hoje.d
-  ),
+  valor_hoje as (select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje where dia = hoje.d),
   valor_semana as (
-    select coalesce(sum(valor), 0) as v
-    from vendedoras_analise, hoje
-    where data_status >= (hoje.d - (extract(isodow from hoje.d)::int - 1))
-      and data_status <= hoje.d
+    select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje
+    where dia >= (hoje.d - (extract(isodow from hoje.d)::int - 1)) and dia <= hoje.d
   )
   select
     (select v from total_mes),
@@ -1470,6 +1490,16 @@ as $$
       else 0 end,
     case when (select passadas from horas_semana) > 0
       then round((select v from valor_semana) / (select passadas from horas_semana) * 50, 2)
+      else 0 end,
+    (select p from total_mes),
+    case when (select n from du_passados) > 0
+      then round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end,
+    case when (select passadas from horas_hoje) > 0
+      then round((select p from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
+      else 0 end,
+    case when (select passadas from horas_semana) > 0
+      then round((select p from valor_semana) / (select passadas from horas_semana) * 50, 2)
       else 0 end;
 $$;
 
@@ -1484,7 +1514,12 @@ returns table (
   semana_atual_valor numeric,
   meta_semana numeric,
   projecao_diaria numeric,
-  projecao_semanal numeric
+  projecao_semanal numeric,
+  pontos_mes_atual numeric,
+  pontos_projecao_mes numeric,
+  pontos_semana_atual numeric,
+  pontos_projecao_diaria numeric,
+  pontos_projecao_semanal numeric
 )
 language sql
 security definer
@@ -1510,19 +1545,20 @@ as $$
     from generate_series((select inicio from mes), (select fim from mes), interval '1 day') g(dia)
     where extract(isodow from g.dia) < 6
   ),
-  total_mes as (
-    select coalesce(sum(valor), 0) as v
-    from vendedoras_analise, mes, hoje
-    where vendedor = p_vendedor
-      and data_status >= mes.inicio
-      and data_status <= hoje.d
+  base_mes as (
+    select va.valor, coalesce(vg.ponto, 0) as ponto, va.data_status as dia
+    from vendedoras_analise va
+    left join vendas_gerais vg
+      on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
+    , mes, hoje
+    where va.vendedor = p_vendedor
+      and va.data_status >= mes.inicio
+      and va.data_status <= hoje.d
   ),
+  total_mes as (select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes),
   semana_atual as (
-    select coalesce(sum(valor), 0) as v
-    from vendedoras_analise, hoje
-    where vendedor = p_vendedor
-      and data_status >= (hoje.d - (extract(isodow from hoje.d)::int - 1))
-      and data_status <= hoje.d
+    select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje
+    where dia >= (hoje.d - (extract(isodow from hoje.d)::int - 1)) and dia <= hoje.d
   ),
   -- ritmo por hora útil (dia útil = 8h às 18h, 10 horas) — pra projeção do
   -- dia/semana refletir o quanto está entrando por hora, não a média do
@@ -1541,9 +1577,7 @@ as $$
     select (least(greatest((select dow from agora) - 1, 0), 5) * 10) + (select passadas from horas_hoje) as passadas
   ),
   valor_hoje as (
-    select coalesce(sum(valor), 0) as v
-    from vendedoras_analise, hoje
-    where vendedor = p_vendedor and data_status = hoje.d
+    select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje where dia = hoje.d
   )
   select
     (select v from total_mes),
@@ -1559,6 +1593,17 @@ as $$
       else 0 end,
     case when (select passadas from horas_semana) > 0
       then round((select v from semana_atual) / (select passadas from horas_semana) * 50, 2)
+      else 0 end,
+    (select p from total_mes),
+    case when (select n from du_passados) > 0
+      then round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2)
+      else 0 end,
+    (select p from semana_atual),
+    case when (select passadas from horas_hoje) > 0
+      then round((select p from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
+      else 0 end,
+    case when (select passadas from horas_semana) > 0
+      then round((select p from semana_atual) / (select passadas from horas_semana) * 50, 2)
       else 0 end;
 $$;
 
@@ -1572,7 +1617,8 @@ returns table (
   inicio date,
   fim date,
   valor_semana numeric,
-  passada boolean
+  passada boolean,
+  ponto_semana numeric
 )
 language sql
 security definer
@@ -1605,7 +1651,13 @@ as $$
       select sum(v.valor) from vendedoras_analise v
       where v.vendedor = p_vendedor and v.data_status between s.semana_inicio and s.semana_fim
     ), 0),
-    (s.semana_fim <= (select d from hoje))
+    (s.semana_fim <= (select d from hoje)),
+    coalesce((
+      select sum(coalesce(vg.ponto, 0)) from vendedoras_analise va
+      left join vendas_gerais vg
+        on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
+      where va.vendedor = p_vendedor and va.data_status between s.semana_inicio and s.semana_fim
+    ), 0)
   from semanas s
   order by s.semana;
 $$;
