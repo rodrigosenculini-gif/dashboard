@@ -2589,7 +2589,7 @@ function VendedorasView() {
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
-      <div className="panel chart-panel">
+      <div className="panel chart-panel extra-tall">
         <p className="section-label">Vendas por dia</p>
         {metas && (() => {
           const ehPonto = modo === 'ponto'
@@ -2614,7 +2614,7 @@ function VendedorasView() {
             </div>
           )
         })()}
-        <ResponsiveContainer width="100%" height="80%">
+        <ResponsiveContainer width="100%" height="70%">
           <BarChart data={porDia.rows}>
             <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} tickFormatter={fmtDataBR} />
             <Tooltip
