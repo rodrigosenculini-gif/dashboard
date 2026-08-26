@@ -1957,6 +1957,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
 
+  const [modo, setModo] = useState('valor') // 'valor' | 'ponto'
+  const fmtV = modo === 'ponto' ? ((v) => `${fmtInt(Math.round(v ?? 0))} pts`) : fmtMoeda
+
   const [showAdd, setShowAdd] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(() => (
@@ -2029,50 +2032,46 @@ function VendedoraPortal({ vendedor, onLogout }) {
     const hoje = todayISO()
     let acumulado = 0
     let marcosBatidos = 0
+    const campoSemana = modo === 'ponto' ? 'ponto_semana' : 'valor_semana'
     // "iniciada" = a semana j\u00e1 come\u00e7ou (mesmo que ainda n\u00e3o tenha terminado)
     // \u2014 o valor_semana dela j\u00e1 reflete s\u00f3 os dias que realmente aconteceram,
     // ent\u00e3o conta como realizado at\u00e9 agora, n\u00e3o como proje\u00e7\u00e3o
     const semanasIniciadas = semanas.filter((s) => s.inicio.slice(0, 10) <= hoje)
     const ultimaIniciada = semanasIniciadas[semanasIniciadas.length - 1]
-    const projecaoFinal = meta ? Number(meta.projecao_mes) : 0
+    const projecaoFinal = meta ? Number(modo === 'ponto' ? meta.pontos_projecao_mes : meta.projecao_mes) : 0
 
     return semanas.map((s) => {
-      const valor = Number(s.valor_semana) || 0
+      const valor = Number(s[campoSemana]) || 0
       const iniciada = s.inicio.slice(0, 10) <= hoje
       if (iniciada) acumulado += valor
       const row = { semana: s.semana_label }
       let nivel = null
-      if (valor >= META_SEMANA && s.passada && marcosBatidos < 4) {
+      if (modo !== 'ponto' && valor >= META_SEMANA && s.passada && marcosBatidos < 4) {
         marcosBatidos += 1
         nivel = marcosBatidos
       }
       if (iniciada) {
         row.realizado = acumulado
         row.nivel = nivel
-        // ponto de conex\u00e3o: a \u00faltima semana real tamb\u00e9m entra na s\u00e9rie de
-        // proje\u00e7\u00e3o, pra linha ficar visualmente cont\u00ednua (sem quebra) \u2014 mas o
-        // tooltip mostra a proje\u00e7\u00e3o de verdade (projecaoMesTotal), n\u00e3o esse valor
         if (s.semana === ultimaIniciada?.semana) {
           row.projecao = acumulado
           row.ehSemanaAtual = true
           row.projecaoMesTotal = projecaoFinal
         }
       } else if (ultimaIniciada) {
-        // interpola linearmente da \u00faltima semana real at\u00e9 a proje\u00e7\u00e3o final
-        // (valor absoluto, nunca somado por cima do realizado)
         const totalSemanas = semanas.length
         const semanasRestantes = totalSemanas - ultimaIniciada.semana
-        const passo = semanasRestantes > 0 ? (projecaoFinal - acumuladoAteUltima(semanas, ultimaIniciada, hoje)) / semanasRestantes : 0
-        row.projecao = acumuladoAteUltima(semanas, ultimaIniciada, hoje) + passo * (s.semana - ultimaIniciada.semana)
+        const passo = semanasRestantes > 0 ? (projecaoFinal - acumuladoAteUltima(semanas, ultimaIniciada, hoje, campoSemana)) / semanasRestantes : 0
+        row.projecao = acumuladoAteUltima(semanas, ultimaIniciada, hoje, campoSemana) + passo * (s.semana - ultimaIniciada.semana)
       }
       return row
     })
-  }, [semanas, meta])
+  }, [semanas, meta, modo])
 
-  function acumuladoAteUltima(lista, ultima, hoje) {
+  function acumuladoAteUltima(lista, ultima, hoje, campo) {
     let soma = 0
     for (const s of lista) {
-      if (s.semana <= ultima.semana) soma += Number(s.valor_semana) || 0
+      if (s.semana <= ultima.semana) soma += Number(s[campo]) || 0
     }
     return soma
   }
@@ -2127,6 +2126,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <PlaybookMenuButton />
           <span ref={tourAiRef} style={{ display: 'inline-flex' }}><AIChatButton vendedor={vendedor} /></span>
+          <button className="reset-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
+            {modo === 'valor' ? '\u21c4 Ver em pontos' : '\u21c4 Ver em valor'}
+          </button>
           <button className="reset-btn" onClick={onLogout} title="Sair">Sair</button>
         </div>
       </div>
@@ -2157,8 +2159,8 @@ function VendedoraPortal({ vendedor, onLogout }) {
       {error && <div className="state-msg error">Erro: {error}</div>}
 
       <div ref={tourChartRef} className="panel chart-panel tall">
-        <p className="section-label">Vendas por semana &mdash; meta e proje&ccedil;&atilde;o</p>
-        <p className="section-sub">meta de {fmtMoeda(META_SEMANA)}/semana &middot; linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s</p>
+        <p className="section-label">Vendas por semana &mdash; {modo === 'ponto' ? 'pontos' : 'meta'} e proje&ccedil;&atilde;o</p>
+        <p className="section-sub">{modo === 'ponto' ? 'exibindo em pontos' : `meta de ${fmtMoeda(META_SEMANA)}/semana`} &middot; linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s</p>
         <ResponsiveContainer width="100%" height="65%">
           <ComposedChart data={chartData} margin={{ top: 26, right: 10, left: 0, bottom: 0 }}>
             <XAxis dataKey="semana" tick={{ fontSize: 10, fill: '#8a978f' }} />
@@ -2353,6 +2355,9 @@ function VendedorasView() {
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
 
+  const [modo, setModo] = useState('valor') // 'valor' | 'ponto'
+  const fmtV = modo === 'ponto' ? ((v) => `${fmtInt(Math.round(v ?? 0))} pts`) : fmtMoeda
+
   const [showMetaConfig, setShowMetaConfig] = useState(false)
   const [metas, setMetas] = useState(null)
   const [metaForm, setMetaForm] = useState(null)
@@ -2546,6 +2551,9 @@ function VendedorasView() {
           <button className="refresh-btn" onClick={abrirMetaConfig} title="Configurar meta">
             &#9881; Meta
           </button>
+          <button className="refresh-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
+            {modo === 'valor' ? '\u21c4 Ver em pontos' : '\u21c4 Ver em valor'}
+          </button>
           <input
             type="file"
             accept=".csv"
@@ -2600,38 +2608,38 @@ function VendedorasView() {
       {!vendedor && (
         <div className="kpi-grid">
           <div className="kpi"><p className="kpi-label">Vendedora com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_qtd_vendedor || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.top_qtd_valor)} vendas</p></div>
-          <div className="kpi"><p className="kpi-label">Vendedora com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_valor_vendedor || '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.top_valor_valor)}</p></div>
+          <div className="kpi"><p className="kpi-label">Vendedora com maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'valor'}</p><p className="kpi-value" style={{ fontSize: 16 }}>{(modo === 'ponto' ? kpisGeral?.top_ponto_vendedor : kpisGeral?.top_valor_vendedor) || '-'}</p><p className="kpi-sub">{fmtV(modo === 'ponto' ? kpisGeral?.top_ponto_valor : kpisGeral?.top_valor_valor)}</p></div>
           <div className="kpi"><p className="kpi-label">Banco mais utilizado</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.banco_top_qtd)} vendas</p></div>
-          <div className="kpi"><p className="kpi-label">Dia com maior valor</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.dia_maior_valor ? fmtDataBR(kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtMoeda(kpisGeral?.dia_maior_valor_total)}</p></div>
+          <div className="kpi"><p className="kpi-label">Dia com maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'valor'}</p><p className="kpi-value" style={{ fontSize: 16 }}>{(modo === 'ponto' ? kpisGeral?.dia_maior_ponto : kpisGeral?.dia_maior_valor) ? fmtDataBR(modo === 'ponto' ? kpisGeral.dia_maior_ponto : kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtV(modo === 'ponto' ? kpisGeral?.dia_maior_ponto_total : kpisGeral?.dia_maior_valor_total)}</p></div>
         </div>
       )}
       {!vendedor && mediasGeral && (
         <div className="kpi-grid">
           <div className="kpi">
-            <p className="kpi-label">Valor total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
+            <p className="kpi-label">{modo === 'ponto' ? 'Pontos' : 'Valor'} total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
             <p className="kpi-value kpi-split">
-              <span>{fmtMoeda(kpisGeral?.valor_total)}</span>
+              <span>{fmtV(modo === 'ponto' ? kpisGeral?.pontos_total : kpisGeral?.valor_total)}</span>
               <span className="kpi-split-bar">|</span>
-              <span className="kpi-split-proj">{fmtMoeda(mediasGeral?.projecao_mes)}</span>
+              <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? mediasGeral?.pontos_projecao_mes : mediasGeral?.projecao_mes)}</span>
             </p>
             <p className="kpi-sub">{fmtInt(kpisGeral?.qtd_total)} vendas no per&iacute;odo</p>
           </div>
           <div className="kpi">
             <p className="kpi-label">M&eacute;dia di&aacute;ria (time todo)</p>
-            <p className="kpi-value">{fmtMoeda(mediasGeral.dias_uteis_passados > 0 ? mediasGeral.total_mes_atual / mediasGeral.dias_uteis_passados : 0)}</p>
+            <p className="kpi-value">{fmtV(mediasGeral.dias_uteis_passados > 0 ? (modo === 'ponto' ? mediasGeral.pontos_mes_atual : mediasGeral.total_mes_atual) / mediasGeral.dias_uteis_passados : 0)}</p>
             <p className="kpi-sub">por dia &uacute;til, m&ecirc;s corrente</p>
           </div>
           <div className="kpi">
             <p className="kpi-label">M&eacute;dia semanal (time todo)</p>
-            <p className="kpi-value">{fmtMoeda(mediasGeral.dias_uteis_passados > 0 ? (mediasGeral.total_mes_atual / mediasGeral.dias_uteis_passados) * 5 : 0)}</p>
+            <p className="kpi-value">{fmtV(mediasGeral.dias_uteis_passados > 0 ? ((modo === 'ponto' ? mediasGeral.pontos_mes_atual : mediasGeral.total_mes_atual) / mediasGeral.dias_uteis_passados) * 5 : 0)}</p>
             <p className="kpi-sub">m&eacute;dia di&aacute;ria &times; 5 dias &uacute;teis</p>
           </div>
           <div className="kpi">
             <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
             <p className="kpi-value kpi-split">
-              <span>{fmtMoeda(mediasGeral.projecao_diaria)}</span>
+              <span>{fmtV(modo === 'ponto' ? mediasGeral.pontos_projecao_diaria : mediasGeral.projecao_diaria)}</span>
               <span className="kpi-split-bar">|</span>
-              <span className="kpi-split-proj">{fmtMoeda(mediasGeral.projecao_semanal)}</span>
+              <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? mediasGeral.pontos_projecao_semanal : mediasGeral.projecao_semanal)}</span>
             </p>
             <p className="kpi-sub">ritmo por hora &uacute;til (8h&ndash;18h) de hoje/semana</p>
           </div>
@@ -2667,14 +2675,14 @@ function VendedorasView() {
 
       {vendedor && (
         <div className="kpi-grid">
-          <div className="kpi"><p className="kpi-label">Maior venda</p><p className="kpi-value">{fmtMoeda(kpisVendedor?.maior_venda)}</p></div>
+          <div className="kpi"><p className="kpi-label">Maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'venda'}</p><p className="kpi-value">{fmtV(modo === 'ponto' ? kpisVendedor?.maior_pontuacao : kpisVendedor?.maior_venda)}</p></div>
           <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisVendedor?.dia_mais_vendas ? fmtDataBR(kpisVendedor.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpisVendedor?.dia_mais_vendas_qtd)} vendas</p></div>
           <div className="kpi">
-            <p className="kpi-label">Valor total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
+            <p className="kpi-label">{modo === 'ponto' ? 'Pontos' : 'Valor'} total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
             <p className="kpi-value kpi-split">
-              <span>{fmtMoeda(kpisVendedor?.valor_total)}</span>
+              <span>{fmtV(modo === 'ponto' ? kpisVendedor?.pontos_total : kpisVendedor?.valor_total)}</span>
               <span className="kpi-split-bar">|</span>
-              <span className="kpi-split-proj">{fmtMoeda(metaVendedor?.projecao_mes)}</span>
+              <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? metaVendedor?.pontos_projecao_mes : metaVendedor?.projecao_mes)}</span>
             </p>
           </div>
           <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpisVendedor?.qtd_total)}</p></div>
@@ -2685,25 +2693,25 @@ function VendedorasView() {
           <div className="kpi">
             <p className="kpi-label">M&eacute;dia di&aacute;ria | semanal</p>
             <p className="kpi-value kpi-split">
-              <span>{fmtMoeda(metaVendedor.dias_uteis_passados > 0 ? metaVendedor.total_mes_atual / metaVendedor.dias_uteis_passados : 0)}</span>
+              <span>{fmtV(metaVendedor.dias_uteis_passados > 0 ? (modo === 'ponto' ? metaVendedor.pontos_mes_atual : metaVendedor.total_mes_atual) / metaVendedor.dias_uteis_passados : 0)}</span>
               <span className="kpi-split-bar">|</span>
-              <span className="kpi-split-proj">{fmtMoeda(metaVendedor.dias_uteis_passados > 0 ? (metaVendedor.total_mes_atual / metaVendedor.dias_uteis_passados) * 5 : 0)}</span>
+              <span className="kpi-split-proj">{fmtV(metaVendedor.dias_uteis_passados > 0 ? ((modo === 'ponto' ? metaVendedor.pontos_mes_atual : metaVendedor.total_mes_atual) / metaVendedor.dias_uteis_passados) * 5 : 0)}</span>
             </p>
             <p className="kpi-sub">m&eacute;s corrente, {vendedor}</p>
           </div>
           <div className="kpi">
             <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
             <p className="kpi-value kpi-split">
-              <span>{fmtMoeda(metaVendedor.projecao_diaria)}</span>
+              <span>{fmtV(modo === 'ponto' ? metaVendedor.pontos_projecao_diaria : metaVendedor.projecao_diaria)}</span>
               <span className="kpi-split-bar">|</span>
-              <span className="kpi-split-proj">{fmtMoeda(metaVendedor.projecao_semanal)}</span>
+              <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? metaVendedor.pontos_projecao_semanal : metaVendedor.projecao_semanal)}</span>
             </p>
             <p className="kpi-sub">ritmo por hora &uacute;til (8h&ndash;18h)</p>
           </div>
           <div className="kpi">
             <p className="kpi-label">Semana atual</p>
-            <p className="kpi-value">{fmtMoeda(metaVendedor.semana_atual_valor)}</p>
-            <p className="kpi-sub">meta: {fmtMoeda(metaVendedor.meta_semana)}</p>
+            <p className="kpi-value">{fmtV(modo === 'ponto' ? metaVendedor.pontos_semana_atual : metaVendedor.semana_atual_valor)}</p>
+            {modo !== 'ponto' && <p className="kpi-sub">meta: {fmtMoeda(metaVendedor.meta_semana)}</p>}
           </div>
         </div>
       )}
