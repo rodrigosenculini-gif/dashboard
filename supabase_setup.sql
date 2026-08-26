@@ -1799,6 +1799,22 @@ begin
     return 'FGTS';
   end if;
 
+  -- V8 com as tabelas "Acelera / Cometa / Grid / Turbo / Normal / Pit Stop"
+  -- são produto FGTS (V8 sem essas tabelas continua CLT, mais abaixo)
+  if upper(replace(coalesce(p_banco, ''), '_', ' ')) like '%V8%'
+     and (
+       upper(coalesce(p_tabela, '')) like '%ACELERA%'
+       or upper(coalesce(p_tabela, '')) like '%COMETA%'
+       or upper(coalesce(p_tabela, '')) like '%GRID%'
+       or upper(coalesce(p_tabela, '')) like '%TURBO%'
+       or upper(coalesce(p_tabela, '')) like '%PIT STOP%'
+       or upper(coalesce(p_tabela, '')) like '%PITSTOP%'
+       or upper(coalesce(p_tabela, '')) like '%NORMAL%'
+     )
+  then
+    return 'FGTS';
+  end if;
+
   return 'CLT';
 end;
 $$;
@@ -1993,7 +2009,18 @@ begin
     return null;
   end if;
 
-  -- V8 (consignado privado)
+  -- V8 FGTS (tabelas Acelera/Cometa/Grid/Turbo/Normal/Pit Stop, 1 a 5 parcelas)
+  -- -- checado antes do V8 consignado generico, senao nunca seria alcancado
+  if banco_norm like '%V8%' then
+    if tabela_norm like '%ACELERA%' then return 12.00; end if;
+    if tabela_norm like '%COMETA%' then return 9.00; end if;
+    if tabela_norm like '%GRID%' then return 6.00; end if;
+    if tabela_norm like '%TURBO%' then return 5.50; end if;
+    if tabela_norm like '%PIT STOP%' or tabela_norm like '%PITSTOP%' then return 1.80; end if;
+    if tabela_norm like '%NORMAL%' then return 4.50; end if;
+  end if;
+
+  -- V8 (consignado privado) -- demais tabelas V8 que nao sao FGTS
   if banco_norm like '%V8%' then
     if tem_seguro_efetivo then
       return case coalesce(p_parcelas, parcelas_texto)
