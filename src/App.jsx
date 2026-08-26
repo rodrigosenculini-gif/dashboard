@@ -1569,6 +1569,12 @@ function ChartTooltip({ active, payload, label }) {
   return (
     <div style={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12, padding: '8px 10px' }}>
       <p style={{ color: '#8a978f', margin: '0 0 4px' }}>{label}</p>
+      {row.valorDia != null && (
+        <p style={{ margin: '2px 0', color: '#fff' }}>Valor do dia: {fmtMoeda(row.valorDia)}</p>
+      )}
+      {row.pontoDia != null && (
+        <p style={{ margin: '2px 0 8px', color: '#fff' }}>Pontos do dia: {fmtInt(Math.round(row.pontoDia))}</p>
+      )}
       {row.realizado != null && (
         <p style={{ margin: '2px 0', color: '#a9d97f' }}>Valor realizado: {fmtMoeda(row.realizado)}</p>
       )}
@@ -2763,6 +2769,8 @@ function VendasView() {
         acumuladoPonto += ponto
       }
       const row = { dia: fmtDataBR(d.dia) }
+      row.valorDia = valor
+      row.pontoDia = ponto
       if (iniciado) {
         row.realizado = acumuladoValor
         row.pontoRealizado = acumuladoPonto
@@ -2913,7 +2921,8 @@ function VendasView() {
         <div className="kpi">
           <p className="kpi-label">% vendas de vendedoras</p>
           <p className="kpi-value" style={{ fontSize: 20 }}>{fmtPct2(kpis?.qtd_total > 0 ? (Number(kpis.qtd_vendedor) / Number(kpis.qtd_total)) * 100 : 0)}</p>
-          <p className="kpi-sub">{fmtInt(kpis?.qtd_vendedor)} de {fmtInt(kpis?.qtd_total)} vendas &middot; {fmtInt(Math.round(kpis?.pontos_vendedor ?? 0))} pontos &middot; {fmtMoeda(kpis?.valor_vendedor)}</p>
+          <p className="kpi-sub">{fmtInt(kpis?.qtd_vendedor)} de {fmtInt(kpis?.qtd_total)} vendas</p>
+          <p className="kpi-sub">{fmtInt(Math.round(kpis?.pontos_vendedor ?? 0))} pontos &middot; {fmtMoeda(kpis?.valor_vendedor)}</p>
         </div>
       </div>
 
