@@ -2646,3 +2646,92 @@ create trigger trg_vendas_gerais_normalize
 
 create unique index if not exists vendas_gerais_cpf_adesao_uidx
   on vendas_gerais (cpf, coalesce(adesao, -1));
+
+-- ============================================================
+-- Configuracao de metas (valor e pontos, por periodo) usada na
+-- view geral "Vendedoras".
+-- ============================================================
+CREATE TABLE IF NOT EXISTS metas_config (
+  id smallint PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  valor_diaria numeric DEFAULT 0,
+  valor_semanal numeric DEFAULT 100000,
+  valor_mensal numeric DEFAULT 0,
+  ponto_diaria numeric DEFAULT 0,
+  ponto_semanal numeric DEFAULT 0,
+  ponto_mensal numeric DEFAULT 0,
+  tipo_ativo text DEFAULT 'valor',
+  periodo_ativo text DEFAULT 'semanal',
+  atualizado_em timestamptz DEFAULT now()
+);
+
+INSERT INTO metas_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION dashboard_metas_progresso(p_vendedor text DEFAULT NULL)
+RETURNS TABLE (
+  tipo_ativo text,
+  periodo_ativo text,
+  valor_diaria numeric, valor_semanal numeric, valor_mensal numeric,
+  ponto_diaria numeric, ponto_semanal numeric, ponto_mensal numeric,
+  realizado_dia_valor numeric, realizado_semana_valor numeric, realizado_mes_valor numeric,
+  realizado_dia_ponto numeric, realizado_semana_ponto numeric, realizado_mes_ponto numeric
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  WITH hoje AS (SELECT (now() at time zone 'America/Sao_Paulo')::date AS d),
+  cfg AS (SELECT * FROM metas_config WHERE id = 1),
+  base AS (
+    SELECT data, valor, ponto
+    FROM vendas_gerais, hoje
+    WHERE vendedor IS NOT NULL
+      AND (p_vendedor IS NULL OR vendedor = p_vendedor)
+      AND data >= date_trunc('month', hoje.d)::date
+      AND data <= hoje.d
+  )
+  SELECT
+    cfg.tipo_ativo, cfg.periodo_ativo,
+    cfg.valor_diaria, cfg.valor_semanal, cfg.valor_mensal,
+    cfg.ponto_diaria, cfg.ponto_semanal, cfg.ponto_mensal,
+    coalesce((SELECT sum(b.valor) FROM base b, hoje WHERE b.data = hoje.d), 0),
+    coalesce((SELECT sum(b.valor) FROM base b, hoje WHERE b.data >= hoje.d - (extract(isodow FROM hoje.d)::int - 1)), 0),
+    coalesce((SELECT sum(b.valor) FROM base b), 0),
+    coalesce((SELECT sum(b.ponto) FROM base b, hoje WHERE b.data = hoje.d), 0),
+    coalesce((SELECT sum(b.ponto) FROM base b, hoje WHERE b.data >= hoje.d - (extract(isodow FROM hoje.d)::int - 1)), 0),
+    coalesce((SELECT sum(b.ponto) FROM base b), 0)
+  FROM cfg;
+$$;
+
+GRANT EXECUTE ON FUNCTION dashboard_metas_progresso TO anon;
+
+CREATE OR REPLACE FUNCTION dashboard_metas_set(
+  p_valor_diaria numeric DEFAULT NULL,
+  p_valor_semanal numeric DEFAULT NULL,
+  p_valor_mensal numeric DEFAULT NULL,
+  p_ponto_diaria numeric DEFAULT NULL,
+  p_ponto_semanal numeric DEFAULT NULL,
+  p_ponto_mensal numeric DEFAULT NULL,
+  p_tipo_ativo text DEFAULT NULL,
+  p_periodo_ativo text DEFAULT NULL
+)
+RETURNS TABLE (ok boolean)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE metas_config SET
+    valor_diaria = coalesce(p_valor_diaria, valor_diaria),
+    valor_semanal = coalesce(p_valor_semanal, valor_semanal),
+    valor_mensal = coalesce(p_valor_mensal, valor_mensal),
+    ponto_diaria = coalesce(p_ponto_diaria, ponto_diaria),
+    ponto_semanal = coalesce(p_ponto_semanal, ponto_semanal),
+    ponto_mensal = coalesce(p_ponto_mensal, ponto_mensal),
+    tipo_ativo = coalesce(p_tipo_ativo, tipo_ativo),
+    periodo_ativo = coalesce(p_periodo_ativo, periodo_ativo),
+    atualizado_em = now()
+  WHERE id = 1
+  RETURNING true;
+$$;
+
+GRANT EXECUTE ON FUNCTION dashboard_metas_set TO anon;
