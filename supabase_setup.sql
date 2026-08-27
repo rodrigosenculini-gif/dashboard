@@ -1425,10 +1425,12 @@ returns table (
   dias_uteis_passados int,
   dias_uteis_mes int,
   projecao_mes numeric,
+  projecao_mes_real numeric,
   projecao_diaria numeric,
   projecao_semanal numeric,
   pontos_mes_atual numeric,
   pontos_projecao_mes numeric,
+  pontos_projecao_mes_real numeric,
   pontos_projecao_diaria numeric,
   pontos_projecao_semanal numeric
 )
@@ -1522,6 +1524,9 @@ as $$
       (select v from total_mes),
       round((select v from total_ate_ontem) + (select v from projecao_hoje_calc) + (select v from media_diaria_calc) * (select n from dias_restantes_calc), 2)
     ),
+    case when (select n from du_passados) > 0
+      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
+      else (select v from total_mes) end,
     case when (select passadas from horas_hoje) > 0
       then round((select v from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
       else 0 end,
@@ -1533,6 +1538,9 @@ as $$
       (select p from total_mes),
       round((select p from total_ate_ontem) + (select p from projecao_hoje_calc) + (select p from media_diaria_calc) * (select n from dias_restantes_calc), 2)
     ),
+    case when (select n from du_passados) > 0
+      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
+      else (select p from total_mes) end,
     case when (select passadas from horas_hoje) > 0
       then round((select p from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
       else 0 end,
@@ -1549,12 +1557,14 @@ returns table (
   dias_uteis_passados int,
   dias_uteis_mes int,
   projecao_mes numeric,
+  projecao_mes_real numeric,
   semana_atual_valor numeric,
   meta_semana numeric,
   projecao_diaria numeric,
   projecao_semanal numeric,
   pontos_mes_atual numeric,
   pontos_projecao_mes numeric,
+  pontos_projecao_mes_real numeric,
   pontos_semana_atual numeric,
   pontos_projecao_diaria numeric,
   pontos_projecao_semanal numeric
@@ -1652,6 +1662,9 @@ as $$
       (select v from total_mes),
       round((select v from total_ate_ontem) + (select v from projecao_hoje_calc) + (select v from media_diaria_calc) * (select n from dias_restantes_calc), 2)
     ),
+    case when (select n from du_passados) > 0
+      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
+      else (select v from total_mes) end,
     (select v from semana_atual),
     100000,
     case when (select passadas from horas_hoje) > 0
@@ -1665,6 +1678,9 @@ as $$
       (select p from total_mes),
       round((select p from total_ate_ontem) + (select p from projecao_hoje_calc) + (select p from media_diaria_calc) * (select n from dias_restantes_calc), 2)
     ),
+    case when (select n from du_passados) > 0
+      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
+      else (select p from total_mes) end,
     (select p from semana_atual),
     case when (select passadas from horas_hoje) > 0
       then round((select p from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
@@ -2379,8 +2395,10 @@ returns table (
   qtd_total bigint,
   valor_hoje numeric,
   projecao_mes numeric,
+  projecao_mes_real numeric,
   pontos_total numeric,
   pontos_projecao_mes numeric,
+  pontos_projecao_mes_real numeric,
   qtd_vendedor bigint,
   valor_vendedor numeric,
   pontos_vendedor numeric,
@@ -2503,11 +2521,17 @@ as $$
       (select v from total_mes),
       round((select v from total_ate_ontem) + (select v from projecao_hoje_calc) + (select v from media_diaria_calc) * (select n from dias_restantes_calc), 2)
     ),
+    case when (select n from du_passados) > 0
+      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
+      else (select v from total_mes) end,
     (select pontos_total from periodo),
     greatest(
       (select p from total_mes),
       round((select p from total_ate_ontem) + (select p from projecao_hoje_calc) + (select p from media_diaria_calc) * (select n from dias_restantes_calc), 2)
     ),
+    case when (select n from du_passados) > 0
+      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
+      else (select p from total_mes) end,
     (select qtd_vendedor from periodo),
     (select valor_vendedor from periodo),
     (select pontos_vendedor from periodo),
