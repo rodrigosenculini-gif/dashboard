@@ -84,11 +84,11 @@ as $$
   with base as (
     select *
     from disparochat
-    where (p_campanha is null or efetiva_campanha(campanha, campanha_reenvio, reenvio) = p_campanha)
-      and (p_origem is null or origem = p_origem)
-      and (p_meta is null or meta = p_meta)
-      and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
-      and (p_mensagem is null or mensagem = p_mensagem)
+    where (p_campanha is null or p_campanha = '' or efetiva_campanha(campanha, campanha_reenvio, reenvio) = any(string_to_array(p_campanha, ',')))
+      and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
+      and (p_meta is null or p_meta = '' or meta = any(string_to_array(p_meta, ',')))
+      and (p_tipo_envio is null or p_tipo_envio = '' or tipo_envio = any(string_to_array(p_tipo_envio, ',')))
+      and (p_mensagem is null or p_mensagem = '' or mensagem = any(string_to_array(p_mensagem, ',')))
       and (
         p_date_from is null and p_date_to is null
         or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
@@ -169,11 +169,11 @@ as $$
     select (realizado at time zone 'America/Sao_Paulo')::date as dia, count(*) as envios
     from disparochat
     where realizado is not null
-      and (p_campanha is null or efetiva_campanha(campanha, campanha_reenvio, reenvio) = p_campanha)
-      and (p_origem is null or origem = p_origem)
-      and (p_meta is null or meta = p_meta)
-      and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
-      and (p_mensagem is null or mensagem = p_mensagem)
+      and (p_campanha is null or p_campanha = '' or efetiva_campanha(campanha, campanha_reenvio, reenvio) = any(string_to_array(p_campanha, ',')))
+      and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
+      and (p_meta is null or p_meta = '' or meta = any(string_to_array(p_meta, ',')))
+      and (p_tipo_envio is null or p_tipo_envio = '' or tipo_envio = any(string_to_array(p_tipo_envio, ',')))
+      and (p_mensagem is null or p_mensagem = '' or mensagem = any(string_to_array(p_mensagem, ',')))
       and (p_date_from is null or realizado >= p_date_from)
       and (p_date_to is null or realizado <= p_date_to)
       and (p_hora_inicio is null or extract(hour from realizado at time zone 'America/Sao_Paulo') >= p_hora_inicio)
@@ -184,11 +184,11 @@ as $$
     select (reenvio at time zone 'America/Sao_Paulo')::date as dia, count(*) as reenvios
     from disparochat
     where reenvio is not null
-      and (p_campanha is null or efetiva_campanha(campanha, campanha_reenvio, reenvio) = p_campanha)
-      and (p_origem is null or origem = p_origem)
-      and (p_meta is null or meta = p_meta)
-      and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
-      and (p_mensagem is null or mensagem = p_mensagem)
+      and (p_campanha is null or p_campanha = '' or efetiva_campanha(campanha, campanha_reenvio, reenvio) = any(string_to_array(p_campanha, ',')))
+      and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
+      and (p_meta is null or p_meta = '' or meta = any(string_to_array(p_meta, ',')))
+      and (p_tipo_envio is null or p_tipo_envio = '' or tipo_envio = any(string_to_array(p_tipo_envio, ',')))
+      and (p_mensagem is null or p_mensagem = '' or mensagem = any(string_to_array(p_mensagem, ',')))
       and (p_date_from is null or reenvio >= p_date_from)
       and (p_hora_inicio is null or extract(hour from reenvio at time zone 'America/Sao_Paulo') >= p_hora_inicio)
       and (p_hora_fim is null or extract(hour from reenvio at time zone 'America/Sao_Paulo') <= p_hora_fim)
@@ -251,10 +251,10 @@ as $$
     count(*) filter (where interacao is not null) as interacao_qtd
   from disparochat
   where efetiva_campanha(campanha, campanha_reenvio, reenvio) is not null
-    and (p_origem is null or origem = p_origem)
-    and (p_meta is null or meta = p_meta)
-    and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
-    and (p_mensagem is null or mensagem = p_mensagem)
+    and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
+    and (p_meta is null or p_meta = '' or meta = any(string_to_array(p_meta, ',')))
+    and (p_tipo_envio is null or p_tipo_envio = '' or tipo_envio = any(string_to_array(p_tipo_envio, ',')))
+    and (p_mensagem is null or p_mensagem = '' or mensagem = any(string_to_array(p_mensagem, ',')))
     and (
       p_date_from is null and p_date_to is null
       or (
@@ -296,11 +296,11 @@ as $$
     count(*) as leads
   from disparochat
   where conversa is not null
-    and (p_campanha is null or efetiva_campanha(campanha, campanha_reenvio, reenvio) = p_campanha)
-    and (p_origem is null or origem = p_origem)
-    and (p_meta is null or meta = p_meta)
-    and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
-    and (p_mensagem is null or mensagem = p_mensagem)
+    and (p_campanha is null or p_campanha = '' or efetiva_campanha(campanha, campanha_reenvio, reenvio) = any(string_to_array(p_campanha, ',')))
+    and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
+    and (p_meta is null or p_meta = '' or meta = any(string_to_array(p_meta, ',')))
+    and (p_tipo_envio is null or p_tipo_envio = '' or tipo_envio = any(string_to_array(p_tipo_envio, ',')))
+    and (p_mensagem is null or p_mensagem = '' or mensagem = any(string_to_array(p_mensagem, ',')))
     and (
       p_date_from is null and p_date_to is null
       or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
@@ -337,10 +337,10 @@ as $$
     count(*) as leads
   from disparochat
   where meta is not null
-    and (p_campanha is null or efetiva_campanha(campanha, campanha_reenvio, reenvio) = p_campanha)
-    and (p_origem is null or origem = p_origem)
-    and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
-    and (p_mensagem is null or mensagem = p_mensagem)
+    and (p_campanha is null or p_campanha = '' or efetiva_campanha(campanha, campanha_reenvio, reenvio) = any(string_to_array(p_campanha, ',')))
+    and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
+    and (p_tipo_envio is null or p_tipo_envio = '' or tipo_envio = any(string_to_array(p_tipo_envio, ',')))
+    and (p_mensagem is null or p_mensagem = '' or mensagem = any(string_to_array(p_mensagem, ',')))
     and (
       p_date_from is null and p_date_to is null
       or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
@@ -378,10 +378,10 @@ as $$
     count(*) filter (where interacao = 1) as interacoes
   from disparochat
   where mensagem is not null
-    and (p_campanha is null or efetiva_campanha(campanha, campanha_reenvio, reenvio) = p_campanha)
-    and (p_origem is null or origem = p_origem)
-    and (p_meta is null or meta = p_meta)
-    and (p_tipo_envio is null or tipo_envio = p_tipo_envio)
+    and (p_campanha is null or p_campanha = '' or efetiva_campanha(campanha, campanha_reenvio, reenvio) = any(string_to_array(p_campanha, ',')))
+    and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
+    and (p_meta is null or p_meta = '' or meta = any(string_to_array(p_meta, ',')))
+    and (p_tipo_envio is null or p_tipo_envio = '' or tipo_envio = any(string_to_array(p_tipo_envio, ',')))
     and (
       p_date_from is null and p_date_to is null
       or ((p_date_from is null or realizado >= p_date_from) and (p_date_to is null or realizado <= p_date_to))
@@ -435,7 +435,7 @@ as $$
     select d.*
     from disparochat d, alvo
     where d.meta in ('sent', 'delivered', 'read', 'failed')
-      and (p_campanha is null or d.campanha = p_campanha)
+      and (p_campanha is null or p_campanha = '' or d.campanha = any(string_to_array(p_campanha, ',')))
       and (
         (d.realizado is not null and d.realizado between alvo.de and alvo.ate)
         or (d.reenvio is not null and d.reenvio between alvo.de and alvo.ate)
@@ -495,7 +495,7 @@ as $$
   where status_atualizado is not null
     and status_atualizado >= now() - (greatest(p_minutos, 1) || ' minutes')::interval
     and meta in ('sent', 'delivered', 'read', 'failed')
-    and (p_campanha is null or campanha = p_campanha)
+    and (p_campanha is null or p_campanha = '' or campanha = any(string_to_array(p_campanha, ',')))
   group by 1
   order by 1;
 $$;
@@ -542,7 +542,7 @@ as $$
   from disparochat d, alvo
   where d.mensagem is not null
     and d.meta in ('sent', 'delivered', 'read', 'failed')
-    and (p_campanha is null or d.campanha = p_campanha)
+    and (p_campanha is null or p_campanha = '' or d.campanha = any(string_to_array(p_campanha, ',')))
     and (
       (d.realizado is not null and d.realizado between alvo.de and alvo.ate)
       or (d.reenvio is not null and d.reenvio between alvo.de and alvo.ate)
@@ -592,9 +592,9 @@ as $$
   with base as (
     select *
     from total_produtos
-    where (p_campanha is null or campanha = p_campanha)
-      and (p_produto is null or produto = p_produto)
-      and (p_origem is null or origem = p_origem)
+    where (p_campanha is null or p_campanha = '' or campanha = any(string_to_array(p_campanha, ',')))
+      and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ',')))
+      and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
       and (p_date_from is null or created_at >= p_date_from)
       and (p_date_to is null or created_at <= p_date_to)
       and (p_hora_inicio is null or extract(hour from created_at at time zone 'America/Sao_Paulo') >= p_hora_inicio)
@@ -652,9 +652,9 @@ as $$
     count(*) as entradas
   from total_produtos
   where created_at is not null
-    and (p_campanha is null or campanha = p_campanha)
-    and (p_produto is null or produto = p_produto)
-    and (p_origem is null or origem = p_origem)
+    and (p_campanha is null or p_campanha = '' or campanha = any(string_to_array(p_campanha, ',')))
+    and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ',')))
+    and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
     and (p_hora_inicio is null or extract(hour from created_at at time zone 'America/Sao_Paulo') >= p_hora_inicio)
     and (p_hora_fim is null or extract(hour from created_at at time zone 'America/Sao_Paulo') <= p_hora_fim)
     and (p_date_from is null or created_at >= p_date_from)
@@ -685,9 +685,9 @@ as $$
     count(*) filter (where aprovadas = 1) as aprovadas
   from total_produtos
   where created_at is not null
-    and (p_campanha is null or campanha = p_campanha)
-    and (p_produto is null or produto = p_produto)
-    and (p_origem is null or origem = p_origem)
+    and (p_campanha is null or p_campanha = '' or campanha = any(string_to_array(p_campanha, ',')))
+    and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ',')))
+    and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
     and (p_date_from is null or created_at >= p_date_from)
     and (p_date_to is null or created_at <= p_date_to)
   group by 1
@@ -733,9 +733,9 @@ as $$
     count(*) filter (where pagas = 1) as pagas,
     coalesce(sum(valor) filter (where pagas = 1), 0) as valor_liberado
   from total_produtos
-  where (p_campanha is null or campanha = p_campanha)
-    and (p_produto is null or produto = p_produto)
-    and (p_origem is null or origem = p_origem)
+  where (p_campanha is null or p_campanha = '' or campanha = any(string_to_array(p_campanha, ',')))
+    and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ',')))
+    and (p_origem is null or p_origem = '' or origem = any(string_to_array(p_origem, ',')))
     and (p_date_from is null or created_at >= p_date_from)
     and (p_date_to is null or created_at <= p_date_to)
   group by campanha, produto
@@ -797,8 +797,8 @@ as $$
   base as (
     select d.*
     from disparochat d, alvo
-    where (p_campanha is null or d.campanha = p_campanha)
-      and (p_origem is null or d.origem = p_origem)
+    where (p_campanha is null or p_campanha = '' or d.campanha = any(string_to_array(p_campanha, ',')))
+      and (p_origem is null or p_origem = '' or d.origem = any(string_to_array(p_origem, ',')))
       and coalesce(d.reenvio, d.realizado) is not null
       and coalesce(d.reenvio, d.realizado) between alvo.de and alvo.ate
   )
@@ -845,9 +845,9 @@ as $$
   base as (
     select t.*
     from total_produtos t, alvo
-    where (p_campanha is null or t.campanha = p_campanha)
-      and (p_origem is null or t.origem = p_origem)
-      and (p_produto is null or t.produto = p_produto)
+    where (p_campanha is null or p_campanha = '' or t.campanha = any(string_to_array(p_campanha, ',')))
+      and (p_origem is null or p_origem = '' or t.origem = any(string_to_array(p_origem, ',')))
+      and (p_produto is null or p_produto = '' or t.produto = any(string_to_array(p_produto, ',')))
       and t.created_at is not null
       and t.created_at between alvo.de and alvo.ate
   )
@@ -1286,7 +1286,7 @@ as $$
     vendedor, valor, cpf, banco, data_status as dia, covnersation_id, conversa_sistema,
     count(*) over() as total_count
   from vendedoras_analise
-  where (p_vendedor is null or vendedor = p_vendedor)
+  where (p_vendedor is null or p_vendedor = '' or vendedor = any(string_to_array(p_vendedor, ',')))
     and (p_date_from is null or data_status >= p_date_from)
     and (p_date_to is null or data_status <= p_date_to)
   order by data_status desc nulls last, id desc
