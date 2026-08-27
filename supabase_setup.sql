@@ -2224,6 +2224,21 @@ grant execute on function dashboard_vendas_sync to anon;
 -- (nome ou código) quanto se trouxer só parcelas + seguro.
 drop function if exists dashboard_vendas_import(jsonb);
 
+-- Converte texto pra bigint com segurança: se não couber ou não for um
+-- número válido (ex.: dígitos longos demais extraídos de um UUID), devolve
+-- null em vez de estourar a importação inteira com erro.
+create or replace function safe_bigint(txt text)
+returns bigint
+language plpgsql
+immutable
+as $$
+begin
+  return nullif(txt, '')::bigint;
+exception when others then
+  return null;
+end;
+$$;
+
 create or replace function dashboard_vendas_import(p_rows jsonb)
 returns table (inseridos int, atualizados int, ignorados int, total int)
 language plpgsql
@@ -2238,8 +2253,8 @@ begin
   select count(*) into v_total from jsonb_array_elements(p_rows);
 
   create temporary table tmp_vendas_import on commit drop as
-  select distinct on (norm_cpf(r->>'cpf'), coalesce(nullif(r->>'adesao', '')::bigint, -1))
-    nullif(r->>'adesao', '')::bigint as adesao,
+  select distinct on (norm_cpf(r->>'cpf'), coalesce(safe_bigint(r->>'adesao'), -1))
+    safe_bigint(r->>'adesao') as adesao,
     norm_cpf(r->>'cpf') as cpf,
     nullif(r->>'tabela', '') as tabela,
     nullif(r->>'nome', '') as nome,
@@ -2247,7 +2262,8 @@ begin
     nullif(r->>'data', '')::date as data,
     nullif(r->>'banco', '') as banco,
     nullif(r->>'parcelas', '')::int as parcelas,
-    nullif(r->>'seguro', '') as seguro
+    nullif(r->>'seguro', '') as seguro,
+    safe_bigint(r->>'whatsapp') as whatsapp
   from jsonb_array_elements(p_rows) r;
 
   -- 1) quem já existe (mesmo cpf+adesão) mas está com peso vazio: atualiza
@@ -2261,7 +2277,8 @@ begin
     seguro = coalesce(v.seguro, t.seguro),
     valor = coalesce(v.valor, t.valor),
     nome = coalesce(v.nome, t.nome),
-    data = coalesce(v.data, t.data)
+    data = coalesce(v.data, t.data),
+    whatsapp = coalesce(v.whatsapp, t.whatsapp)
   from tmp_vendas_import t
   where norm_cpf(v.cpf) = t.cpf
     and coalesce(v.adesao, -1) = coalesce(t.adesao, -1)
@@ -2269,8 +2286,8 @@ begin
   get diagnostics v_atualizados = row_count;
 
   -- 2) quem ainda não existe na base: insere normalmente
-  insert into vendas_gerais (adesao, cpf, tabela, nome, valor, data, banco, parcelas, seguro)
-  select t.adesao, t.cpf, t.tabela, t.nome, t.valor, t.data, t.banco, t.parcelas, t.seguro
+  insert into vendas_gerais (adesao, cpf, tabela, nome, valor, data, banco, parcelas, seguro, whatsapp)
+  select t.adesao, t.cpf, t.tabela, t.nome, t.valor, t.data, t.banco, t.parcelas, t.seguro, t.whatsapp
   from tmp_vendas_import t
   where not exists (
     select 1 from vendas_gerais v
