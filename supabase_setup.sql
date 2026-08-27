@@ -1389,15 +1389,31 @@ end;
 $$;
 
 -- Lista de vendedoras pro filtro
+drop function if exists dashboard_vendedoras_filtros();
+
 create or replace function dashboard_vendedoras_filtros()
-returns table (vendedores text[])
+returns table (vendedores text[], bancos text[])
 language sql
 security definer
 set search_path = public
 stable
 as $$
-  select array_agg(distinct vendedor) from vendedoras_analise where vendedor is not null;
+  select
+    (select array_agg(distinct vendedor) from vendedoras_analise where vendedor is not null),
+    (select array_agg(distinct banco order by banco) from vendedoras_analise where banco is not null);
 $$;
+
+create or replace function dashboard_vendas_filtros()
+returns table (bancos text[])
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select array_agg(distinct banco order by banco) from vendas_gerais where banco is not null;
+$$;
+
+grant execute on function dashboard_vendas_filtros to anon;
 
 grant execute on function norm_cpf to anon;
 grant execute on function safe_date_br to anon;
