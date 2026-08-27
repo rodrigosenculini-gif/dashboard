@@ -1097,7 +1097,8 @@ drop function if exists dashboard_vendedoras_kpis_geral(date, date);
 
 create or replace function dashboard_vendedoras_kpis_geral(
   p_date_from date default null,
-  p_date_to date default null
+  p_date_to date default null,
+  p_banco text default null
 )
 returns table (
   top_qtd_vendedor text,
@@ -1129,6 +1130,7 @@ as $$
       on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
     where (p_date_from is null or va.data_status >= p_date_from)
       and (p_date_to is null or va.data_status <= p_date_to)
+      and (p_banco is null or p_banco = '' or va.banco = any(string_to_array(p_banco, ',')))
   ),
   por_vendedor as (
     select vendedor, count(*) as qtd, coalesce(sum(valor), 0) as total, coalesce(sum(ponto), 0) as total_ponto
@@ -1225,7 +1227,8 @@ drop function if exists dashboard_vendedoras_por_dia(text, timestamptz, timestam
 create or replace function dashboard_vendedoras_por_dia(
   p_vendedor text default null,
   p_date_from date default null,
-  p_date_to date default null
+  p_date_to date default null,
+  p_banco text default null
 )
 returns table (
   dia date,
@@ -1246,9 +1249,10 @@ as $$
   left join vendas_gerais vg
     on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
   where va.data_status is not null
-    and (p_vendedor is null or va.vendedor = p_vendedor)
+    and (p_vendedor is null or p_vendedor = '' or va.vendedor = any(string_to_array(p_vendedor, ',')))
     and (p_date_from is null or va.data_status >= p_date_from)
     and (p_date_to is null or va.data_status <= p_date_to)
+    and (p_banco is null or p_banco = '' or va.banco = any(string_to_array(p_banco, ',')))
   group by 1, 2
   order by 1;
 $$;
@@ -2388,7 +2392,8 @@ drop function if exists dashboard_vendas_kpis(date, date, text);
 create or replace function dashboard_vendas_kpis(
   p_date_from date default null,
   p_date_to date default null,
-  p_produto text default null
+  p_produto text default null,
+  p_banco text default null
 )
 returns table (
   valor_total numeric,
@@ -2431,13 +2436,13 @@ as $$
     from vendas_gerais
     where (p_date_from is null or data >= p_date_from)
       and (p_date_to is null or data <= p_date_to)
-      and (p_produto is null or produto = p_produto)
+      and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ','))) and (p_banco is null or p_banco = '' or banco = any(string_to_array(p_banco, ',')))
   ),
   hoje_valor as (
     select coalesce(sum(valor), 0) as v
     from vendas_gerais, hoje
     where data = hoje.d
-      and (p_produto is null or produto = p_produto)
+      and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ','))) and (p_banco is null or p_banco = '' or banco = any(string_to_array(p_banco, ',')))
   ),
   -- "hoje" nunca conta como dia passado aqui -- so a partir de amanha ele
   -- vira um dia completo pra entrar na media. O TOTAL (numerador) continua
@@ -2457,13 +2462,13 @@ as $$
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, mes, hoje
     where data >= mes.inicio and data <= hoje.d
-      and (p_produto is null or produto = p_produto)
+      and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ','))) and (p_banco is null or p_banco = '' or banco = any(string_to_array(p_banco, ',')))
   ),
   total_ate_ontem as (
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, mes, hoje
     where data >= mes.inicio and data < hoje.d
-      and (p_produto is null or produto = p_produto)
+      and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ','))) and (p_banco is null or p_banco = '' or banco = any(string_to_array(p_banco, ',')))
   ),
   agora as (
     select
@@ -2483,14 +2488,14 @@ as $$
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, hoje
     where data = hoje.d
-      and (p_produto is null or produto = p_produto)
+      and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ','))) and (p_banco is null or p_banco = '' or banco = any(string_to_array(p_banco, ',')))
   ),
   valor_semana_real as (
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, hoje
     where data >= (hoje.d - (extract(isodow from hoje.d)::int - 1))
       and data <= hoje.d
-      and (p_produto is null or produto = p_produto)
+      and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ','))) and (p_banco is null or p_banco = '' or banco = any(string_to_array(p_banco, ',')))
   ),
   media_diaria_calc as (
     select
@@ -2656,7 +2661,7 @@ drop function if exists dashboard_vendas_dias_mes();
 
 drop function if exists dashboard_vendas_dias_mes();
 
-create or replace function dashboard_vendas_dias_mes(p_produto text default null)
+create or replace function dashboard_vendas_dias_mes(p_produto text default null, p_banco text default null)
 returns table (
   dia date,
   valor_dia numeric,
@@ -2677,8 +2682,12 @@ as $$
   )
   select
     g.dia::date,
-    coalesce((select sum(v.valor) from vendas_gerais v where v.data = g.dia and (p_produto is null or v.produto = p_produto)), 0),
-    coalesce((select sum(v.ponto) from vendas_gerais v where v.data = g.dia and (p_produto is null or v.produto = p_produto)), 0),
+    coalesce((select sum(v.valor) from vendas_gerais v where v.data = g.dia
+      and (p_produto is null or p_produto = '' or v.produto = any(string_to_array(p_produto, ',')))
+      and (p_banco is null or p_banco = '' or v.banco = any(string_to_array(p_banco, ',')))), 0),
+    coalesce((select sum(v.ponto) from vendas_gerais v where v.data = g.dia
+      and (p_produto is null or p_produto = '' or v.produto = any(string_to_array(p_produto, ',')))
+      and (p_banco is null or p_banco = '' or v.banco = any(string_to_array(p_banco, ',')))), 0),
     (g.dia <= (select d from hoje))
   from generate_series((select inicio from mes), (select fim from mes), interval '1 day') g(dia)
   order by g.dia;
@@ -2688,7 +2697,8 @@ $$;
 create or replace function dashboard_vendas_por_campanha(
   p_date_from date default null,
   p_date_to date default null,
-  p_produto text default null
+  p_produto text default null,
+  p_banco text default null
 )
 returns table (
   campanha text,
@@ -2710,7 +2720,8 @@ as $$
   where campanha is not null
     and (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
-    and (p_produto is null or produto = p_produto)
+    and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ',')))
+    and (p_banco is null or p_banco = '' or banco = any(string_to_array(p_banco, ',')))
   group by campanha
   order by coalesce(sum(ponto), 0) desc
   limit 300;
@@ -2720,7 +2731,8 @@ $$;
 create or replace function dashboard_vendas_por_origem(
   p_date_from date default null,
   p_date_to date default null,
-  p_produto text default null
+  p_produto text default null,
+  p_banco text default null
 )
 returns table (
   origem text,
@@ -2742,7 +2754,8 @@ as $$
   where origem is not null
     and (p_date_from is null or data >= p_date_from)
     and (p_date_to is null or data <= p_date_to)
-    and (p_produto is null or produto = p_produto)
+    and (p_produto is null or p_produto = '' or produto = any(string_to_array(p_produto, ',')))
+    and (p_banco is null or p_banco = '' or banco = any(string_to_array(p_banco, ',')))
   group by origem
   order by coalesce(sum(ponto), 0) desc
   limit 300;
