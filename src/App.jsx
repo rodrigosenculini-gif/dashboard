@@ -555,7 +555,7 @@ function MultiSelect({ value, onChange, options, label }) {
 }
 
 function CampanhaSearch({ value, onChange, options }) {
-  return <SearchSelect value={value} onChange={onChange} options={options} label="campanha" />
+  return <MultiSelect value={value} onChange={onChange} options={options} label="campanha" />
 }
 
 function ExpandToggle({ expanded, onToggle, hiddenCount }) {
@@ -700,7 +700,8 @@ function LeilaoDetalhado() {
   const [dataFim, setDataFim] = useState(todayISO())
   const [horaInicio, setHoraInicio] = useState('')
   const [horaFim, setHoraFim] = useState('')
-  const [campanha, setCampanha] = useState('')
+  const [campanhaSel, setCampanhaSel] = useState([])
+  const campanha = campanhaSel.join(',')
 
   useEffect(() => {
     callApi('filtros', {})
@@ -759,7 +760,7 @@ function LeilaoDetalhado() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanha(''); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -772,7 +773,7 @@ function LeilaoDetalhado() {
       </div>
 
       <div className="filters">
-        <CampanhaSearch value={campanha} onChange={setCampanha} options={campanhas} />
+        <CampanhaSearch value={campanhaSel} onChange={setCampanhaSel} options={campanhas} />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
@@ -890,9 +891,12 @@ function EntradasLP() {
   const [entradas, setEntradas] = useState([])
   const [campanhasProdutos, setCampanhasProdutos] = useState([])
   const [filtros, setFiltros] = useState({ campanhas: [], produtos: [], origens: [] })
-  const [campanha, setCampanha] = useState('')
-  const [produto, setProduto] = useState('')
-  const [origem, setOrigem] = useState('')
+  const [campanhaSel, setCampanhaSel] = useState([])
+  const campanha = campanhaSel.join(',')
+  const [produtoSel, setProdutoSel] = useState([])
+  const [origemSel, setOrigemSel] = useState([])
+  const produto = produtoSel.join(',')
+  const origem = origemSel.join(',')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [horaInicio, setHoraInicio] = useState('')
@@ -980,7 +984,7 @@ function EntradasLP() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanha(''); setProduto(''); setOrigem(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -996,9 +1000,9 @@ function EntradasLP() {
       </div>
 
       <div className="filters">
-        <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
-        <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto — todos" />
-        <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
+        <CampanhaSearch value={campanhaSel} onChange={setCampanhaSel} options={filtros.campanhas} />
+        <MultiSelect value={produtoSel} onChange={setProdutoSel} options={filtros.produtos} label="produto" />
+        <MultiSelect value={origemSel} onChange={setOrigemSel} options={filtros.origens} label="origem" />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
@@ -1071,9 +1075,12 @@ function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, 
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], produtos: [] })
   const [dataInicio, setDataInicio] = useState(todayISO())
   const [dataFim, setDataFim] = useState(todayISO())
-  const [campanha, setCampanha] = useState('')
-  const [origem, setOrigem] = useState('')
-  const [produto, setProduto] = useState('')
+  const [campanhaSel, setCampanhaSel] = useState([])
+  const campanha = campanhaSel.join(',')
+  const [origemSel, setOrigemSel] = useState([])
+  const [produtoSel, setProdutoSel] = useState([])
+  const origem = origemSel.join(',')
+  const produto = produtoSel.join(',')
 
   useEffect(() => {
     callApi(campanhaFiltroType, {})
@@ -1110,10 +1117,10 @@ function FunilOverlay({ titulo, subtitulo, apiType, campanhaFiltroType, etapas, 
         </div>
 
         <div className="filters">
-          <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
-          <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
+          <CampanhaSearch value={campanhaSel} onChange={setCampanhaSel} options={filtros.campanhas} />
+          <MultiSelect value={origemSel} onChange={setOrigemSel} options={filtros.origens} label="origem" />
           {showProduto && (
-            <SearchSelect value={produto} onChange={setProduto} options={filtros.produtos} label="produto" allLabel="produto — todos" />
+            <MultiSelect value={produtoSel} onChange={setProdutoSel} options={filtros.produtos} label="produto" />
           )}
         </div>
         <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
@@ -3395,11 +3402,16 @@ function VendasView() {
 
 function VisaoGeral() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [], tiposEnvio: [], mensagens: [] })
-  const [campanha, setCampanha] = useState('')
-  const [origem, setOrigem] = useState('')
-  const [meta, setMeta] = useState('')
-  const [tipoEnvio, setTipoEnvio] = useState('')
-  const [mensagemFiltro, setMensagemFiltro] = useState('')
+  const [campanhaSel, setCampanhaSel] = useState([])
+  const campanha = campanhaSel.join(',')
+  const [origemSel, setOrigemSel] = useState([])
+  const [metaSel, setMetaSel] = useState([])
+  const [tipoEnvioSel, setTipoEnvioSel] = useState([])
+  const [mensagemFiltroSel, setMensagemFiltroSel] = useState([])
+  const origem = origemSel.join(',')
+  const meta = metaSel.join(',')
+  const tipoEnvio = tipoEnvioSel.join(',')
+  const mensagemFiltro = mensagemFiltroSel.join(',')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [horaInicio, setHoraInicio] = useState('')
@@ -3501,7 +3513,7 @@ function VisaoGeral() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanha(''); setOrigem(''); setMeta(''); setTipoEnvio(''); setMensagemFiltro(''); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setOrigemSel([]); setMetaSel([]); setTipoEnvioSel([]); setMensagemFiltroSel([]); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -3517,11 +3529,11 @@ function VisaoGeral() {
       </div>
 
       <div className="filters">
-        <CampanhaSearch value={campanha} onChange={setCampanha} options={filtros.campanhas} />
-        <SearchSelect value={origem} onChange={setOrigem} options={filtros.origens} label="origem" allLabel="origem — todas" />
-        <SearchSelect value={meta} onChange={setMeta} options={filtros.metas} label="meta" allLabel="meta — todos" />
-        <SearchSelect value={tipoEnvio} onChange={setTipoEnvio} options={filtros.tiposEnvio} label="tipo de envio" allLabel="tipo de envio — todos" />
-        <SearchSelect value={mensagemFiltro} onChange={setMensagemFiltro} options={filtros.mensagens} label="mensagem" allLabel="mensagem — todas" />
+        <CampanhaSearch value={campanhaSel} onChange={setCampanhaSel} options={filtros.campanhas} />
+        <MultiSelect value={origemSel} onChange={setOrigemSel} options={filtros.origens} label="origem" />
+        <MultiSelect value={metaSel} onChange={setMetaSel} options={filtros.metas} label="meta" />
+        <MultiSelect value={tipoEnvioSel} onChange={setTipoEnvioSel} options={filtros.tiposEnvio} label="tipo de envio" />
+        <MultiSelect value={mensagemFiltroSel} onChange={setMensagemFiltroSel} options={filtros.mensagens} label="mensagem" />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
