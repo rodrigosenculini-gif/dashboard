@@ -923,7 +923,7 @@ body {
 .playbook-dropdown-back{color:#92999f; font-size:12.5px; margin-top:4px;}
 
 .playbook-iframe-overlay{
-  position:fixed; inset:0; z-index:500; background:rgba(0,0,0,.7);
+  position:fixed; inset:0; z-index:500; background:#0a0c0d;
   display:flex; flex-direction:column; align-items:center; padding:20px;
 }
 .playbook-iframe-close{
