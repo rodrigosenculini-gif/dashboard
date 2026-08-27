@@ -306,6 +306,10 @@ function presetRange(preset) {
   if (preset === 'este_mes') {
     return { from: fmtDateISO(new Date(y, m, 1)), to: fmtDateISO(now) }
   }
+  if (preset === 'esta_semana') {
+    const dow = now.getDay() === 0 ? 7 : now.getDay() // segunda=1 ... domingo=7
+    return { from: fmtDateISO(new Date(y, m, d - (dow - 1))), to: fmtDateISO(now) }
+  }
   if (preset === 'mes_passado') {
     return { from: fmtDateISO(new Date(y, m - 1, 1)), to: fmtDateISO(new Date(y, m, 0)) }
   }
@@ -323,6 +327,7 @@ function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
       <div className="date-presets">
         <button type="button" onClick={() => applyPreset('hoje')}>Hoje</button>
         <button type="button" onClick={() => applyPreset('ontem')}>Ontem</button>
+        <button type="button" onClick={() => applyPreset('esta_semana')}>Esta semana</button>
         <button type="button" onClick={() => applyPreset('este_mes')}>Este m&ecirc;s</button>
         <button type="button" onClick={() => applyPreset('mes_passado')}>M&ecirc;s passado</button>
       </div>
@@ -2230,8 +2235,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.dia_mais_vendas ? fmtDataBR(kpis.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpis?.dia_mais_vendas_qtd)} vendas</p></div>
         <div className="kpi">
           <p className="kpi-label">{modo === 'ponto' ? 'Pontos totais' : 'Valor total vendido'}</p>
-          <p className="kpi-value kpi-split"><span>{fmtV(modo === 'ponto' ? kpis?.pontos_total : kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtV(modo === 'ponto' ? meta?.pontos_projecao_mes : meta?.projecao_mes)}</span></p>
+          <p className="kpi-value kpi-split"><span>{fmtV(modo === 'ponto' ? kpis?.pontos_total : kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtV(modo === 'ponto' ? meta?.pontos_projecao_mes_real : meta?.projecao_mes_real)}</span></p>
           <p className="kpi-sub">realizado | proje&ccedil;&atilde;o do m&ecirc;s</p>
+          <p className="kpi-sub">considerando hoje: {fmtV(modo === 'ponto' ? meta?.pontos_projecao_mes : meta?.projecao_mes)}</p>
         </div>
         <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpis?.qtd_total)}</p></div>
         <div className="kpi"><p className="kpi-label">Banco mais vendido</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpis?.banco_top_qtd)} vendas</p></div>
@@ -2705,9 +2711,10 @@ function VendedorasView() {
             <p className="kpi-value kpi-split">
               <span>{fmtV(modo === 'ponto' ? kpisGeral?.pontos_total : kpisGeral?.valor_total)}</span>
               <span className="kpi-split-bar">|</span>
-              <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? mediasGeral?.pontos_projecao_mes : mediasGeral?.projecao_mes)}</span>
+              <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? mediasGeral?.pontos_projecao_mes_real : mediasGeral?.projecao_mes_real)}</span>
             </p>
             <p className="kpi-sub">{fmtInt(kpisGeral?.qtd_total)} vendas no per&iacute;odo</p>
+            <p className="kpi-sub">considerando hoje: {fmtV(modo === 'ponto' ? mediasGeral?.pontos_projecao_mes : mediasGeral?.projecao_mes)}</p>
           </div>
           <div className="kpi">
             <p className="kpi-label">M&eacute;dia di&aacute;ria (time todo)</p>
@@ -2739,8 +2746,9 @@ function VendedorasView() {
             <p className="kpi-value kpi-split">
               <span>{fmtV(modo === 'ponto' ? kpisVendedor?.pontos_total : kpisVendedor?.valor_total)}</span>
               <span className="kpi-split-bar">|</span>
-              <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? metaVendedor?.pontos_projecao_mes : metaVendedor?.projecao_mes)}</span>
+              <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? metaVendedor?.pontos_projecao_mes_real : metaVendedor?.projecao_mes_real)}</span>
             </p>
+            <p className="kpi-sub">considerando hoje: {fmtV(modo === 'ponto' ? metaVendedor?.pontos_projecao_mes : metaVendedor?.projecao_mes)}</p>
           </div>
           <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpisVendedor?.qtd_total)}</p></div>
         </div>
@@ -3113,11 +3121,13 @@ function VendasView() {
         </div>
         <div className="kpi">
           <p className="kpi-label">Proje&ccedil;&atilde;o do m&ecirc;s (pontos)</p>
-          <p className="kpi-value" style={{ color: corAtual }}>{fmtInt(Math.round(kpis?.pontos_projecao_mes ?? 0))}</p>
+          <p className="kpi-value" style={{ color: corAtual }}>{fmtInt(Math.round(kpis?.pontos_projecao_mes_real ?? 0))}</p>
+          <p className="kpi-sub">considerando hoje: {fmtInt(Math.round(kpis?.pontos_projecao_mes ?? 0))}</p>
         </div>
         <div className="kpi">
           <p className="kpi-label">Soma de valor | Proje&ccedil;&atilde;o valor</p>
-          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_mes)}</span></p>
+          <p className="kpi-value kpi-split"><span>{fmtMoeda(kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtMoeda(kpis?.projecao_mes_real)}</span></p>
+          <p className="kpi-sub">considerando hoje: {fmtMoeda(kpis?.projecao_mes)}</p>
         </div>
         <div className="kpi">
           <p className="kpi-label">% vendas de vendedoras</p>
