@@ -2901,7 +2901,7 @@ function VendedorasView() {
       <div className="panel table-panel">
         <p className="section-label">Vendas ({fmtInt(tabela.total)})</p>
         <div className="template-row head" style={{ gridTemplateColumns: '1.2fr 0.9fr 1fr 1fr 0.8fr 0.6fr' }}>
-          <span>Vendedor</span><span>Valor</span><span>CPF</span><span>Banco</span><span>Data</span><span>Conversa</span>
+          <span>Vendedor</span><span>{modo === 'ponto' ? 'Pontos' : 'Valor'}</span><span>CPF</span><span>Banco</span><span>Data</span><span>Conversa</span>
         </div>
         {tabela.rows.length === 0 && !loading && (
           <div className="state-msg">Nenhuma venda encontrada para os filtros selecionados.</div>
@@ -2909,7 +2909,7 @@ function VendedorasView() {
         {tabela.rows.map((r, i) => (
           <div className="template-row" key={i} style={{ gridTemplateColumns: '1.2fr 0.9fr 1fr 1fr 0.8fr 0.6fr' }}>
             <span className="campanha-nome">{r.vendedor}</span>
-            <span>{fmtMoeda(r.valor)}</span>
+            <span>{modo === 'ponto' ? fmtInt(Math.round(r.ponto)) : fmtMoeda(r.valor)}</span>
             <span>{r.cpf}</span>
             <span>{r.banco || '-'}</span>
             <span>{fmtDataBR(r.dia)}</span>
