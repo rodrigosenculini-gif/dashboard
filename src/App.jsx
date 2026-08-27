@@ -322,8 +322,65 @@ function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
     setDataInicio(from)
     setDataFim(to)
   }
+  const [open, setOpen] = useState(false)
+  const [picking, setPicking] = useState(null) // guarda o 1º clique enquanto espera o 2º
+  const [mesVisivel, setMesVisivel] = useState(() => {
+    const base = dataInicio ? new Date(dataInicio + 'T00:00:00') : new Date()
+    return { y: base.getFullYear(), m: base.getMonth() }
+  })
+  const boxRef = useRef(null)
+
+  useEffect(() => {
+    function onClickFora(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) { setOpen(false); setPicking(null) }
+    }
+    document.addEventListener('mousedown', onClickFora)
+    return () => document.removeEventListener('mousedown', onClickFora)
+  }, [])
+
+  function diasDoMes(y, m) {
+    const primeiro = new Date(y, m, 1)
+    const inicioSemana = primeiro.getDay() // 0=dom
+    const totalDias = new Date(y, m + 1, 0).getDate()
+    const dias = []
+    for (let i = 0; i < inicioSemana; i++) dias.push(null)
+    for (let d = 1; d <= totalDias; d++) dias.push(fmtDateISO(new Date(y, m, d)))
+    return dias
+  }
+
+  function clicarDia(iso) {
+    if (!iso) return
+    if (!picking) {
+      setPicking(iso)
+      setDataInicio(iso)
+      setDataFim(iso)
+      return
+    }
+    if (iso < picking) {
+      setDataInicio(iso)
+      setDataFim(picking)
+    } else {
+      setDataInicio(picking)
+      setDataFim(iso)
+    }
+    setPicking(null)
+    setOpen(false)
+  }
+
+  const mudarMes = (delta) => {
+    setMesVisivel(({ y, m }) => {
+      const nova = new Date(y, m + delta, 1)
+      return { y: nova.getFullYear(), m: nova.getMonth() }
+    })
+  }
+
+  const nomeMes = new Date(mesVisivel.y, mesVisivel.m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  const rotulo = dataInicio && dataFim
+    ? (dataInicio === dataFim ? fmtDataBR(dataInicio) : `${fmtDataBR(dataInicio)} — ${fmtDataBR(dataFim)}`)
+    : 'selecionar per\u00edodo'
+
   return (
-    <div className="date-range-filter">
+    <div className="date-range-filter" ref={boxRef} style={{ position: 'relative' }}>
       <div className="date-presets">
         <button type="button" onClick={() => applyPreset('hoje')}>Hoje</button>
         <button type="button" onClick={() => applyPreset('ontem')}>Ontem</button>
@@ -331,8 +388,42 @@ function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
         <button type="button" onClick={() => applyPreset('este_mes')}>Este m&ecirc;s</button>
         <button type="button" onClick={() => applyPreset('mes_passado')}>M&ecirc;s passado</button>
       </div>
-      <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
-      <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+      <button type="button" className="date-range-box-btn" onClick={() => setOpen((o) => !o)}>
+        &#128197; {rotulo}
+      </button>
+      {open && (
+        <div className="date-range-popover">
+          <div className="date-range-popover-head">
+            <button type="button" onClick={() => mudarMes(-1)}>&lsaquo;</button>
+            <strong style={{ textTransform: 'capitalize' }}>{nomeMes}</strong>
+            <button type="button" onClick={() => mudarMes(1)}>&rsaquo;</button>
+          </div>
+          <div className="date-range-popover-grid date-range-popover-dow">
+            {['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 's\u00e1b'].map((d) => <span key={d}>{d}</span>)}
+          </div>
+          <div className="date-range-popover-grid">
+            {diasDoMes(mesVisivel.y, mesVisivel.m).map((iso, i) => {
+              const dentro = iso && dataInicio && dataFim && iso >= dataInicio && iso <= dataFim
+              const borda = iso && (iso === dataInicio || iso === dataFim)
+              return (
+                <button
+                  type="button"
+                  key={i}
+                  disabled={!iso}
+                  onClick={() => clicarDia(iso)}
+                  className={`date-range-day ${dentro ? 'in-range' : ''} ${borda ? 'is-edge' : ''}`}
+                >
+                  {iso ? Number(iso.slice(8, 10)) : ''}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{picking ? 'escolha a data final' : 'escolha a data inicial'}</span>
+            <button type="button" className="reset-btn" onClick={() => { setDataInicio(''); setDataFim(''); setPicking(null) }}>Limpar</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -404,6 +495,59 @@ function SearchSelect({ value, onChange, options, label, allLabel }) {
           {filtered.length === 0 && (
             <div className="campanha-search-empty">Nenhum valor encontrado</div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Seletor de múltipla escolha (checkboxes) com botão "desmarcar tudo".
+// `value` é sempre um array (vazio = "todos").
+function MultiSelect({ value, onChange, options, label }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const opcoes = options.filter((o) => o != null && String(o).trim() !== '')
+
+  function toggle(o) {
+    if (value.includes(o)) onChange(value.filter((v) => v !== o))
+    else onChange([...value, o])
+  }
+
+  const rotulo = value.length === 0
+    ? `${label} \u2014 todos`
+    : value.length === 1
+      ? value[0]
+      : `${label} (${value.length})`
+
+  return (
+    <div className="multi-select" ref={ref}>
+      <button type="button" className="multi-select-btn" onClick={() => setOpen((o) => !o)}>
+        {rotulo}
+      </button>
+      {open && (
+        <div className="multi-select-popover">
+          <div className="multi-select-head">
+            <span style={{ fontSize: 11.5, color: 'var(--muted)', textTransform: 'uppercase' }}>{label}</span>
+            <button type="button" className="reset-btn" onClick={() => onChange([])} disabled={value.length === 0}>
+              Desmarcar tudo
+            </button>
+          </div>
+          {opcoes.map((o) => (
+            <label className="multi-select-item" key={o}>
+              <input type="checkbox" checked={value.includes(o)} onChange={() => toggle(o)} />
+              {o}
+            </label>
+          ))}
+          {opcoes.length === 0 && <div className="campanha-search-empty">Nenhum valor dispon&iacute;vel</div>}
         </div>
       )}
     </div>
@@ -2395,7 +2539,14 @@ function VendedoraPortal({ vendedor, onLogout }) {
 function VendedorasView() {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [vendedores, setVendedores] = useState([])
-  const [vendedor, setVendedor] = useState('')
+  const [bancosDisponiveis, setBancosDisponiveis] = useState([])
+  const [vendedorSel, setVendedorSel] = useState([])
+  const [bancoSel, setBancoSel] = useState([])
+  // "vendedor" (singular) só existe quando exatamente 1 está selecionada —
+  // é o que ativa o modo de detalhe individual, igual antes
+  const vendedor = vendedorSel.length === 1 ? vendedorSel[0] : ''
+  const vendedorLista = vendedorSel.join(',')
+  const banco = bancoSel.join(',')
   const [dataInicio, setDataInicio] = useState(week.from)
   const [dataFim, setDataFim] = useState(week.to)
 
@@ -2464,11 +2615,11 @@ function VendedorasView() {
 
   useEffect(() => {
     callApi('vendedoras_filtros', {})
-      .then((d) => setVendedores(d?.[0]?.vendedores || []))
+      .then((d) => { setVendedores(d?.[0]?.vendedores || []); setBancosDisponiveis(d?.[0]?.bancos || []) })
       .catch(() => {})
   }, [])
 
-  useEffect(() => { setPage(0) }, [vendedor, dataInicio, dataFim])
+  useEffect(() => { setPage(0) }, [vendedor, banco, dataInicio, dataFim])
 
   const { limit, offset } = useMemo(() => {
     if (page === 0) return { limit: 10, offset: 0 }
@@ -2485,7 +2636,7 @@ function VendedorasView() {
     const date_to = dataFim || ''
     try {
       const [dia, tab, medias] = await Promise.all([
-        callApi('vendedoras_por_dia', { vendedor, date_from, date_to }),
+        callApi('vendedoras_por_dia', { vendedor: vendedorLista, date_from, date_to, banco }),
         callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }),
         callApi('vendedoras_medias_geral', {}),
       ])
@@ -2517,7 +2668,7 @@ function VendedorasView() {
         setMetaVendedor(mv?.[0] ?? null)
         setKpisGeral(null)
       } else {
-        const kg = await callApi('vendedoras_kpis_geral', { date_from, date_to })
+        const kg = await callApi('vendedoras_kpis_geral', { date_from, date_to, banco })
         setKpisGeral(kg?.[0] ?? null)
         setKpisVendedor(null)
         setMetaVendedor(null)
@@ -2529,7 +2680,7 @@ function VendedorasView() {
     } finally {
       setLoading(false)
     }
-  }, [vendedor, dataInicio, dataFim, limit, offset, modo])
+  }, [vendedor, vendedorLista, banco, dataInicio, dataFim, limit, offset, modo])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -2601,7 +2752,7 @@ function VendedorasView() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setVendedor(''); setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setVendedorSel([]); setBancoSel([]); setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -2642,7 +2793,8 @@ function VendedorasView() {
       {syncMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{syncMsg}</div>}
 
       <div className="filters">
-        <SearchSelect value={vendedor} onChange={setVendedor} options={vendedores} label="vendedor" allLabel="vendedor — todas" />
+        <MultiSelect value={vendedorSel} onChange={setVendedorSel} options={vendedores} label="vendedor" />
+        <MultiSelect value={bancoSel} onChange={setBancoSel} options={bancosDisponiveis} label="banco" />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
@@ -2909,13 +3061,23 @@ function VendasView() {
   const mesAtual = presetRange('este_mes')
   const [dataInicio, setDataInicio] = useState(mesAtual.from)
   const [dataFim, setDataFim] = useState(mesAtual.to)
-  const [produto, setProduto] = useState('')
+  const [produtoSel, setProdutoSel] = useState([])
+  const [bancoSel, setBancoSel] = useState([])
+  const produto = produtoSel.join(',')
+  const banco = bancoSel.join(',')
 
   const [kpis, setKpis] = useState(null)
   const [porProduto, setPorProduto] = useState([])
   const [diasMes, setDiasMes] = useState([])
   const [porCampanha, setPorCampanha] = useState([])
   const [porOrigem, setPorOrigem] = useState([])
+  const [filtrosBanco, setFiltrosBanco] = useState([])
+
+  useEffect(() => {
+    callApi('vendas_filtros', {})
+      .then((d) => setFiltrosBanco(d?.[0]?.bancos || []))
+      .catch(() => {})
+  }, [])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -2931,11 +3093,11 @@ function VendasView() {
     setError(null)
     try {
       const [kp, pp, dm, pc, po] = await Promise.all([
-        callApi('vendas_kpis', { date_from: dataInicio, date_to: dataFim, produto }),
+        callApi('vendas_kpis', { date_from: dataInicio, date_to: dataFim, produto, banco }),
         callApi('vendas_por_produto', { date_from: dataInicio, date_to: dataFim }),
-        callApi('vendas_dias_mes', { produto }),
-        callApi('vendas_por_campanha', { date_from: dataInicio, date_to: dataFim, produto }),
-        callApi('vendas_por_origem', { date_from: dataInicio, date_to: dataFim, produto }),
+        callApi('vendas_dias_mes', { produto, banco }),
+        callApi('vendas_por_campanha', { date_from: dataInicio, date_to: dataFim, produto, banco }),
+        callApi('vendas_por_origem', { date_from: dataInicio, date_to: dataFim, produto, banco }),
       ])
       setKpis(kp?.[0] ?? null)
       setPorProduto(pp ?? [])
@@ -2948,7 +3110,7 @@ function VendasView() {
     } finally {
       setLoading(false)
     }
-  }, [dataInicio, dataFim, produto])
+  }, [dataInicio, dataFim, produto, banco])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -3071,7 +3233,7 @@ function VendasView() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setProduto('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setProdutoSel([]); setBancoSel([]) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
@@ -3094,7 +3256,8 @@ function VendasView() {
       {syncMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{syncMsg}</div>}
 
       <div className="filters">
-        <SearchSelect value={produto} onChange={setProduto} options={porProduto.map((p) => p.produto)} label="produto" allLabel="produto — todos" />
+        <MultiSelect value={produtoSel} onChange={setProdutoSel} options={porProduto.map((p) => p.produto)} label="produto" />
+        <MultiSelect value={bancoSel} onChange={setBancoSel} options={filtrosBanco} label="banco" />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
@@ -3142,7 +3305,7 @@ function VendasView() {
           <div
             className="kpi"
             key={p.produto}
-            onClick={() => setProduto(produto === p.produto ? '' : p.produto)}
+            onClick={() => setProdutoSel(produtoSel.length === 1 && produtoSel[0] === p.produto ? [] : [p.produto])}
             style={{ cursor: 'pointer', outline: produto === p.produto ? `1px solid ${VENDAS_CORES[i % VENDAS_CORES.length]}` : 'none' }}
             title="Clique para filtrar por esse produto"
           >
