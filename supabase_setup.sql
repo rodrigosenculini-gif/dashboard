@@ -1446,9 +1446,13 @@ as $$
       (date_trunc('month', d) + interval '1 month - 1 day')::date as fim
     from hoje
   ),
+  -- "hoje" nunca conta como dia passado aqui -- so a partir de amanha ele
+  -- vira um dia completo pra entrar na media. O TOTAL (numerador) continua
+  -- somando o que ja foi vendido hoje normalmente, so o denominador (dias
+  -- passados) para de contar em ontem, pra nao diluir a media logo cedo.
   du_passados as (
     select count(*) as n
-    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+    from generate_series((select inicio from mes), (select d from hoje) - 1, interval '1 day') g(dia)
     where extract(isodow from g.dia) < 6
   ),
   du_mes as (
@@ -1465,6 +1469,7 @@ as $$
     where va.data_status >= mes.inicio and va.data_status <= hoje.d
   ),
   total_mes as (select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes),
+  total_ate_ontem as (select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje where dia < hoje.d),
   agora as (
     select
       extract(hour from now() at time zone 'America/Sao_Paulo')
@@ -1478,18 +1483,45 @@ as $$
   horas_semana as (
     select (least(greatest((select dow from agora) - 1, 0), 5) * 10) + (select passadas from horas_hoje) as passadas
   ),
+  eh_util_hoje as (select ((select dow from agora) between 1 and 5) as util),
   valor_hoje as (select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje where dia = hoje.d),
   valor_semana as (
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje
     where dia >= (hoje.d - (extract(isodow from hoje.d)::int - 1)) and dia <= hoje.d
+  ),
+  -- Media limpa, baseada só nos dias completos (até ontem) -- nunca mistura
+  -- com o valor parcial de hoje.
+  media_diaria_calc as (
+    select
+      case when (select n from du_passados) > 0 then (select v from total_ate_ontem) / (select n from du_passados) else 0 end as v,
+      case when (select n from du_passados) > 0 then (select p from total_ate_ontem) / (select n from du_passados) else 0 end as p
+  ),
+  -- Hoje entra na projeção pelo próprio ritmo (8h-18h), não pelo valor bruto
+  -- parcial -- assim um dia que só começou não puxa a média pra baixo.
+  projecao_hoje_calc as (
+    select
+      case
+        when not (select util from eh_util_hoje) then (select v from valor_hoje)
+        when (select passadas from horas_hoje) > 0 then (select v from valor_hoje) / (select passadas from horas_hoje) * 10
+        else (select v from media_diaria_calc)
+      end as v,
+      case
+        when not (select util from eh_util_hoje) then (select p from valor_hoje)
+        when (select passadas from horas_hoje) > 0 then (select p from valor_hoje) / (select passadas from horas_hoje) * 10
+        else (select p from media_diaria_calc)
+      end as p
+  ),
+  dias_restantes_calc as (
+    select greatest((select n from du_mes) - (select n from du_passados) - (case when (select util from eh_util_hoje) then 1 else 0 end), 0) as n
   )
   select
     (select v from total_mes),
     (select n from du_passados),
     (select n from du_mes),
-    case when (select n from du_passados) > 0
-      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
-      else 0 end,
+    greatest(
+      (select v from total_mes),
+      round((select v from total_ate_ontem) + (select v from projecao_hoje_calc) + (select v from media_diaria_calc) * (select n from dias_restantes_calc), 2)
+    ),
     case when (select passadas from horas_hoje) > 0
       then round((select v from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
       else 0 end,
@@ -1497,9 +1529,10 @@ as $$
       then round((select v from valor_semana) / (select passadas from horas_semana) * 50, 2)
       else 0 end,
     (select p from total_mes),
-    case when (select n from du_passados) > 0
-      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
-      else 0 end,
+    greatest(
+      (select p from total_mes),
+      round((select p from total_ate_ontem) + (select p from projecao_hoje_calc) + (select p from media_diaria_calc) * (select n from dias_restantes_calc), 2)
+    ),
     case when (select passadas from horas_hoje) > 0
       then round((select p from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
       else 0 end,
@@ -1540,9 +1573,13 @@ as $$
       (date_trunc('month', d) + interval '1 month - 1 day')::date as fim
     from hoje
   ),
+  -- "hoje" nunca conta como dia passado aqui -- so a partir de amanha ele
+  -- vira um dia completo pra entrar na media. O TOTAL (numerador) continua
+  -- somando o que ja foi vendido hoje normalmente, so o denominador (dias
+  -- passados) para de contar em ontem, pra nao diluir a media logo cedo.
   du_passados as (
     select count(*) as n
-    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+    from generate_series((select inicio from mes), (select d from hoje) - 1, interval '1 day') g(dia)
     where extract(isodow from g.dia) < 6
   ),
   du_mes as (
@@ -1561,6 +1598,7 @@ as $$
       and va.data_status <= hoje.d
   ),
   total_mes as (select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes),
+  total_ate_ontem as (select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje where dia < hoje.d),
   semana_atual as (
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje
     where dia >= (hoje.d - (extract(isodow from hoje.d)::int - 1)) and dia <= hoje.d
@@ -1581,16 +1619,39 @@ as $$
   horas_semana as (
     select (least(greatest((select dow from agora) - 1, 0), 5) * 10) + (select passadas from horas_hoje) as passadas
   ),
+  eh_util_hoje as (select ((select dow from agora) between 1 and 5) as util),
   valor_hoje as (
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p from base_mes, hoje where dia = hoje.d
+  ),
+  media_diaria_calc as (
+    select
+      case when (select n from du_passados) > 0 then (select v from total_ate_ontem) / (select n from du_passados) else 0 end as v,
+      case when (select n from du_passados) > 0 then (select p from total_ate_ontem) / (select n from du_passados) else 0 end as p
+  ),
+  projecao_hoje_calc as (
+    select
+      case
+        when not (select util from eh_util_hoje) then (select v from valor_hoje)
+        when (select passadas from horas_hoje) > 0 then (select v from valor_hoje) / (select passadas from horas_hoje) * 10
+        else (select v from media_diaria_calc)
+      end as v,
+      case
+        when not (select util from eh_util_hoje) then (select p from valor_hoje)
+        when (select passadas from horas_hoje) > 0 then (select p from valor_hoje) / (select passadas from horas_hoje) * 10
+        else (select p from media_diaria_calc)
+      end as p
+  ),
+  dias_restantes_calc as (
+    select greatest((select n from du_mes) - (select n from du_passados) - (case when (select util from eh_util_hoje) then 1 else 0 end), 0) as n
   )
   select
     (select v from total_mes),
     (select n from du_passados),
     (select n from du_mes),
-    case when (select n from du_passados) > 0
-      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
-      else 0 end,
+    greatest(
+      (select v from total_mes),
+      round((select v from total_ate_ontem) + (select v from projecao_hoje_calc) + (select v from media_diaria_calc) * (select n from dias_restantes_calc), 2)
+    ),
     (select v from semana_atual),
     100000,
     case when (select passadas from horas_hoje) > 0
@@ -1600,9 +1661,10 @@ as $$
       then round((select v from semana_atual) / (select passadas from horas_semana) * 50, 2)
       else 0 end,
     (select p from total_mes),
-    case when (select n from du_passados) > 0
-      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
-      else 0 end,
+    greatest(
+      (select p from total_mes),
+      round((select p from total_ate_ontem) + (select p from projecao_hoje_calc) + (select p from media_diaria_calc) * (select n from dias_restantes_calc), 2)
+    ),
     (select p from semana_atual),
     case when (select passadas from horas_hoje) > 0
       then round((select p from valor_hoje) / (select passadas from horas_hoje) * 10, 2)
@@ -2359,9 +2421,13 @@ as $$
     where data = hoje.d
       and (p_produto is null or produto = p_produto)
   ),
+  -- "hoje" nunca conta como dia passado aqui -- so a partir de amanha ele
+  -- vira um dia completo pra entrar na media. O TOTAL (numerador) continua
+  -- somando o que ja foi vendido hoje normalmente, so o denominador (dias
+  -- passados) para de contar em ontem, pra nao diluir a media logo cedo.
   du_passados as (
     select count(*) as n
-    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+    from generate_series((select inicio from mes), (select d from hoje) - 1, interval '1 day') g(dia)
     where extract(isodow from g.dia) < 6
   ),
   du_mes as (
@@ -2373,6 +2439,12 @@ as $$
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, mes, hoje
     where data >= mes.inicio and data <= hoje.d
+      and (p_produto is null or produto = p_produto)
+  ),
+  total_ate_ontem as (
+    select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
+    from vendas_gerais, mes, hoje
+    where data >= mes.inicio and data < hoje.d
       and (p_produto is null or produto = p_produto)
   ),
   agora as (
@@ -2388,6 +2460,7 @@ as $$
   horas_semana as (
     select (least(greatest((select dow from agora) - 1, 0), 5) * 10) + (select passadas from horas_hoje) as passadas
   ),
+  eh_util_hoje as (select ((select dow from agora) between 1 and 5) as util),
   valor_hoje_real as (
     select coalesce(sum(valor), 0) as v, coalesce(sum(ponto), 0) as p
     from vendas_gerais, hoje
@@ -2400,18 +2473,41 @@ as $$
     where data >= (hoje.d - (extract(isodow from hoje.d)::int - 1))
       and data <= hoje.d
       and (p_produto is null or produto = p_produto)
+  ),
+  media_diaria_calc as (
+    select
+      case when (select n from du_passados) > 0 then (select v from total_ate_ontem) / (select n from du_passados) else 0 end as v,
+      case when (select n from du_passados) > 0 then (select p from total_ate_ontem) / (select n from du_passados) else 0 end as p
+  ),
+  projecao_hoje_calc as (
+    select
+      case
+        when not (select util from eh_util_hoje) then (select v from valor_hoje_real)
+        when (select passadas from horas_hoje) > 0 then (select v from valor_hoje_real) / (select passadas from horas_hoje) * 10
+        else (select v from media_diaria_calc)
+      end as v,
+      case
+        when not (select util from eh_util_hoje) then (select p from valor_hoje_real)
+        when (select passadas from horas_hoje) > 0 then (select p from valor_hoje_real) / (select passadas from horas_hoje) * 10
+        else (select p from media_diaria_calc)
+      end as p
+  ),
+  dias_restantes_calc as (
+    select greatest((select n from du_mes) - (select n from du_passados) - (case when (select util from eh_util_hoje) then 1 else 0 end), 0) as n
   )
   select
     (select valor_total from periodo),
     (select qtd_total from periodo),
     (select v from hoje_valor),
-    case when (select n from du_passados) > 0
-      then greatest((select v from total_mes), round((select v from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
-      else 0 end,
+    greatest(
+      (select v from total_mes),
+      round((select v from total_ate_ontem) + (select v from projecao_hoje_calc) + (select v from media_diaria_calc) * (select n from dias_restantes_calc), 2)
+    ),
     (select pontos_total from periodo),
-    case when (select n from du_passados) > 0
-      then greatest((select p from total_mes), round((select p from total_mes) / (select n from du_passados) * (select n from du_mes), 2))
-      else 0 end,
+    greatest(
+      (select p from total_mes),
+      round((select p from total_ate_ontem) + (select p from projecao_hoje_calc) + (select p from media_diaria_calc) * (select n from dias_restantes_calc), 2)
+    ),
     (select qtd_vendedor from periodo),
     (select valor_vendedor from periodo),
     (select pontos_vendedor from periodo),
@@ -2459,9 +2555,13 @@ stable
 as $$
   with hoje as (select (now() at time zone 'America/Sao_Paulo')::date as d),
   mes as (select date_trunc('month', d)::date as inicio from hoje),
+  -- "hoje" nunca conta como dia passado aqui -- so a partir de amanha ele
+  -- vira um dia completo pra entrar na media. O TOTAL (numerador) continua
+  -- somando o que ja foi vendido hoje normalmente, so o denominador (dias
+  -- passados) para de contar em ontem, pra nao diluir a media logo cedo.
   du_passados as (
     select count(*) as n
-    from generate_series((select inicio from mes), (select d from hoje), interval '1 day') g(dia)
+    from generate_series((select inicio from mes), (select d from hoje) - 1, interval '1 day') g(dia)
     where extract(isodow from g.dia) < 6
   ),
   du_mes as (
