@@ -109,6 +109,38 @@ async function parseVendedorasCsv(file) {
 // Le\u00ea o CSV da visão Vendas. Aceita variações de nome de coluna e não
 // exige todas — o gatilho no banco calcula produto/peso/ponto sozinho a
 // partir do que vier (tabela OU parcelas+seguro).
+// Normaliza o nome do banco pra bater com os já usados no cálculo de peso
+// (ex.: "novo_saque_api" -> "NOVO SAQUE", "soma_uy3" -> "SOMA").
+function normalizarBanco(raw) {
+  const v = (raw || '').trim().toLowerCase()
+  if (!v) return ''
+  if (v.includes('facta')) return 'FACTA'
+  if (v.includes('novo_saque') || v.includes('novosaque') || v.includes('novo saque')) return 'NOVO SAQUE'
+  if (v.includes('fgtsv8') || v.includes('fgts_v8') || v.includes('fgts v8')) return 'FGTSV8'
+  if (v.includes('v8')) return 'V8'
+  if (v.includes('soma')) return 'SOMA'
+  if (v.includes('crefaz')) return 'CREFAZ'
+  if (v.includes('presen')) return 'PRESENÇA'
+  if (v.includes('mercantil')) return 'MERCANTIL'
+  if (v.includes('pan')) return 'PAN'
+  // desconhecido: devolve em maiúsculo, com _ virando espaço, pra pelo
+  // menos ficar legível e não quebrar nada
+  return v.replace(/_/g, ' ').toUpperCase()
+}
+
+// Normaliza telefone pro padrão DDI+DDD+9+numero (13 dígitos).
+// Números com 12 dígitos (sem o "9" na frente do número local) recebem o
+// "9" inserido logo depois do DDD. Números já com 13 dígitos não mudam.
+function normalizarWhatsapp(raw) {
+  let d = (raw || '').replace(/\D/g, '')
+  if (!d) return ''
+  if (!d.startsWith('55')) d = '55' + d
+  if (d.length === 12) {
+    d = d.slice(0, 4) + '9' + d.slice(4)
+  }
+  return d
+}
+
 async function parseVendasCsv(file) {
   const buf = await file.arrayBuffer()
   const text = new TextDecoder('iso-8859-1').decode(buf)
@@ -124,15 +156,16 @@ async function parseVendasCsv(file) {
     }
     return -1
   }
-  const iAdesao = idx('ade', 'adesão', 'adesao')
+  const iAdesao = idx('ade', 'adesão', 'adesao', 'codigo', 'código')
   const iCpf = idx('cpf')
   const iTabela = idx('tabela')
-  const iNome = idx('nome')
+  const iNome = idx('nome', 'cliente')
   const iValor = idx('valor')
   const iData = idx('data status', 'data')
   const iBanco = idx('banco')
   const iParcelas = idx('parcelas')
   const iSeguro = idx('seguro')
+  const iWhatsapp = idx('telefone', 'whatsapp', 'celular')
 
   const rows = []
   for (let i = 1; i < lines.length; i++) {
@@ -149,6 +182,9 @@ async function parseVendasCsv(file) {
       if (dataRaw.includes('/')) {
         const [dd, mm, yyyy] = dataRaw.split('/')
         dataIso = dd && mm && yyyy ? `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}` : ''
+      } else if (dataRaw.includes('T')) {
+        // "2026-08-27T00:08:15.080149+00:00" -> só a parte da data
+        dataIso = dataRaw.slice(0, 10)
       } else {
         dataIso = dataRaw
       }
@@ -157,16 +193,22 @@ async function parseVendasCsv(file) {
     const valorRaw = iValor !== -1 ? parseValorFlexivel(cols[iValor] || '') : ''
     const valor = valorRaw && !isNaN(Number(valorRaw)) ? valorRaw : ''
 
+    // código/adesão: mantém só os dígitos (um UUID vira uma sequência de
+    // números "aproveitada", já que não tem outro identificador melhor)
+    const adesaoRaw = iAdesao !== -1 ? (cols[iAdesao] || '').trim() : ''
+    const adesao = adesaoRaw.replace(/\D/g, '')
+
     rows.push({
-      adesao: iAdesao !== -1 ? (cols[iAdesao] || '').trim() : '',
+      adesao,
       cpf,
       tabela: iTabela !== -1 ? (cols[iTabela] || '').trim() : '',
       nome: iNome !== -1 ? (cols[iNome] || '').trim() : '',
       valor,
       data: dataIso,
-      banco: iBanco !== -1 ? (cols[iBanco] || '').trim() : '',
+      banco: iBanco !== -1 ? normalizarBanco(cols[iBanco]) : '',
       parcelas: iParcelas !== -1 ? (cols[iParcelas] || '').trim() : '',
-      seguro: iSeguro !== -1 ? (cols[iSeguro] || '').trim() : '',
+      seguro: iSeguro !== -1 ? (cols[iSeguro] || '').trim() : 's',
+      whatsapp: iWhatsapp !== -1 ? normalizarWhatsapp(cols[iWhatsapp]) : '',
     })
   }
   return rows
