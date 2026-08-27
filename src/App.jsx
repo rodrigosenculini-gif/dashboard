@@ -1913,68 +1913,26 @@ const FACTA_CODIGOS = [
 
 // URL do site de playbooks (projeto separado, "hotline-playbook").
 const PLAYBOOK_BASE_URL = 'https://hotline-playbook.vercel.app'
-const PLAYBOOK_PRODUCTS = [
-  { id: 'clt', name: 'Crédito CLT', icon: '\uD83D\uDCBC' },
-  { id: 'refin', name: 'Refinanciamento CLT', icon: '\uD83D\uDD04' },
-  { id: 'energia', name: 'Empréstimo Conta de Luz', icon: '\uD83D\uDCA1' },
-  { id: 'fgts', name: 'FGTS Saque-Aniversário', icon: '\uD83C\uDFE6' },
-  { id: 'trabalhador', name: 'Crédito do Trabalhador', icon: '\uD83D\uDCF1' },
-]
 
-// Botão de três pontinhos: abre lista de produtos -> Completo/Dicas ->
-// mostra o playbook (site separado) num iframe em cima de tudo.
+// Botão "Info Produtos": abre direto a Home do site de playbooks (sem
+// menuzinho de seleção) num iframe em cima de tudo — o usuário escolhe o
+// produto lá dentro.
 function PlaybookMenuButton() {
-  const [open, setOpen] = useState(false)
-  const [step, setStep] = useState('products') // 'products' | 'mode'
-  const [selectedProduct, setSelectedProduct] = useState(null)
-  const [iframeUrl, setIframeUrl] = useState(null)
-
-  function closeMenu() {
-    setOpen(false)
-    setStep('products')
-    setSelectedProduct(null)
-  }
-
-  function pickProduct(p) {
-    setSelectedProduct(p)
-    setStep('mode')
-  }
-
-  function pickMode(mode) {
-    setIframeUrl(`${PLAYBOOK_BASE_URL}?product=${selectedProduct.id}&mode=${mode}`)
-    closeMenu()
-  }
+  const [aberto, setAberto] = useState(false)
 
   return (
     <>
-      <div style={{ position: 'relative' }}>
-        <button
-          className="reset-btn"
-          title="Playbooks"
-          onClick={() => setOpen((v) => !v)}
-        >⋮</button>
-        {open && (
-          <div className="playbook-dropdown">
-            {step === 'products' && PLAYBOOK_PRODUCTS.map((p) => (
-              <button key={p.id} className="playbook-dropdown-item" onClick={() => pickProduct(p)}>
-                <span>{p.icon}</span> {p.name}
-              </button>
-            ))}
-            {step === 'mode' && (
-              <>
-                <div className="playbook-dropdown-title">{selectedProduct.icon} {selectedProduct.name}</div>
-                <button className="playbook-dropdown-item" onClick={() => pickMode('info')}>📘 Completo</button>
-                <button className="playbook-dropdown-item" onClick={() => pickMode('tips')}>💡 Dicas</button>
-                <button className="playbook-dropdown-item playbook-dropdown-back" onClick={() => setStep('products')}>← Voltar</button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-      {iframeUrl && (
+      <button
+        className="reset-btn"
+        title="Info Produtos"
+        onClick={() => setAberto(true)}
+      >
+        Info Produtos
+      </button>
+      {aberto && (
         <div className="playbook-iframe-overlay">
-          <button className="playbook-iframe-close" onClick={() => setIframeUrl(null)}>✕ Fechar</button>
-          <iframe src={iframeUrl} title="Playbook" className="playbook-iframe" />
+          <button className="playbook-iframe-close" onClick={() => setAberto(false)}>✕ Fechar</button>
+          <iframe src={PLAYBOOK_BASE_URL} title="Playbook" className="playbook-iframe" />
         </div>
       )}
     </>
