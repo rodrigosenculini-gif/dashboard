@@ -1270,6 +1270,7 @@ create or replace function dashboard_vendedoras_tabela(
 returns table (
   vendedor text,
   valor numeric,
+  ponto numeric,
   cpf text,
   banco text,
   dia date,
@@ -1283,15 +1284,18 @@ set search_path = public
 stable
 as $$
   select
-    vendedor, valor, cpf, banco, data_status as dia, covnersation_id, conversa_sistema,
+    va.vendedor, va.valor, coalesce(vg.ponto, 0) as ponto, va.cpf, va.banco, va.data_status as dia,
+    va.covnersation_id, va.conversa_sistema,
     count(*) over() as total_count
-  from vendedoras_analise
-  where (p_vendedor is null or p_vendedor = '' or vendedor = any(string_to_array(p_vendedor, ',')))
-    and (p_date_from is null or data_status >= p_date_from)
-    and (p_date_to is null or data_status <= p_date_to)
-  order by data_status desc nulls last, id desc
+  from vendedoras_analise va
+  left join vendas_gerais vg
+    on norm_cpf(vg.cpf) = norm_cpf(va.cpf) and coalesce(vg.adesao, -1) = coalesce(va.adesao, -1)
+  where (p_vendedor is null or p_vendedor = '' or va.vendedor = any(string_to_array(p_vendedor, ',')))
+    and (p_date_from is null or va.data_status >= p_date_from)
+    and (p_date_to is null or va.data_status <= p_date_to)
+  order by va.data_status desc nulls last, va.id desc
   limit p_limit offset p_offset;
-$$;
+$$
 
 -- Ranking de vendedoras (valor total, qtd total, banco mais vendido),
 -- em ordem decrescente de valor total
