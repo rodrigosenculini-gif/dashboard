@@ -362,25 +362,28 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_funil_produtos($1::timestamptz,$2::timestamptz,$3::text,$4::text,$5::text)';
     params = [p_date_from, p_date_to, p_campanha, p_origem, req.query.produto || null];
   } else if (type === 'vendas_kpis') {
-    sql = 'select * from dashboard_vendas_kpis($1::date,$2::date,$3::text)';
-    params = [p_date_from, p_date_to, req.query.produto || null];
+    sql = 'select * from dashboard_vendas_kpis($1::date,$2::date,$3::text,$4::text)';
+    params = [p_date_from, p_date_to, req.query.produto || null, req.query.banco || null];
   } else if (type === 'vendas_por_produto') {
     sql = 'select * from dashboard_vendas_por_produto($1::date,$2::date)';
     params = [p_date_from, p_date_to];
   } else if (type === 'vendas_dias_mes') {
-    sql = 'select * from dashboard_vendas_dias_mes($1::text)';
-    params = [req.query.produto || null];
+    sql = 'select * from dashboard_vendas_dias_mes($1::text,$2::text)';
+    params = [req.query.produto || null, req.query.banco || null];
   } else if (type === 'vendas_por_dia') {
     sql = 'select * from dashboard_vendas_por_dia($1::date,$2::date)';
     params = [p_date_from, p_date_to];
   } else if (type === 'vendas_por_campanha') {
-    sql = 'select * from dashboard_vendas_por_campanha($1::date,$2::date,$3::text)';
-    params = [p_date_from, p_date_to, req.query.produto || null];
+    sql = 'select * from dashboard_vendas_por_campanha($1::date,$2::date,$3::text,$4::text)';
+    params = [p_date_from, p_date_to, req.query.produto || null, req.query.banco || null];
   } else if (type === 'vendas_por_origem') {
-    sql = 'select * from dashboard_vendas_por_origem($1::date,$2::date,$3::text)';
-    params = [p_date_from, p_date_to, req.query.produto || null];
+    sql = 'select * from dashboard_vendas_por_origem($1::date,$2::date,$3::text,$4::text)';
+    params = [p_date_from, p_date_to, req.query.produto || null, req.query.banco || null];
   } else if (type === 'vendas_sync') {
     sql = 'select * from dashboard_vendas_sync()';
+    params = [];
+  } else if (type === 'vendas_filtros') {
+    sql = 'select * from dashboard_vendas_filtros()';
     params = [];
   } else if (type === 'vendedoras_filtros') {
     sql = 'select * from dashboard_vendedoras_filtros()';
@@ -389,14 +392,14 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_vendedoras_sync()';
     params = [];
   } else if (type === 'vendedoras_kpis_geral') {
-    sql = 'select * from dashboard_vendedoras_kpis_geral($1::date,$2::date)';
-    params = [p_date_from, p_date_to];
+    sql = 'select * from dashboard_vendedoras_kpis_geral($1::date,$2::date,$3::text)';
+    params = [p_date_from, p_date_to, req.query.banco || null];
   } else if (type === 'vendedoras_kpis_vendedor') {
     sql = 'select * from dashboard_vendedoras_kpis_vendedor($1::text,$2::date,$3::date)';
     params = [req.query.vendedor || null, p_date_from, p_date_to];
   } else if (type === 'vendedoras_por_dia') {
-    sql = 'select * from dashboard_vendedoras_por_dia($1::text,$2::date,$3::date)';
-    params = [req.query.vendedor || null, p_date_from, p_date_to];
+    sql = 'select * from dashboard_vendedoras_por_dia($1::text,$2::date,$3::date,$4::text)';
+    params = [req.query.vendedor || null, p_date_from, p_date_to, req.query.banco || null];
   } else if (type === 'vendedoras_ranking') {
     sql = 'select * from dashboard_vendedoras_ranking($1::date,$2::date)';
     params = [p_date_from, p_date_to];
