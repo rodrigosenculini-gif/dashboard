@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
+import IATreinamento from './IATreinamento'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 const VISIBLE_DEFAULT = 6
@@ -11,6 +12,7 @@ const VIEWS = [
   { id: 'n8n', label: 'n8n \u2014 Execu\u00e7\u00f5es' },
   { id: 'vendedoras', label: 'Vendedoras' },
   { id: 'vendas', label: 'Vendas' },
+  { id: 'ia', label: 'IA \u2014 Treinamento' },
 ]
 
 async function callApi(type, params) {
@@ -3576,6 +3578,7 @@ function Dashboard() {
       {view === 'n8n' && <N8nExecucoes />}
       {view === 'vendedoras' && <VendedorasView />}
       {view === 'vendas' && <VendasView />}
+      {view === 'ia' && <IATreinamento />}
     </div>
   )
 }
