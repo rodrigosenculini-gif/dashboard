@@ -1945,10 +1945,229 @@ function PlaybookMenuButton() {
 // URL do webhook n8n que consulta o FAQ via IA.
 const IA_WEBHOOK_URL = 'https://hotn8n.querosacarfgts.com.br/webhook/vendedoras-ia'
 
+async function treinoPost(acao, extra = {}) {
+  const res = await fetch('/api/ia?type=treino', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acao, ...extra }),
+  })
+  const data = await res.json()
+  if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.erro || `Erro na a\u00e7\u00e3o "${acao}"`)
+  return data
+}
+
+const FASE_LABEL_TREINO = {
+  1: 'In\u00edcio / contextualiza\u00e7\u00e3o',
+  2: 'Vendedora na trilha',
+  3: 'Perto do especialista',
+  4: 'Especialista',
+  5: 'Batendo a meta',
+}
+
+function fmtNotaTreino(v) {
+  return v === null || v === undefined ? '\u2014' : Number(v).toFixed(2).replace('.', ',')
+}
+
 // Botão com símbolo de IA: abre um chat moderno (gradiente animado) que
 // consulta o webhook do n8n. Nunca fecha sozinho -- só no X.
+function TreinamentoPainel({ vendedor }) {
+  const [abas, setAbas] = useState([])
+  const [loadingAbas, setLoadingAbas] = useState(true)
+  const [erro, setErro] = useState('')
+  const [sessaoAtiva, setSessaoAtiva] = useState(null) // {sessao_id, fase, ciclo, nota_minima, status}
+  const [mensagens, setMensagens] = useState([])
+  const [resultado, setResultado] = useState(null)
+  const [input, setInput] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [abrindo, setAbrindo] = useState(false)
+  const listRef = useRef(null)
+
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
+  }, [mensagens, enviando])
+
+  const carregarAbas = useCallback(() => {
+    setLoadingAbas(true); setErro('')
+    treinoPost('historico', { vendedor })
+      .then((r) => setAbas(r.abas || []))
+      .catch((e) => setErro(e.message))
+      .finally(() => setLoadingAbas(false))
+  }, [vendedor])
+
+  useEffect(() => { carregarAbas() }, [carregarAbas])
+
+  async function iniciarNovo() {
+    setAbrindo(true); setErro(''); setResultado(null)
+    try {
+      const r = await treinoPost('iniciar', { vendedor })
+      setSessaoAtiva({ sessao_id: r.sessao_id, fase: r.fase, ciclo: r.ciclo, nota_minima: r.nota_minima, status: 'aberta' })
+      setMensagens([{ origem: 'CLIENTE_IA', conteudo: r.mensagem_cliente }])
+      carregarAbas()
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setAbrindo(false)
+    }
+  }
+
+  async function abrirSessao(aba) {
+    setAbrindo(true); setErro(''); setResultado(null)
+    try {
+      const r = await treinoPost('mensagens', { sessao_id: aba.sessao_id })
+      setSessaoAtiva({ sessao_id: r.sessao_id, fase: r.fase, ciclo: r.ciclo, nota_minima: r.nota_minima, status: r.status })
+      setMensagens(r.mensagens || [])
+      if (r.status === 'encerrada') {
+        setResultado({
+          nota_final: r.nota_final, classificacao: r.classificacao, atingiu_minimo: r.atingiu_minimo,
+          resumo: r.resumo_final,
+        })
+      }
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setAbrindo(false)
+    }
+  }
+
+  async function enviar() {
+    const texto = input.trim()
+    if (!texto || enviando || !sessaoAtiva) return
+    setInput('')
+    setMensagens((m) => [...m, { origem: 'VENDEDOR', conteudo: texto }])
+    setEnviando(true)
+    try {
+      const r = await treinoPost('mensagem', { sessao_id: sessaoAtiva.sessao_id, mensagem: texto })
+      setMensagens((m) => [...m, {
+        origem: 'CLIENTE_IA', conteudo: r.mensagem_cliente,
+        veredito: r.feedback?.veredito, feedback: r.feedback?.texto, sugestao: r.feedback?.sugestao,
+        passo_fluxograma: r.feedback?.passo, delta_pontos: r.feedback?.delta,
+      }])
+      setSessaoAtiva((s) => ({ ...s, notaParcial: r.nota_parcial }))
+    } catch (e) {
+      setMensagens((m) => [...m, { origem: 'CLIENTE_IA', conteudo: 'Erro ao processar sua mensagem. Tente de novo.' }])
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  async function encerrar() {
+    if (!sessaoAtiva || enviando) return
+    setEnviando(true)
+    try {
+      const r = await treinoPost('encerrar', { sessao_id: sessaoAtiva.sessao_id })
+      setResultado(r)
+      setSessaoAtiva((s) => ({ ...s, status: 'encerrada' }))
+      carregarAbas()
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      enviar()
+    }
+  }
+
+  return (
+    <div className="trein-painel">
+      <div className="trein-abas">
+        {abas.map((a) => (
+          <button
+            key={a.sessao_id}
+            className={`trein-aba ${sessaoAtiva?.sessao_id === a.sessao_id ? 'ativa' : ''}`}
+            onClick={() => abrirSessao(a)}
+            title={a.titulo}
+          >
+            {a.status === 'aberta' ? '\u25cf ' : ''}
+            {a.titulo?.replace(/^Treino\s*/, '') || 'Sess\u00e3o'}
+            {a.nota_final != null && <span className="trein-aba-nota"> \u00b7 {fmtNotaTreino(a.nota_final)}</span>}
+          </button>
+        ))}
+        <button className="trein-aba trein-aba-novo" onClick={iniciarNovo} disabled={abrindo}>+ Novo</button>
+      </div>
+
+      {loadingAbas && <div className="ai-msg ai-msg-ia">Carregando sess\u00f5es...</div>}
+      {erro && <div className="ai-msg ai-msg-ia" style={{ color: 'var(--rose)' }}>{erro}</div>}
+
+      {!sessaoAtiva && !loadingAbas && (
+        <div className="ai-chat-empty">Clique em "+ Novo" pra come\u00e7ar um treino, ou escolha uma sess\u00e3o acima pra rever.</div>
+      )}
+
+      {sessaoAtiva && (
+        <>
+          <div className="trein-status-bar">
+            <span>Fase {sessaoAtiva.fase} \u2014 {FASE_LABEL_TREINO[sessaoAtiva.fase]}</span>
+            <span>Ciclo {sessaoAtiva.ciclo}</span>
+            <span>M\u00ednimo {fmtNotaTreino(sessaoAtiva.nota_minima)}</span>
+          </div>
+
+          <div className="ai-chat-messages" ref={listRef}>
+            {mensagens.map((m, i) => (
+              <div key={i}>
+                <div className={`ai-msg ${m.origem === 'VENDEDOR' ? 'ai-msg-user' : 'ai-msg-ia'}`}>{m.conteudo}</div>
+                {m.origem === 'CLIENTE_IA' && m.feedback && (
+                  <div className={`trein-feedback trein-feedback-${m.veredito || 'neutro'}`}>
+                    <div className="trein-feedback-topo">
+                      <span className="trein-feedback-veredito">
+                        {m.veredito === 'acerto' ? '\u2713 Acerto' : m.veredito === 'erro' ? '\u2717 Erro' : m.veredito === 'parcial' ? '\u25d0 Parcial' : '\u2014'}
+                      </span>
+                      {m.delta_pontos != null && (
+                        <span className="trein-feedback-delta">{m.delta_pontos > 0 ? '+' : ''}{m.delta_pontos}</span>
+                      )}
+                      {m.passo_fluxograma && <span className="trein-feedback-passo">passo {m.passo_fluxograma}</span>}
+                    </div>
+                    <div>{m.feedback}</div>
+                    {m.sugestao && <div className="trein-feedback-sugestao">\uD83D\uDCA1 {m.sugestao}</div>}
+                  </div>
+                )}
+              </div>
+            ))}
+            {enviando && <div className="ai-msg ai-msg-ia ai-msg-loading">Consultando...</div>}
+          </div>
+
+          {resultado && (
+            <div className="trein-resultado">
+              <div className="trein-resultado-nota">
+                {fmtNotaTreino(resultado.nota_final)} / 10 \u2014 {resultado.classificacao}
+              </div>
+              {resultado.promoveu && (
+                <div className="trein-resultado-promoveu">
+                  \uD83C\uDF89 Subiu para Fase {resultado.nova_fase} \u00b7 Ciclo {resultado.novo_ciclo}!
+                </div>
+              )}
+              {resultado.resumo && <div className="trein-resultado-resumo">{resultado.resumo}</div>}
+            </div>
+          )}
+
+          {sessaoAtiva.status !== 'encerrada' && (
+            <div className="ai-chat-inputbar">
+              <textarea
+                className="ai-chat-input"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Responda como se fosse o cliente de verdade..."
+                rows={1}
+              />
+              <button className="ai-chat-send" onClick={enviar} disabled={enviando || !input.trim()}>Enviar</button>
+              <button className="reset-btn" onClick={encerrar} disabled={enviando} title="Encerrar e ver a nota final">
+                Encerrar e ver nota
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 function AIChatButton({ vendedor }) {
   const [open, setOpen] = useState(false)
+  const [modo, setModo] = useState('consulta') // 'consulta' | 'treinamento'
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -1968,10 +2187,10 @@ function AIChatButton({ vendedor }) {
       const url = `${IA_WEBHOOK_URL}?Pergunta=${encodeURIComponent(pergunta)}&Vendedora=${encodeURIComponent(vendedor || 'geral')}`
       const res = await fetch(url)
       const data = await res.json()
-      const resposta = data?.resposta || 'Não consegui consultar agora. Tente novamente em instantes.'
+      const resposta = data?.resposta || 'N\u00e3o consegui consultar agora. Tente novamente em instantes.'
       setMessages((m) => [...m, { role: 'ia', text: resposta }])
     } catch (e) {
-      setMessages((m) => [...m, { role: 'ia', text: 'Erro ao consultar a IA. Verifique a conexão e tente de novo.' }])
+      setMessages((m) => [...m, { role: 'ia', text: 'Erro ao consultar a IA. Verifique a conex\u00e3o e tente de novo.' }])
     } finally {
       setSending(false)
     }
@@ -2011,33 +2230,51 @@ function AIChatButton({ vendedor }) {
             <div className="ai-chat-gradient" />
             <div className="ai-chat-header">
               <div>
-                <div className="ai-chat-title">Consulta rápida · IA</div>
-                <div className="ai-chat-subtitle">Pergunte sobre qualquer produto — a resposta vem direto do FAQ oficial.</div>
+                <div className="ai-chat-title">{modo === 'consulta' ? 'Consulta r\u00e1pida \u00b7 IA' : 'Treinamento \u00b7 IA'}</div>
+                <div className="ai-chat-subtitle">
+                  {modo === 'consulta'
+                    ? 'Pergunte sobre qualquer produto \u2014 a resposta vem direto do FAQ oficial.'
+                    : 'A IA finge ser cliente. Voc\u00ea sabe que \u00e9 treino \u2014 a cada mensagem, ela te diz o que acertou ou errou.'}
+                </div>
               </div>
-              <button className="ai-chat-close" onClick={() => setOpen(false)}>Encerrar ✕</button>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  className="reset-btn"
+                  onClick={() => setModo(modo === 'consulta' ? 'treinamento' : 'consulta')}
+                >
+                  {modo === 'consulta' ? 'Treinamento' : 'Consulta'}
+                </button>
+                <button className="ai-chat-close" onClick={() => setOpen(false)}>Encerrar \u2715</button>
+              </div>
             </div>
 
-            <div className="ai-chat-messages" ref={listRef}>
-              {messages.length === 0 && (
-                <div className="ai-chat-empty">Digite sua dúvida abaixo. Ex: "Cliente negativado pode contratar o CLT?"</div>
-              )}
-              {messages.map((m, i) => (
-                <div key={i} className={`ai-msg ai-msg-${m.role}`}>{m.text}</div>
-              ))}
-              {sending && <div className="ai-msg ai-msg-ia ai-msg-loading">Consultando...</div>}
-            </div>
+            {modo === 'consulta' ? (
+              <>
+                <div className="ai-chat-messages" ref={listRef}>
+                  {messages.length === 0 && (
+                    <div className="ai-chat-empty">Digite sua d\u00favida abaixo. Ex: "Cliente negativado pode contratar o CLT?"</div>
+                  )}
+                  {messages.map((m, i) => (
+                    <div key={i} className={`ai-msg ai-msg-${m.role}`}>{m.text}</div>
+                  ))}
+                  {sending && <div className="ai-msg ai-msg-ia ai-msg-loading">Consultando...</div>}
+                </div>
 
-            <div className="ai-chat-inputbar">
-              <textarea
-                className="ai-chat-input"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Escreva sua dúvida..."
-                rows={1}
-              />
-              <button className="ai-chat-send" onClick={send} disabled={sending || !input.trim()}>Enviar</button>
-            </div>
+                <div className="ai-chat-inputbar">
+                  <textarea
+                    className="ai-chat-input"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Escreva sua d\u00favida..."
+                    rows={1}
+                  />
+                  <button className="ai-chat-send" onClick={send} disabled={sending || !input.trim()}>Enviar</button>
+                </div>
+              </>
+            ) : (
+              <TreinamentoPainel vendedor={vendedor} />
+            )}
           </div>
         </div>
       )}

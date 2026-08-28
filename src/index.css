@@ -1462,3 +1462,100 @@ body {
   flex-direction: column;
   gap: 16px;
 }
+
+/* ================================================================== */
+/* Treinamento (dentro do popup de IA, portal restrito da vendedora)   */
+/* ================================================================== */
+
+.trein-painel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.trein-abas {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 20px 0;
+}
+
+.trein-aba {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 12px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.trein-aba:hover { color: var(--text); border-color: var(--rose); }
+.trein-aba.ativa { color: var(--text); border-color: var(--lime); background: rgba(169, 217, 127, 0.1); }
+.trein-aba-novo { color: var(--lime); border-color: var(--lime); font-weight: 600; }
+.trein-aba-nota { color: var(--gold); }
+
+.trein-status-bar {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 20px;
+  font-size: 11.5px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.trein-feedback {
+  margin: -4px 14px 10px 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  max-width: 78%;
+}
+.trein-feedback-acerto { border-color: var(--lime); }
+.trein-feedback-erro { border-color: var(--rose); }
+.trein-feedback-parcial { border-color: var(--gold); }
+
+.trein-feedback-topo {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.trein-feedback-veredito { font-weight: 600; color: var(--text); }
+.trein-feedback-delta { color: var(--gold); font-family: var(--font-mono); }
+.trein-feedback-passo { font-family: var(--font-mono); }
+.trein-feedback-sugestao { margin-top: 4px; color: var(--muted); font-style: italic; }
+
+.trein-resultado {
+  margin: 10px 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--lime);
+}
+.trein-resultado-nota {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+.trein-resultado-promoveu {
+  margin-top: 8px;
+  color: var(--lime);
+  font-weight: 600;
+  font-size: 13px;
+}
+.trein-resultado-resumo {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
