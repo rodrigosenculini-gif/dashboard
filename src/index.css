@@ -1358,19 +1358,12 @@ body {
 }
 
 .ia-barra {
-  position: relative;
-  height: 8px;
-  background: var(--surface-2);
-  border-radius: 999px;
-  overflow: hidden;
-  min-width: 90px;
-}
-
-.ia-barra > span {
-  display: block;
-  height: 100%;
-  background: var(--lime);
-  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
 }
 
 .ia-chart {
