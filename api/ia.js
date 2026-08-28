@@ -1,5 +1,18 @@
 import { Pool } from 'pg';
 
+// Remove qualquer sslmode da connection string (pode forçar validação
+// estrita do certificado e sobrescrever a opção ssl abaixo) — mesma
+// correção já aplicada em api/dashboard.js
+function cleanConnectionString(raw) {
+  try {
+    const url = new URL(raw);
+    url.searchParams.delete('sslmode');
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 const CONNECTION_STRING =
   process.env.POSTGRES_URL ||
   process.env.POSTGRES_URL_NON_POOLING ||
@@ -9,7 +22,7 @@ let pool;
 function getPool() {
   if (!pool) {
     pool = new Pool({
-      connectionString: CONNECTION_STRING,
+      connectionString: cleanConnectionString(CONNECTION_STRING),
       ssl: { rejectUnauthorized: false },
       max: 3,
       idleTimeoutMillis: 10_000,
