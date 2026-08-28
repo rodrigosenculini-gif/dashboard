@@ -1134,6 +1134,25 @@ body {
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
+.multi-select-search {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  outline: none;
+  margin-bottom: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.multi-select-search:hover,
+.multi-select-search:focus { border-color: var(--rose); }
 .multi-select-item {
   display: flex;
   align-items: center;

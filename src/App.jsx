@@ -503,10 +503,11 @@ function SearchSelect({ value, onChange, options, label, allLabel }) {
   )
 }
 
-// Seletor de múltipla escolha (checkboxes) com botão "desmarcar tudo".
+// Seletor de múltipla escolha (checkboxes) com busca e botão "desmarcar tudo".
 // `value` é sempre um array (vazio = "todos").
 function MultiSelect({ value, onChange, options, label }) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const ref = useRef(null)
 
   useEffect(() => {
@@ -517,7 +518,14 @@ function MultiSelect({ value, onChange, options, label }) {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
 
+  useEffect(() => {
+    if (!open) setQuery('')
+  }, [open])
+
   const opcoes = options.filter((o) => o != null && String(o).trim() !== '')
+  const opcoesFiltradas = query
+    ? opcoes.filter((o) => String(o).toLowerCase().includes(query.toLowerCase()))
+    : opcoes
 
   function toggle(o) {
     if (value.includes(o)) onChange(value.filter((v) => v !== o))
@@ -543,13 +551,24 @@ function MultiSelect({ value, onChange, options, label }) {
               Desmarcar tudo
             </button>
           </div>
-          {opcoes.map((o) => (
+          <input
+            type="text"
+            className="multi-select-search"
+            placeholder={`Buscar ${label}...`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+          />
+          {opcoesFiltradas.map((o) => (
             <label className="multi-select-item" key={o}>
               <input type="checkbox" checked={value.includes(o)} onChange={() => toggle(o)} />
               {o}
             </label>
           ))}
           {opcoes.length === 0 && <div className="campanha-search-empty">Nenhum valor dispon&iacute;vel</div>}
+          {opcoes.length > 0 && opcoesFiltradas.length === 0 && (
+            <div className="campanha-search-empty">Nenhum valor encontrado</div>
+          )}
         </div>
       )}
     </div>
