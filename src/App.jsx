@@ -2171,11 +2171,57 @@ function AIChatButton({ vendedor }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [historicoCarregado, setHistoricoCarregado] = useState(false)
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false)
+  const [mostrarMemoria, setMostrarMemoria] = useState(false)
+  const [memoriaTexto, setMemoriaTexto] = useState('')
+  const [enviandoMemoria, setEnviandoMemoria] = useState(false)
+  const [memoriaMsg, setMemoriaMsg] = useState('')
   const listRef = useRef(null)
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
   }, [messages, sending])
+
+  useEffect(() => {
+    if (!open || modo !== 'consulta' || historicoCarregado) return
+    setCarregandoHistorico(true)
+    const url = `${IA_WEBHOOK_URL}?Acao=historico&Vendedora=${encodeURIComponent(vendedor || 'geral')}`
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.ok && Array.isArray(data.mensagens) && data.mensagens.length > 0) {
+          setMessages(data.mensagens)
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setHistoricoCarregado(true)
+        setCarregandoHistorico(false)
+      })
+  }, [open, modo, historicoCarregado, vendedor])
+
+  async function enviarMemoria() {
+    const texto = memoriaTexto.trim()
+    if (!texto || enviandoMemoria) return
+    setEnviandoMemoria(true)
+    setMemoriaMsg('')
+    try {
+      const url = `${IA_WEBHOOK_URL}?Acao=memoria&Vendedora=${encodeURIComponent(vendedor || 'geral')}&Informacao=${encodeURIComponent(texto)}`
+      const res = await fetch(url)
+      const data = await res.json()
+      if (data?.ok) {
+        setMemoriaMsg(data.mensagem || 'Informação registrada!')
+        setMemoriaTexto('')
+      } else {
+        setMemoriaMsg('Não consegui salvar agora. Tente de novo.')
+      }
+    } catch (e) {
+      setMemoriaMsg('Erro ao salvar. Tente de novo.')
+    } finally {
+      setEnviandoMemoria(false)
+    }
+  }
 
   async function send() {
     const pergunta = input.trim()
@@ -2238,6 +2284,14 @@ function AIChatButton({ vendedor }) {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {modo === 'consulta' && (
+                  <button
+                    className="reset-btn"
+                    onClick={() => { setMostrarMemoria((v) => !v); setMemoriaMsg('') }}
+                  >
+                    {mostrarMemoria ? 'Chat' : 'Memória'}
+                  </button>
+                )}
                 <button
                   className="reset-btn"
                   onClick={() => setModo(modo === 'consulta' ? 'treinamento' : 'consulta')}
@@ -2249,9 +2303,32 @@ function AIChatButton({ vendedor }) {
             </div>
 
             {modo === 'consulta' ? (
+              mostrarMemoria ? (
+                <div className="ai-chat-messages" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div className="ai-chat-empty" style={{ padding: 0, textAlign: 'left' }}>
+                    Adicione uma informação nova pra IA aprender — vale pra todas as vendedoras, não só pra você.
+                  </div>
+                  <textarea
+                    className="ai-chat-input"
+                    style={{ minHeight: 100, width: '100%' }}
+                    value={memoriaTexto}
+                    onChange={(e) => setMemoriaTexto(e.target.value)}
+                    placeholder='Ex: "Cliente autônomo também pode contratar o Empréstimo na Conta de Luz, desde que a conta esteja no nome dele."'
+                  />
+                  {memoriaMsg && (
+                    <div className="ai-chat-subtitle" style={{ color: 'var(--lime)' }}>{memoriaMsg}</div>
+                  )}
+                  <button className="ai-chat-send" onClick={enviarMemoria} disabled={enviandoMemoria || !memoriaTexto.trim()} style={{ alignSelf: 'flex-start' }}>
+                    {enviandoMemoria ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              ) : (
               <>
                 <div className="ai-chat-messages" ref={listRef}>
-                  {messages.length === 0 && (
+                  {carregandoHistorico && (
+                    <div className="ai-chat-empty">Carregando conversa anterior...</div>
+                  )}
+                  {!carregandoHistorico && messages.length === 0 && (
                     <div className="ai-chat-empty">Digite sua dúvida abaixo. Ex: "Cliente negativado pode contratar o CLT?"</div>
                   )}
                   {messages.map((m, i) => (
@@ -2272,6 +2349,7 @@ function AIChatButton({ vendedor }) {
                   <button className="ai-chat-send" onClick={send} disabled={sending || !input.trim()}>Enviar</button>
                 </div>
               </>
+              )
             ) : (
               <TreinamentoPainel vendedor={vendedor} />
             )}
