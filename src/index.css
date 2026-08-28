@@ -1144,3 +1144,328 @@ body {
   border-radius: 6px;
 }
 .multi-select-item:hover { background: var(--border); }
+
+/* ================================================================== */
+/* IA — Treinamento e Avaliação                                        */
+/* ================================================================== */
+
+.ia-view {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.ia-head {
+  margin-bottom: 22px;
+}
+
+.ia-titulo {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0 0 6px;
+  color: var(--text);
+}
+
+.ia-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+  max-width: 720px;
+}
+
+.ia-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+.ia-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ia-field-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ia-field select,
+.ia-field-inline select,
+.ia-field input,
+.ia-field-inline input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 7px;
+}
+
+.ia-field select:focus,
+.ia-field-inline select:focus,
+.ia-field input:focus,
+.ia-field-inline input:focus {
+  border-color: var(--rose);
+  outline: none;
+}
+
+.ia-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 13px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ia-btn:hover { color: var(--text); border-color: var(--rose); }
+.ia-btn:disabled { opacity: 0.5; cursor: default; }
+
+.ia-btn-primary {
+  background: var(--surface-2);
+  border: 1px solid var(--lime);
+  color: var(--lime);
+  font-family: var(--font-display);
+  font-size: 13px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ia-btn-primary:hover { background: rgba(169, 217, 127, 0.12); }
+.ia-btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+.ia-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 13px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ia-btn-ghost:hover { color: var(--text); border-color: var(--rose); }
+
+.ia-botoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 20px;
+}
+
+.ia-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ia-kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.ia-kpi .ia-kpi-label,
+.ia-kpi > span:first-child {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.ia-kpi-alerta {
+  border-color: var(--rose);
+}
+
+.ia-h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 24px 0 10px;
+}
+
+.ia-tabela-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.ia-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.ia-tabela th {
+  text-align: left;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.ia-tabela td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.ia-tabela tr:last-child td { border-bottom: none; }
+.ia-tabela tr:hover td { background: var(--surface-2); }
+
+.ia-td-obs {
+  white-space: normal;
+  max-width: 320px;
+  color: var(--muted);
+  font-family: var(--font-display);
+}
+
+.ia-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-family: var(--font-display);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+.ia-tag.warn {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(217, 184, 119, 0.1);
+}
+
+.ia-barra {
+  position: relative;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 90px;
+}
+
+.ia-barra > span {
+  display: block;
+  height: 100%;
+  background: var(--lime);
+  border-radius: 999px;
+}
+
+.ia-chart {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+
+.ia-inline-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ia-msg {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 12px 0;
+}
+
+.ia-erro {
+  font-size: 13px;
+  color: var(--rose);
+  padding: 12px 0;
+}
+
+.ia-vazio {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 20px;
+  text-align: center;
+}
+
+.ia-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.ia-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Overlay (reaproveita o padrão visual do funil-overlay já existente) */
+.ia-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 10, 8, 0.72);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px;
+  z-index: 60;
+  overflow-y: auto;
+}
+
+.ia-overlay {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 26px;
+  width: 100%;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.ia-overlay-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.ia-overlay-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.ia-overlay-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.ia-overlay-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
