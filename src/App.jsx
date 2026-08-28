@@ -7,12 +7,12 @@ const VISIBLE_DEFAULT = 6
 
 const VIEWS = [
   { id: 'geral', label: 'Disparos' },
-  { id: 'leilao', label: 'Meta \u2014 Detalhado' },
+  { id: 'leilao', label: 'Meta — Detalhado' },
   { id: 'produtos', label: 'Entradas LP' },
-  { id: 'n8n', label: 'n8n \u2014 Execu\u00e7\u00f5es' },
+  { id: 'n8n', label: 'n8n — Execuções' },
   { id: 'vendedoras', label: 'Vendedoras' },
   { id: 'vendas', label: 'Vendas' },
-  { id: 'ia', label: 'IA \u2014 Treinamento' },
+  { id: 'ia', label: 'IA — Treinamento' },
 ]
 
 async function callApi(type, params) {
@@ -34,8 +34,8 @@ async function postApi(type, body) {
   return data
 }
 
-// L\u00ea o CSV de vendedoras (arquivo exportado em Latin-1, separado por ";"),
-// corta s\u00f3 as colunas necess\u00e1rias e normaliza cpf/data/valor.
+// Lê o CSV de vendedoras (arquivo exportado em Latin-1, separado por ";"),
+// corta só as colunas necessárias e normaliza cpf/data/valor.
 // Detecta o formato do número (brasileiro "1.234,56" ou americano "1234.56")
 // e sempre devolve no padrão que o Postgres numeric espera (ponto decimal,
 // sem separador de milhar) — sem inventar nem cortar dígito nenhum.
@@ -108,7 +108,7 @@ async function parseVendedorasCsv(file) {
   return rows
 }
 
-// Le\u00ea o CSV da visão Vendas. Aceita variações de nome de coluna e não
+// Leê o CSV da visão Vendas. Aceita variações de nome de coluna e não
 // exige todas — o gatilho no banco calcula produto/peso/ponto sozinho a
 // partir do que vier (tabela OU parcelas+seguro).
 // Normaliza o nome do banco pra bater com os já usados no cálculo de peso
@@ -279,15 +279,15 @@ function fmtDateISO(d) {
 
 function weekRange() {
   const now = new Date()
-  const dow = now.getDay() // 0=domingo, 1=segunda, ... 6=s\u00e1bado
-  const diffToMonday = (dow + 6) % 7 // 0 se hoje j\u00e1 \u00e9 segunda
+  const dow = now.getDay() // 0=domingo, 1=segunda, ... 6=sábado
+  const diffToMonday = (dow + 6) % 7 // 0 se hoje já é segunda
   const monday = new Date(now)
   monday.setDate(now.getDate() - diffToMonday)
   const friday = new Date(monday)
   friday.setDate(monday.getDate() + 4)
   const hojeStr = fmtDateISO(now)
   const sextaStr = fmtDateISO(friday)
-  // nunca passa da sexta-feira dessa semana, mesmo se hoje for s\u00e1bado/domingo
+  // nunca passa da sexta-feira dessa semana, mesmo se hoje for sábado/domingo
   const to = hojeStr < sextaStr ? hojeStr : sextaStr
   return { from: fmtDateISO(monday), to }
 }
@@ -379,7 +379,7 @@ function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
   const nomeMes = new Date(mesVisivel.y, mesVisivel.m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
   const rotulo = dataInicio && dataFim
     ? (dataInicio === dataFim ? fmtDataBR(dataInicio) : `${fmtDataBR(dataInicio)} — ${fmtDataBR(dataFim)}`)
-    : 'selecionar per\u00edodo'
+    : 'selecionar período'
 
   return (
     <div className="date-range-filter" ref={boxRef} style={{ position: 'relative' }}>
@@ -401,7 +401,7 @@ function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
             <button type="button" onClick={() => mudarMes(1)}>&rsaquo;</button>
           </div>
           <div className="date-range-popover-grid date-range-popover-dow">
-            {['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 's\u00e1b'].map((d) => <span key={d}>{d}</span>)}
+            {['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map((d) => <span key={d}>{d}</span>)}
           </div>
           <div className="date-range-popover-grid">
             {diasDoMes(mesVisivel.y, mesVisivel.m).map((iso, i) => {
@@ -472,7 +472,7 @@ function SearchSelect({ value, onChange, options, label, allLabel }) {
       <input
         type="text"
         className="campanha-search-input"
-        placeholder={`${label} \u2014 todas`}
+        placeholder={`${label} — todas`}
         value={open ? query : (value || '')}
         onFocus={() => { setOpen(true); setQuery('') }}
         onChange={(e) => setQuery(e.target.value)}
@@ -483,7 +483,7 @@ function SearchSelect({ value, onChange, options, label, allLabel }) {
             className="campanha-search-item"
             onMouseDown={() => { onChange(''); setOpen(false) }}
           >
-            {allLabel || `${label} \u2014 todas`}
+            {allLabel || `${label} — todas`}
           </button>
           {filtered.map((o) => (
             <button
@@ -525,7 +525,7 @@ function MultiSelect({ value, onChange, options, label }) {
   }
 
   const rotulo = value.length === 0
-    ? `${label} \u2014 todos`
+    ? `${label} — todos`
     : value.length === 1
       ? value[0]
       : `${label} (${value.length})`
@@ -760,7 +760,7 @@ function LeilaoDetalhado() {
         </div>
         <div className="topbar-right">
           <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -984,7 +984,7 @@ function EntradasLP() {
         <h1><span className="pulse" /> Entradas LP</h1>
         <div className="topbar-right">
           <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -1059,7 +1059,7 @@ const FUNIL_DISPAROS_ETAPAS = [
   { key: 'leads', label: 'Disparado' },
   { key: 'entregues', label: 'Entregue' },
   { key: 'interagidos', label: 'Interagido' },
-  { key: 'simulacoes_saldo', label: 'Simula\u00e7\u00f5es com saldo' },
+  { key: 'simulacoes_saldo', label: 'Simulações com saldo' },
   { key: 'pagas', label: 'Pagas' },
 ]
 
@@ -1238,8 +1238,8 @@ function humanizeLabel(key) {
 }
 
 // Renderiza QUALQUER campo presente no objeto, sem lista fixa — assim,
-// se a Facta mandar um campo novo amanh\u00e3, ele j\u00e1 aparece aqui sozinho,
-// sem precisar mexer no c\u00f3digo.
+// se a Facta mandar um campo novo amanhã, ele já aparece aqui sozinho,
+// sem precisar mexer no código.
 function CamposGenericos({ obj, prefix }) {
   if (!obj || typeof obj !== 'object') return null
   const entries = Object.entries(obj).filter(
@@ -1249,7 +1249,7 @@ function CamposGenericos({ obj, prefix }) {
   return (
     <>
       {entries.map(([k, v]) => {
-        const label = prefix ? `${prefix} \u2013 ${humanizeLabel(k)}` : humanizeLabel(k)
+        const label = prefix ? `${prefix} – ${humanizeLabel(k)}` : humanizeLabel(k)
         if (v && typeof v === 'object' && !Array.isArray(v)) {
           return <CamposGenericos key={k} obj={v} prefix={label} />
         }
@@ -1352,7 +1352,7 @@ function FactaConsultaOverlay({ onClose }) {
                 <input
                   value={codigoAfCancelar}
                   onChange={(e) => setCodigoAfCancelar(e.target.value)}
-                  placeholder="C\u00f3digo AF ou CPF"
+                  placeholder="Código AF ou CPF"
                   style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 13, padding: '9px 10px', borderRadius: 7 }}
                 />
                 {ehCpf(codigoAfCancelar.trim()) && (
@@ -1384,7 +1384,7 @@ function FactaConsultaOverlay({ onClose }) {
           <input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="CPF ou c\u00f3digo AF"
+            placeholder="CPF ou código AF"
             style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 13, padding: '9px 10px', borderRadius: 7 }}
           />
           <button type="submit" className="refresh-btn" disabled={loading}>{loading ? 'Buscando...' : 'Buscar'}</button>
@@ -1405,7 +1405,7 @@ function FactaConsultaOverlay({ onClose }) {
               return (
                 <div className="card" key={i} style={{ marginBottom: 12 }}>
                   {(nome || cpf) && (
-                    <p className="card-label">{[nome, cpf].filter(Boolean).join(' \u2014 ')}</p>
+                    <p className="card-label">{[nome, cpf].filter(Boolean).join(' — ')}</p>
                   )}
                   <div className="grid-2" style={{ maxWidth: '100%' }}>
                     <CamposGenericos obj={p} />
@@ -1502,7 +1502,7 @@ function N8nExecucoes() {
       'id;status;pendente_ha_segundos',
       ...(stats?.pending_list || []).map((p) => `${p.id};${p.status};${p.elapsedSec ?? ''}`),
     ]
-    const csv = '\uFEFF' + linhas.join('\r\n')
+    const csv = '﻿' + linhas.join('\r\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -1518,7 +1518,7 @@ function N8nExecucoes() {
         <h1><span className="pulse" /> n8n &mdash; Execu&ccedil;&otilde;es</h1>
         <div className="topbar-right">
           <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
           <button className="reset-btn" onClick={() => { setWorkflowId(''); setDataInicio(todayISO()); setDataFim(todayISO()) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -1624,15 +1624,15 @@ function parseDataFlexivel(str) {
   return -Infinity
 }
 
-// Regra de sele\u00e7\u00e3o das propostas a mostrar (a Facta pode devolver v\u00e1rias
+// Regra de seleção das propostas a mostrar (a Facta pode devolver várias
 // pro mesmo CPF/AF):
 // 1) Sempre olha a mais recente primeiro (por data_digitacao).
-// 2) Se existir alguma com "pago" no status (n\u00e3o precisa ser exatamente esse
-//    status, s\u00f3 conter a palavra) \u2014 prioridade m\u00e1xima: mostra s\u00f3 ela
+// 2) Se existir alguma com "pago" no status (não precisa ser exatamente esse
+//    status, só conter a palavra) — prioridade máxima: mostra só ela
 //    (a mais recente entre as pagas).
-// 3) Sen\u00e3o, se existir uma "cancelada" e outra em "assinatura" (mesma l\u00f3gica
-//    de conter a palavra, n\u00e3o precisa ser o status exato) \u2014 mostra as duas.
-// 4) Em qualquer outro caso \u2014 mostra as duas mais recentes.
+// 3) Senão, se existir uma "cancelada" e outra em "assinatura" (mesma lógica
+//    de conter a palavra, não precisa ser o status exato) — mostra as duas.
+// 4) Em qualquer outro caso — mostra as duas mais recentes.
 function contemPalavra(p, palavra) {
   const status = (pick(p, 'status', 'status_proposta') || '').toString().toLowerCase()
   return status.includes(palavra)
@@ -1857,59 +1857,59 @@ const FGTSV8_TABELAS = [
 ]
 
 // Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
-const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESEN\u00c7A', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE']
+const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE']
 
 const FACTA_CODIGOS = [
-  { codigo: '69205', label: '69205 \u2014 Novo Gold, 60x (1,45)' },
-  { codigo: '69191', label: '69191 \u2014 Novo Gold, 36/48x (1,35)' },
-  { codigo: '69183', label: '69183 \u2014 Novo Gold, 36/48x (1,35)' },
-  { codigo: '69035', label: '69035 \u2014 Novo Gold, 36/48x (1,35)' },
-  { codigo: '69027', label: '69027 \u2014 Novo Gold, 36/48x (1,35)' },
-  { codigo: '69043', label: '69043 \u2014 Novo Gold, 36/48x (1,35)' },
-  { codigo: '69051', label: '69051 \u2014 Novo Gold, 36/48x (1,35)' },
-  { codigo: '69167', label: '69167 \u2014 Novo Gold, 24/60x (1,25)' },
-  { codigo: '69175', label: '69175 \u2014 Novo Gold, 24/60x (1,25)' },
-  { codigo: '69159', label: '69159 \u2014 Novo Gold, 48x (1,20)' },
-  { codigo: '69140', label: '69140 \u2014 Novo Gold, 24/36x (1,15)' },
-  { codigo: '69060', label: '69060 \u2014 Novo Gold, 24/36x (1,15)' },
-  { codigo: '69132', label: '69132 \u2014 Novo Gold, 24x (1,10)' },
-  { codigo: '692213', label: '692213 \u2014 Novo Smart, 24-60x (1,10)' },
-  { codigo: '69221', label: '69221 \u2014 Novo Smart, 24-60x (1,10)' },
-  { codigo: '69230', label: '69230 \u2014 Novo Smart, 24-60x (1,10)' },
-  { codigo: '69078', label: '69078 \u2014 Novo Gold, 36/48x (0,90)' },
-  { codigo: '69086', label: '69086 \u2014 Novo Gold, 36/48x (0,90)' },
-  { codigo: '69213', label: '69213 \u2014 Novo Smart, 24x (0,90)' },
-  { codigo: '69116', label: '69116 \u2014 Novo Smart, 24-48x (0,90)' },
-  { codigo: '69019', label: '69019 \u2014 Novo Gold, 24x (0,80)' },
-  { codigo: '69094', label: '69094 \u2014 Novo Gold, 24x (0,80)' },
-  { codigo: '69272', label: '69272 \u2014 Refin Gold Power, 36-60x (0,90)' },
-  { codigo: '69264', label: '69264 \u2014 Refin Gold Plus, 36-60x (0,80)' },
-  { codigo: '69256', label: '69256 \u2014 Refin Gold Prime, 36-60x (0,70)' },
-  { codigo: '69280', label: '69280 \u2014 Refin, 36-60x (0,60)' },
-  { codigo: '61107', label: '61107 \u2014 Portabilidade >12 pagas, 1-48x (0,35)' },
-  { codigo: '61093', label: '61093 \u2014 Portabilidade >12 pagas, 1-48x (0,35)' },
-  { codigo: '61085', label: '61085 \u2014 Portabilidade >12 pagas, 1-48x (0,35)' },
-  { codigo: '69299', label: '69299 \u2014 Refin da Port, 36/60x (0,35)' },
-  { codigo: '69302', label: '69302 \u2014 Refin da Port, 36/60x (0,35)' },
-  { codigo: '64815', label: '64815 \u2014 Portabilidade <12 pagas, 1-48x (0,00)' },
-  { codigo: '64823', label: '64823 \u2014 Portabilidade <12 pagas, 1-48x (0,00)' },
-  { codigo: '64831', label: '64831 \u2014 Portabilidade <12 pagas, 1-48x (0,00)' },
-  { codigo: '66036', label: '66036 \u2014 Novo Gold, 60x (1,15) / 48x com 66010 (1,00)' },
-  { codigo: '66028', label: '66028 \u2014 Novo Gold, 60x (1,15) / 48x com 66010 (1,00)' },
-  { codigo: '66010', label: '66010 \u2014 Novo Gold, 48x (1,00) / 36x (0,90)' },
-  { codigo: '66060', label: '66060 \u2014 Novo Gold, 36x (0,90)' },
-  { codigo: '66052', label: '66052 \u2014 Novo Gold, 36x (0,90)' },
-  { codigo: '65951', label: '65951 \u2014 Novo Gold, 36x (0,90)' },
-  { codigo: '66044', label: '66044 \u2014 Novo Gold, 24x (0,75)' },
-  { codigo: '65943', label: '65943 \u2014 Novo Gold, 24x (0,75)' },
-  { codigo: '66095', label: '66095 \u2014 Novo Smart, 48/60x (0,80) / 36x (0,65)' },
-  { codigo: '66087', label: '66087 \u2014 Novo Smart, 48/60x (0,80) / 36x (0,65)' },
-  { codigo: '66079', label: '66079 \u2014 Novo Smart, 36x (0,65) / 24x (0,55)' },
-  { codigo: '65935', label: '65935 \u2014 Novo Smart, 36x (0,65) / 24x (0,55)' },
-  { codigo: '641130', label: '641130 \u2014 Refin Gold, 36/48x (0,75)' },
-  { codigo: '64181', label: '64181 \u2014 Refin, 36-60x (0,60)' },
-  { codigo: '61433', label: '61433 \u2014 Refin da Port CLT, 36/48x (0,30)' },
-  { codigo: '64785', label: '64785 \u2014 Refin da Port CLT, 36/48x (0,30)' },
+  { codigo: '69205', label: '69205 — Novo Gold, 60x (1,45)' },
+  { codigo: '69191', label: '69191 — Novo Gold, 36/48x (1,35)' },
+  { codigo: '69183', label: '69183 — Novo Gold, 36/48x (1,35)' },
+  { codigo: '69035', label: '69035 — Novo Gold, 36/48x (1,35)' },
+  { codigo: '69027', label: '69027 — Novo Gold, 36/48x (1,35)' },
+  { codigo: '69043', label: '69043 — Novo Gold, 36/48x (1,35)' },
+  { codigo: '69051', label: '69051 — Novo Gold, 36/48x (1,35)' },
+  { codigo: '69167', label: '69167 — Novo Gold, 24/60x (1,25)' },
+  { codigo: '69175', label: '69175 — Novo Gold, 24/60x (1,25)' },
+  { codigo: '69159', label: '69159 — Novo Gold, 48x (1,20)' },
+  { codigo: '69140', label: '69140 — Novo Gold, 24/36x (1,15)' },
+  { codigo: '69060', label: '69060 — Novo Gold, 24/36x (1,15)' },
+  { codigo: '69132', label: '69132 — Novo Gold, 24x (1,10)' },
+  { codigo: '692213', label: '692213 — Novo Smart, 24-60x (1,10)' },
+  { codigo: '69221', label: '69221 — Novo Smart, 24-60x (1,10)' },
+  { codigo: '69230', label: '69230 — Novo Smart, 24-60x (1,10)' },
+  { codigo: '69078', label: '69078 — Novo Gold, 36/48x (0,90)' },
+  { codigo: '69086', label: '69086 — Novo Gold, 36/48x (0,90)' },
+  { codigo: '69213', label: '69213 — Novo Smart, 24x (0,90)' },
+  { codigo: '69116', label: '69116 — Novo Smart, 24-48x (0,90)' },
+  { codigo: '69019', label: '69019 — Novo Gold, 24x (0,80)' },
+  { codigo: '69094', label: '69094 — Novo Gold, 24x (0,80)' },
+  { codigo: '69272', label: '69272 — Refin Gold Power, 36-60x (0,90)' },
+  { codigo: '69264', label: '69264 — Refin Gold Plus, 36-60x (0,80)' },
+  { codigo: '69256', label: '69256 — Refin Gold Prime, 36-60x (0,70)' },
+  { codigo: '69280', label: '69280 — Refin, 36-60x (0,60)' },
+  { codigo: '61107', label: '61107 — Portabilidade >12 pagas, 1-48x (0,35)' },
+  { codigo: '61093', label: '61093 — Portabilidade >12 pagas, 1-48x (0,35)' },
+  { codigo: '61085', label: '61085 — Portabilidade >12 pagas, 1-48x (0,35)' },
+  { codigo: '69299', label: '69299 — Refin da Port, 36/60x (0,35)' },
+  { codigo: '69302', label: '69302 — Refin da Port, 36/60x (0,35)' },
+  { codigo: '64815', label: '64815 — Portabilidade <12 pagas, 1-48x (0,00)' },
+  { codigo: '64823', label: '64823 — Portabilidade <12 pagas, 1-48x (0,00)' },
+  { codigo: '64831', label: '64831 — Portabilidade <12 pagas, 1-48x (0,00)' },
+  { codigo: '66036', label: '66036 — Novo Gold, 60x (1,15) / 48x com 66010 (1,00)' },
+  { codigo: '66028', label: '66028 — Novo Gold, 60x (1,15) / 48x com 66010 (1,00)' },
+  { codigo: '66010', label: '66010 — Novo Gold, 48x (1,00) / 36x (0,90)' },
+  { codigo: '66060', label: '66060 — Novo Gold, 36x (0,90)' },
+  { codigo: '66052', label: '66052 — Novo Gold, 36x (0,90)' },
+  { codigo: '65951', label: '65951 — Novo Gold, 36x (0,90)' },
+  { codigo: '66044', label: '66044 — Novo Gold, 24x (0,75)' },
+  { codigo: '65943', label: '65943 — Novo Gold, 24x (0,75)' },
+  { codigo: '66095', label: '66095 — Novo Smart, 48/60x (0,80) / 36x (0,65)' },
+  { codigo: '66087', label: '66087 — Novo Smart, 48/60x (0,80) / 36x (0,65)' },
+  { codigo: '66079', label: '66079 — Novo Smart, 36x (0,65) / 24x (0,55)' },
+  { codigo: '65935', label: '65935 — Novo Smart, 36x (0,65) / 24x (0,55)' },
+  { codigo: '641130', label: '641130 — Refin Gold, 36/48x (0,75)' },
+  { codigo: '64181', label: '64181 — Refin, 36-60x (0,60)' },
+  { codigo: '61433', label: '61433 — Refin da Port CLT, 36/48x (0,30)' },
+  { codigo: '64785', label: '64785 — Refin da Port CLT, 36/48x (0,30)' },
 ]
 
 
@@ -1952,12 +1952,12 @@ async function treinoPost(acao, extra = {}) {
     body: JSON.stringify({ acao, ...extra }),
   })
   const data = await res.json()
-  if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.erro || `Erro na a\u00e7\u00e3o "${acao}"`)
+  if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.erro || `Erro na ação "${acao}"`)
   return data
 }
 
 const FASE_LABEL_TREINO = {
-  1: 'In\u00edcio / contextualiza\u00e7\u00e3o',
+  1: 'Início / contextualização',
   2: 'Vendedora na trilha',
   3: 'Perto do especialista',
   4: 'Especialista',
@@ -1965,7 +1965,7 @@ const FASE_LABEL_TREINO = {
 }
 
 function fmtNotaTreino(v) {
-  return v === null || v === undefined ? '\u2014' : Number(v).toFixed(2).replace('.', ',')
+  return v === null || v === undefined ? '—' : Number(v).toFixed(2).replace('.', ',')
 }
 
 // Botão com símbolo de IA: abre um chat moderno (gradiente animado) que
@@ -2082,27 +2082,27 @@ function TreinamentoPainel({ vendedor }) {
             onClick={() => abrirSessao(a)}
             title={a.titulo}
           >
-            {a.status === 'aberta' ? '\u25cf ' : ''}
-            {a.titulo?.replace(/^Treino\s*/, '') || 'Sess\u00e3o'}
-            {a.nota_final != null && <span className="trein-aba-nota"> \u00b7 {fmtNotaTreino(a.nota_final)}</span>}
+            {a.status === 'aberta' ? '● ' : ''}
+            {a.titulo?.replace(/^Treino\s*/, '') || 'Sessão'}
+            {a.nota_final != null && <span className="trein-aba-nota"> · {fmtNotaTreino(a.nota_final)}</span>}
           </button>
         ))}
         <button className="trein-aba trein-aba-novo" onClick={iniciarNovo} disabled={abrindo}>+ Novo</button>
       </div>
 
-      {loadingAbas && <div className="ai-msg ai-msg-ia">Carregando sess\u00f5es...</div>}
+      {loadingAbas && <div className="ai-msg ai-msg-ia">Carregando sessões...</div>}
       {erro && <div className="ai-msg ai-msg-ia" style={{ color: 'var(--rose)' }}>{erro}</div>}
 
       {!sessaoAtiva && !loadingAbas && (
-        <div className="ai-chat-empty">Clique em "+ Novo" pra come\u00e7ar um treino, ou escolha uma sess\u00e3o acima pra rever.</div>
+        <div className="ai-chat-empty">Clique em "+ Novo" pra começar um treino, ou escolha uma sessão acima pra rever.</div>
       )}
 
       {sessaoAtiva && (
         <>
           <div className="trein-status-bar">
-            <span>Fase {sessaoAtiva.fase} \u2014 {FASE_LABEL_TREINO[sessaoAtiva.fase]}</span>
+            <span>Fase {sessaoAtiva.fase} — {FASE_LABEL_TREINO[sessaoAtiva.fase]}</span>
             <span>Ciclo {sessaoAtiva.ciclo}</span>
-            <span>M\u00ednimo {fmtNotaTreino(sessaoAtiva.nota_minima)}</span>
+            <span>Mínimo {fmtNotaTreino(sessaoAtiva.nota_minima)}</span>
           </div>
 
           <div className="ai-chat-messages" ref={listRef}>
@@ -2113,7 +2113,7 @@ function TreinamentoPainel({ vendedor }) {
                   <div className={`trein-feedback trein-feedback-${m.veredito || 'neutro'}`}>
                     <div className="trein-feedback-topo">
                       <span className="trein-feedback-veredito">
-                        {m.veredito === 'acerto' ? '\u2713 Acerto' : m.veredito === 'erro' ? '\u2717 Erro' : m.veredito === 'parcial' ? '\u25d0 Parcial' : '\u2014'}
+                        {m.veredito === 'acerto' ? '✓ Acerto' : m.veredito === 'erro' ? '✗ Erro' : m.veredito === 'parcial' ? '◐ Parcial' : '—'}
                       </span>
                       {m.delta_pontos != null && (
                         <span className="trein-feedback-delta">{m.delta_pontos > 0 ? '+' : ''}{m.delta_pontos}</span>
@@ -2121,7 +2121,7 @@ function TreinamentoPainel({ vendedor }) {
                       {m.passo_fluxograma && <span className="trein-feedback-passo">passo {m.passo_fluxograma}</span>}
                     </div>
                     <div>{m.feedback}</div>
-                    {m.sugestao && <div className="trein-feedback-sugestao">\uD83D\uDCA1 {m.sugestao}</div>}
+                    {m.sugestao && <div className="trein-feedback-sugestao">💡 {m.sugestao}</div>}
                   </div>
                 )}
               </div>
@@ -2132,11 +2132,11 @@ function TreinamentoPainel({ vendedor }) {
           {resultado && (
             <div className="trein-resultado">
               <div className="trein-resultado-nota">
-                {fmtNotaTreino(resultado.nota_final)} / 10 \u2014 {resultado.classificacao}
+                {fmtNotaTreino(resultado.nota_final)} / 10 — {resultado.classificacao}
               </div>
               {resultado.promoveu && (
                 <div className="trein-resultado-promoveu">
-                  \uD83C\uDF89 Subiu para Fase {resultado.nova_fase} \u00b7 Ciclo {resultado.novo_ciclo}!
+                  🎉 Subiu para Fase {resultado.nova_fase} · Ciclo {resultado.novo_ciclo}!
                 </div>
               )}
               {resultado.resumo && <div className="trein-resultado-resumo">{resultado.resumo}</div>}
@@ -2150,7 +2150,7 @@ function TreinamentoPainel({ vendedor }) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Responda como se fosse o cliente de verdade..."
+                placeholder="Responda seu cliente por aqui..."
                 rows={1}
               />
               <button className="ai-chat-send" onClick={enviar} disabled={enviando || !input.trim()}>Enviar</button>
@@ -2187,10 +2187,10 @@ function AIChatButton({ vendedor }) {
       const url = `${IA_WEBHOOK_URL}?Pergunta=${encodeURIComponent(pergunta)}&Vendedora=${encodeURIComponent(vendedor || 'geral')}`
       const res = await fetch(url)
       const data = await res.json()
-      const resposta = data?.resposta || 'N\u00e3o consegui consultar agora. Tente novamente em instantes.'
+      const resposta = data?.resposta || 'Não consegui consultar agora. Tente novamente em instantes.'
       setMessages((m) => [...m, { role: 'ia', text: resposta }])
     } catch (e) {
-      setMessages((m) => [...m, { role: 'ia', text: 'Erro ao consultar a IA. Verifique a conex\u00e3o e tente de novo.' }])
+      setMessages((m) => [...m, { role: 'ia', text: 'Erro ao consultar a IA. Verifique a conexão e tente de novo.' }])
     } finally {
       setSending(false)
     }
@@ -2230,11 +2230,11 @@ function AIChatButton({ vendedor }) {
             <div className="ai-chat-gradient" />
             <div className="ai-chat-header">
               <div>
-                <div className="ai-chat-title">{modo === 'consulta' ? 'Consulta r\u00e1pida \u00b7 IA' : 'Treinamento \u00b7 IA'}</div>
+                <div className="ai-chat-title">{modo === 'consulta' ? 'Consulta rápida · IA' : 'Treinamento · IA'}</div>
                 <div className="ai-chat-subtitle">
                   {modo === 'consulta'
-                    ? 'Pergunte sobre qualquer produto \u2014 a resposta vem direto do FAQ oficial.'
-                    : 'A IA finge ser cliente. Voc\u00ea sabe que \u00e9 treino \u2014 a cada mensagem, ela te diz o que acertou ou errou.'}
+                    ? 'Pergunte sobre qualquer produto — a resposta vem direto do FAQ oficial.'
+                    : 'Treine e melhore seu atendimento nesta aba!'}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -2244,7 +2244,7 @@ function AIChatButton({ vendedor }) {
                 >
                   {modo === 'consulta' ? 'Treinamento' : 'Consulta'}
                 </button>
-                <button className="ai-chat-close" onClick={() => setOpen(false)}>Encerrar \u2715</button>
+                <button className="ai-chat-close" onClick={() => setOpen(false)}>Encerrar ✕</button>
               </div>
             </div>
 
@@ -2252,7 +2252,7 @@ function AIChatButton({ vendedor }) {
               <>
                 <div className="ai-chat-messages" ref={listRef}>
                   {messages.length === 0 && (
-                    <div className="ai-chat-empty">Digite sua d\u00favida abaixo. Ex: "Cliente negativado pode contratar o CLT?"</div>
+                    <div className="ai-chat-empty">Digite sua dúvida abaixo. Ex: "Cliente negativado pode contratar o CLT?"</div>
                   )}
                   {messages.map((m, i) => (
                     <div key={i} className={`ai-msg ai-msg-${m.role}`}>{m.text}</div>
@@ -2266,7 +2266,7 @@ function AIChatButton({ vendedor }) {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Escreva sua d\u00favida..."
+                    placeholder="Escreva sua dúvida..."
                     rows={1}
                   />
                   <button className="ai-chat-send" onClick={send} disabled={sending || !input.trim()}>Enviar</button>
@@ -2430,18 +2430,18 @@ function VendedoraPortal({ vendedor, onLogout }) {
     return () => clearInterval(id)
   }, [load])
 
-  // monta os dois pontos do gráfico: realizado (acumulado, s\u00f3 semanas
-  // passadas) e proje\u00e7\u00e3o (linha tracejada da \u00faltima semana real at\u00e9 o
-  // total projetado, na \u00faltima semana do m\u00eas)
+  // monta os dois pontos do gráfico: realizado (acumulado, só semanas
+  // passadas) e projeção (linha tracejada da última semana real até o
+  // total projetado, na última semana do mês)
   const chartData = useMemo(() => {
     if (!semanas.length) return []
     const hoje = todayISO()
     let acumulado = 0
     let marcosBatidos = 0
     const campoSemana = modo === 'ponto' ? 'ponto_semana' : 'valor_semana'
-    // "iniciada" = a semana j\u00e1 come\u00e7ou (mesmo que ainda n\u00e3o tenha terminado)
-    // \u2014 o valor_semana dela j\u00e1 reflete s\u00f3 os dias que realmente aconteceram,
-    // ent\u00e3o conta como realizado at\u00e9 agora, n\u00e3o como proje\u00e7\u00e3o
+    // "iniciada" = a semana já começou (mesmo que ainda não tenha terminado)
+    // — o valor_semana dela já reflete só os dias que realmente aconteceram,
+    // então conta como realizado até agora, não como projeção
     const semanasIniciadas = semanas.filter((s) => s.inicio.slice(0, 10) <= hoje)
     const ultimaIniciada = semanasIniciadas[semanasIniciadas.length - 1]
     const projecaoFinal = meta ? Number(modo === 'ponto' ? meta.pontos_projecao_mes : meta.projecao_mes) : 0
@@ -2507,10 +2507,10 @@ function VendedoraPortal({ vendedor, onLogout }) {
         setAddForm({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
         await callApi('vendedoras_sync', {})
         await load()
-        setAddMsg('Conclu\u00eddo!')
+        setAddMsg('Concluído!')
         setTimeout(() => { setShowAdd(false); setAddMsg('') }, 1500)
       } else {
-        setAddMsg(r?.mensagem || 'N\u00e3o foi poss\u00edvel adicionar.')
+        setAddMsg(r?.mensagem || 'Não foi possível adicionar.')
       }
     } catch (e2) {
       setAddMsg('Erro: ' + (e2.message || ''))
@@ -2533,7 +2533,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <PlaybookMenuButton />
           <span ref={tourAiRef} style={{ display: 'inline-flex' }}><AIChatButton vendedor={vendedor} /></span>
           <button className="reset-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
-            {modo === 'valor' ? '\u21c4 Ver em pontos' : '\u21c4 Ver em valor'}
+            {modo === 'valor' ? '⇄ Ver em pontos' : '⇄ Ver em valor'}
           </button>
           <button className="reset-btn" onClick={onLogout} title="Sair">Sair</button>
         </div>
@@ -2543,7 +2543,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <h1><span className="pulse" /> Minhas Vendas</h1>
         <div className="topbar-right">
           <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
           <button className="reset-btn" onClick={() => { setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -2900,8 +2900,8 @@ function VendedorasView() {
       const s = r?.[0]
       setSyncMsg(
         s
-          ? `Conclu\u00eddo \u2014 ${fmtInt(s.atualizados_vendedoras)} vendedoras com dados completos, ${fmtInt(s.atualizados_disparochat)} atualizadas em disparochat, ${fmtInt(s.atualizados_total_produtos)} em total_produtos, ${fmtInt(s.atualizados_leads_chatwoot)} em leads_chatwoot.`
-          : 'Sincroniza\u00e7\u00e3o conclu\u00edda.'
+          ? `Concluído — ${fmtInt(s.atualizados_vendedoras)} vendedoras com dados completos, ${fmtInt(s.atualizados_disparochat)} atualizadas em disparochat, ${fmtInt(s.atualizados_total_produtos)} em total_produtos, ${fmtInt(s.atualizados_leads_chatwoot)} em leads_chatwoot.`
+          : 'Sincronização concluída.'
       )
       load()
     } catch (e) {
@@ -2922,13 +2922,13 @@ function VendedorasView() {
     try {
       const rows = await parseVendedorasCsv(file)
       if (rows.length === 0) {
-        setImportMsg('Nenhuma linha v\u00e1lida encontrada no arquivo.')
+        setImportMsg('Nenhuma linha válida encontrada no arquivo.')
         return
       }
       const result = await postApi('vendedoras_import', { rows })
       const r = result?.[0]
       setImportMsg(
-        `Importa\u00e7\u00e3o conclu\u00edda \u2014 ${fmtInt(r?.inseridos)} vendas novas adicionadas, ${fmtInt(r?.ignorados)} j\u00e1 existiam (mesmo CPF + ades\u00e3o) e foram ignoradas. Sincronizando...`
+        `Importação concluída — ${fmtInt(r?.inseridos)} vendas novas adicionadas, ${fmtInt(r?.ignorados)} já existiam (mesmo CPF + adesão) e foram ignoradas. Sincronizando...`
       )
       await handleSync()
     } catch (err) {
@@ -2954,7 +2954,7 @@ function VendedorasView() {
         <h1><span className="pulse" /> Vendedoras</h1>
         <div className="topbar-right">
           <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
           <button className="reset-btn" onClick={() => { setVendedorSel([]); setBancoSel([]); setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -2972,7 +2972,7 @@ function VendedorasView() {
             &#9881; Meta
           </button>
           <button className="refresh-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
-            {modo === 'valor' ? '\u21c4 Ver em pontos' : '\u21c4 Ver em valor'}
+            {modo === 'valor' ? '⇄ Ver em pontos' : '⇄ Ver em valor'}
           </button>
           <input
             type="file"
@@ -2982,10 +2982,10 @@ function VendedorasView() {
             style={{ display: 'none' }}
           />
           <button className="refresh-btn" onClick={handleImportClick} disabled={importing} title="Importar vendas de um arquivo CSV">
-            {importing ? 'Importando...' : '\u2191 Importar'}
+            {importing ? 'Importando...' : '↑ Importar'}
           </button>
           <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
-            {syncing ? 'Sincronizando...' : '\u21bb Sincronizar'}
+            {syncing ? 'Sincronizando...' : '↻ Sincronizar'}
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -3017,11 +3017,11 @@ function VendedorasView() {
             : (periodo === 'diario' ? metas.realizado_dia_valor : periodo === 'mensal' ? metas.realizado_mes_valor : metas.realizado_semana_valor)
           const pct = metaAtiva > 0 ? Math.min(100, (Number(realizado) / Number(metaAtiva)) * 100) : 0
           const fmt = ehPonto ? (v) => `${fmtInt(Math.round(v ?? 0))} pts` : fmtMoeda
-          const periodoLabel = periodo === 'diario' ? 'di\u00e1ria' : periodo === 'mensal' ? 'mensal' : 'semanal'
+          const periodoLabel = periodo === 'diario' ? 'diária' : periodo === 'mensal' ? 'mensal' : 'semanal'
           return (
             <div style={{ marginBottom: 10, width: '100%' }}>
               <span style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Meta {periodoLabel}{vendedor ? ` \u00b7 ${vendedor}` : ''}: {fmt(realizado)} / {fmt(metaAtiva)} ({pct.toFixed(0)}%)
+                Meta {periodoLabel}{vendedor ? ` · ${vendedor}` : ''}: {fmt(realizado)} / {fmt(metaAtiva)} ({pct.toFixed(0)}%)
               </span>
               <div style={{ width: '100%', background: 'var(--border)', borderRadius: 99, height: 4, overflow: 'hidden' }}>
                 <div style={{ width: `${pct}%`, background: pct >= 100 ? '#a9d97f' : '#d9b877', height: '100%' }} />
@@ -3041,7 +3041,7 @@ function VendedorasView() {
                 const outro = modo === 'ponto' ? item?.payload?.[`${name}__valor`] : item?.payload?.[`${name}__pontos`]
                 const outroLabel = modo === 'ponto' ? fmtMoeda(outro) : `${fmtInt(Math.round(outro ?? 0))} pts`
                 const valorFmt = modo === 'ponto' ? `${fmtInt(value)} pts` : fmtMoeda(value)
-                return [`${valorFmt}${vendas != null ? ` \u00b7 ${fmtInt(vendas)} vendas` : ''}${outro != null ? ` \u00b7 ${outroLabel}` : ''}`, name]
+                return [`${valorFmt}${vendas != null ? ` · ${fmtInt(vendas)} vendas` : ''}${outro != null ? ` · ${outroLabel}` : ''}`, name]
               }}
             />
             <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
@@ -3322,8 +3322,8 @@ function VendasView() {
     return () => clearInterval(id)
   }, [load])
 
-  // gr\u00e1fico realizado x proje\u00e7\u00e3o, dia a dia do m\u00eas corrente (igual ao
-  // portal da vendedora, s\u00f3 que sem os n\u00edveis de marco) \u2014 traz tanto valor
+  // gráfico realizado x projeção, dia a dia do mês corrente (igual ao
+  // portal da vendedora, só que sem os níveis de marco) — traz tanto valor
   // quanto pontos, pra aparecer os dois no tooltip ao passar o mouse
   const chartData = useMemo(() => {
     if (!diasMes.length) return []
@@ -3370,8 +3370,8 @@ function VendasView() {
     })
   }, [diasMes, kpis])
 
-  // cor do gr\u00e1fico e dos KPIs muda de acordo com o produto selecionado no
-  // filtro (mesma cor do card daquele produto); sem filtro, usa o verde padr\u00e3o
+  // cor do gráfico e dos KPIs muda de acordo com o produto selecionado no
+  // filtro (mesma cor do card daquele produto); sem filtro, usa o verde padrão
   const corAtual = useMemo(() => {
     if (!produto) return '#a9d97f'
     const idx = porProduto.findIndex((p) => p.produto === produto)
@@ -3386,8 +3386,8 @@ function VendasView() {
       const s = r?.[0]
       setSyncMsg(
         s
-          ? `Conclu\u00eddo \u2014 ${fmtInt(s.atualizados_vendas)} vendas com dados completos, ${fmtInt(s.atualizados_disparochat)} atualizadas em disparochat, ${fmtInt(s.atualizados_total_produtos)} em total_produtos, ${fmtInt(s.atualizados_leads_chatwoot)} em leads_chatwoot.`
-          : 'Sincroniza\u00e7\u00e3o conclu\u00edda.'
+          ? `Concluído — ${fmtInt(s.atualizados_vendas)} vendas com dados completos, ${fmtInt(s.atualizados_disparochat)} atualizadas em disparochat, ${fmtInt(s.atualizados_total_produtos)} em total_produtos, ${fmtInt(s.atualizados_leads_chatwoot)} em leads_chatwoot.`
+          : 'Sincronização concluída.'
       )
       load()
     } catch (e) {
@@ -3408,13 +3408,13 @@ function VendasView() {
     try {
       const rows = await parseVendasCsv(file)
       if (rows.length === 0) {
-        setImportMsg('Nenhuma linha v\u00e1lida encontrada no arquivo.')
+        setImportMsg('Nenhuma linha válida encontrada no arquivo.')
         return
       }
       const result = await postApi('vendas_import', { rows })
       const r = result?.[0]
       setImportMsg(
-        `Importa\u00e7\u00e3o conclu\u00edda \u2014 ${fmtInt(r?.inseridos)} vendas novas, ${fmtInt(r?.atualizados)} atualizadas (estavam sem peso), ${fmtInt(r?.ignorados)} j\u00e1 estavam completas. Sincronizando...`
+        `Importação concluída — ${fmtInt(r?.inseridos)} vendas novas, ${fmtInt(r?.atualizados)} atualizadas (estavam sem peso), ${fmtInt(r?.ignorados)} já estavam completas. Sincronizando...`
       )
       await handleSync()
     } catch (err) {
@@ -3435,20 +3435,20 @@ function VendasView() {
         <h1><span className="pulse" /> Vendas</h1>
         <div className="topbar-right">
           <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
           <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setProdutoSel([]); setBancoSel([]) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
           <button className="refresh-btn" onClick={handleImportClick} disabled={importing} title="Importar vendas de um arquivo CSV">
-            {importing ? 'Importando...' : '\u2191 Importar'}
+            {importing ? 'Importando...' : '↑ Importar'}
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar tabela filtrada em CSV">
             &#8595; Baixar
           </button>
           <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
-            {syncing ? 'Sincronizando...' : '\u21bb Sincronizar'}
+            {syncing ? 'Sincronizando...' : '↻ Sincronizar'}
           </button>
           <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -3708,7 +3708,7 @@ function VisaoGeral() {
         <h1><span className="pulse" /> Disparos &mdash; Dashboard</h1>
         <div className="topbar-right">
           <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado \u00e0s ${fmtHora(lastUpdate)}` : ''}
+            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setOrigemSel([]); setMetaSel([]); setTipoEnvioSel([]); setMensagemFiltroSel([]); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
