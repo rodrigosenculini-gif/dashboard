@@ -2193,7 +2193,8 @@ function AIChatButton({ vendedor }) {
   const [historicoCarregado, setHistoricoCarregado] = useState(false)
   const [carregandoHistorico, setCarregandoHistorico] = useState(false)
   const [mostrarMemoria, setMostrarMemoria] = useState(false)
-  const [memoriaTexto, setMemoriaTexto] = useState('')
+  const [memoriaPergunta, setMemoriaPergunta] = useState('')
+  const [memoriaResposta, setMemoriaResposta] = useState('')
   const [enviandoMemoria, setEnviandoMemoria] = useState(false)
   const [memoriaMsg, setMemoriaMsg] = useState('')
   const listRef = useRef(null)
@@ -2221,17 +2222,19 @@ function AIChatButton({ vendedor }) {
   }, [open, modo, historicoCarregado, vendedor])
 
   async function enviarMemoria() {
-    const texto = memoriaTexto.trim()
-    if (!texto || enviandoMemoria) return
+    const pergunta = memoriaPergunta.trim()
+    const resposta = memoriaResposta.trim()
+    if (!pergunta || !resposta || enviandoMemoria) return
     setEnviandoMemoria(true)
     setMemoriaMsg('')
     try {
-      const url = `${IA_WEBHOOK_URL}?Acao=memoria&Vendedora=${encodeURIComponent(vendedor || 'geral')}&Informacao=${encodeURIComponent(texto)}`
+      const url = `${IA_WEBHOOK_URL}?Acao=memoria&Vendedora=${encodeURIComponent(vendedor || 'geral')}&Pergunta=${encodeURIComponent(pergunta)}&Resposta=${encodeURIComponent(resposta)}`
       const res = await fetch(url)
       const data = await res.json()
       if (data?.ok) {
         setMemoriaMsg(data.mensagem || 'Informação registrada!')
-        setMemoriaTexto('')
+        setMemoriaPergunta('')
+        setMemoriaResposta('')
       } else {
         setMemoriaMsg('Não consegui salvar agora. Tente de novo.')
       }
@@ -2325,19 +2328,33 @@ function AIChatButton({ vendedor }) {
               mostrarMemoria ? (
                 <div className="ai-chat-messages" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div className="ai-chat-empty" style={{ padding: 0, textAlign: 'left' }}>
-                    Adicione uma informação nova pra IA aprender — vale pra todas as vendedoras, não só pra você.
+                    Adicione uma informação nova pra IA aprender — vale pra todas as vendedoras, não só pra você. Descreva a situação/pergunta separada da resposta, pra IA achar mais fácil quando for relevante.
                   </div>
-                  <textarea
-                    className="ai-chat-input"
-                    style={{ minHeight: 100, width: '100%' }}
-                    value={memoriaTexto}
-                    onChange={(e) => setMemoriaTexto(e.target.value)}
-                    placeholder='Ex: "Cliente autônomo também pode contratar o Empréstimo na Conta de Luz, desde que a conta esteja no nome dele."'
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: 11.5, color: 'var(--muted)', textTransform: 'uppercase' }}>Pergunta / situação</label>
+                    <input
+                      type="text"
+                      className="ai-chat-input"
+                      style={{ width: '100%' }}
+                      value={memoriaPergunta}
+                      onChange={(e) => setMemoriaPergunta(e.target.value)}
+                      placeholder='Ex: "Cliente autônomo pode contratar o Empréstimo na Conta de Luz?"'
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: 11.5, color: 'var(--muted)', textTransform: 'uppercase' }}>Resposta</label>
+                    <textarea
+                      className="ai-chat-input"
+                      style={{ minHeight: 100, width: '100%' }}
+                      value={memoriaResposta}
+                      onChange={(e) => setMemoriaResposta(e.target.value)}
+                      placeholder="Explique a resposta certa — evite deixar específico demais de um banco/caso só, se a regra valer pra geral."
+                    />
+                  </div>
                   {memoriaMsg && (
                     <div className="ai-chat-subtitle" style={{ color: 'var(--lime)' }}>{memoriaMsg}</div>
                   )}
-                  <button className="ai-chat-send" onClick={enviarMemoria} disabled={enviandoMemoria || !memoriaTexto.trim()} style={{ alignSelf: 'flex-start' }}>
+                  <button className="ai-chat-send" onClick={enviarMemoria} disabled={enviandoMemoria || !memoriaPergunta.trim() || !memoriaResposta.trim()} style={{ alignSelf: 'flex-start' }}>
                     {enviandoMemoria ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
