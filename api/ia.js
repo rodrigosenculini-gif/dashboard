@@ -172,6 +172,15 @@ async function handleGet(type, req, res) {
     });
   }
 
+  if (type === 'sistema') {
+    const rows = await q(
+      `select id, ativo, hora_inicio, hora_fim, dias_semana, atualizado_em
+         from sim_config
+        where id = 1`
+    );
+    return res.json({ data: rows[0] || null });
+  }
+
   return res.status(400).json({ error: `type desconhecido: ${type}` });
 }
 
@@ -224,6 +233,22 @@ async function handlePost(type, req, res) {
        returning vendedor, ciclo, fase, status`,
       [vendedor, chatwoot_agent_id || null]
     );
+    return res.json({ ok: true, data: rows[0] });
+  }
+
+  if (type === 'sistema') {
+    const { ativo } = body;
+    if (typeof ativo !== 'boolean') {
+      return res.status(400).json({ error: 'ativo (boolean) é obrigatório' });
+    }
+    const rows = await q(
+      `update sim_config
+          set ativo = $1, atualizado_em = now()
+        where id = 1
+      returning id, ativo, hora_inicio, hora_fim, dias_semana, atualizado_em`,
+      [ativo]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'sim_config (id=1) não encontrado' });
     return res.json({ ok: true, data: rows[0] });
   }
 

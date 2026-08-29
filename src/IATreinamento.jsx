@@ -465,6 +465,8 @@ export default function IATreinamento() {
   const [overlay, setOverlay] = useState(null) // 'programar' | 'criterios' | 'trilha'
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
+  const [sistema, setSistema] = useState(null) // { ativo, ... } — interruptor geral do simulado
+  const [sistemaSalvando, setSistemaSalvando] = useState(false)
 
   const carregar = useCallback(() => {
     setLoading(true); setErro('')
@@ -474,7 +476,25 @@ export default function IATreinamento() {
       .finally(() => setLoading(false))
   }, [])
 
+  const carregarSistema = useCallback(() => {
+    iaGet('sistema').then((r) => setSistema(r.data)).catch(() => {})
+  }, [])
+
   useEffect(() => { carregar() }, [carregar])
+  useEffect(() => { carregarSistema() }, [carregarSistema])
+
+  async function alternarSistema() {
+    if (!sistema || sistemaSalvando) return
+    setSistemaSalvando(true)
+    try {
+      const r = await iaPost('sistema', { ativo: !sistema.ativo })
+      setSistema(r.data)
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setSistemaSalvando(false)
+    }
+  }
 
   const vendedorFiltro = filtro === 'todos' ? '' : filtro
   const ativas = vendedores.filter((v) => v.status === 'ativo')
@@ -489,7 +509,23 @@ export default function IATreinamento() {
             (ela sabe). 12 critérios, escala 10,00.
           </p>
         </div>
-        <button className="ia-btn ia-btn-ghost" onClick={carregar}>↻ Atualizar</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {sistema && (
+            <button
+              className={`ia-btn ${sistema.ativo ? 'ia-btn-primary' : 'ia-btn-ghost'}`}
+              onClick={alternarSistema}
+              disabled={sistemaSalvando}
+              title="Liga/desliga o disparo automático das mensagens da IA pelo WhatsApp (Meta). Ativar uma vendedora na tabela abaixo não liga isso sozinho — os dois precisam estar ligados."
+            >
+              {sistemaSalvando
+                ? 'Salvando…'
+                : sistema.ativo
+                  ? '🟢 Simulado no WhatsApp: Ligado'
+                  : '⚪ Simulado no WhatsApp: Desligado'}
+            </button>
+          )}
+          <button className="ia-btn ia-btn-ghost" onClick={carregar}>↻ Atualizar</button>
+        </div>
       </div>
 
       <div className="ia-barra">
