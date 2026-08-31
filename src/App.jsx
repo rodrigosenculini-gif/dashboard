@@ -3772,6 +3772,7 @@ function VisaoGeral() {
         callApi('kpis', apiArgsBase),
         callApi('envios', apiArgsBase),
         callApi('campanhas', {
+          campanha: apiArgsBase.campanha,
           origem: apiArgsBase.origem,
           meta: apiArgsBase.meta,
           tipo_envio: apiArgsBase.tipo_envio,
