@@ -3922,6 +3922,10 @@ function Dashboard() {
       <div className="app-header">
         <img src="/tiger-icon.png" alt="" className="app-logo" />
         <ViewSwitcher view={view} setView={changeView} />
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <PlaybookMenuButton />
+          <AIChatButton vendedor={undefined} />
+        </div>
       </div>
       {view === 'geral' && <VisaoGeral />}
       {view === 'leilao' && <LeilaoDetalhado />}
