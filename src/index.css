@@ -1704,3 +1704,32 @@ body {
   .nuvem-side{width:150px; flex-basis:150px;}
   .nuvem-busca{width:120px;}
 }
+
+/* ---------- BARRA DE ROLAGEM (só aparece rolando, degradê laranja) ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color .35s ease;
+}
+html.is-scrolling * {
+  scrollbar-color: #e8834a transparent;
+}
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  background-image: linear-gradient(180deg, #f0a75c 0%, #f4874a 45%, var(--rose) 100%);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity .35s ease, background-image .35s ease;
+}
+html.is-scrolling ::-webkit-scrollbar-thumb {
+  opacity: 1;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-image: linear-gradient(180deg, #f4874a 0%, var(--rose) 100%);
+}
