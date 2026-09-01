@@ -1708,34 +1708,43 @@ body {
 /* ---------- BARRA DE ROLAGEM (só aparece rolando, degradê laranja) ---------- */
 /* Chrome/Edge/Safari: NÃO declarar scrollbar-width/scrollbar-color aqui —
    a partir do Chrome 121 essas propriedades padrão desativam todas as
-   regras ::-webkit-scrollbar (e o degradê some junto). */
+   regras ::-webkit-scrollbar (e o degradê some junto).
+   A entrada/saída é um deslize lateral: como não dá pra usar transform
+   aqui, animamos a largura da borda transparente — com background-clip
+   padding-box, isso empurra a barra visível pra fora e pra dentro. */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-corner { background: transparent; }
 
 ::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: 999px;
-  background-color: transparent;
-  transition: background-color .3s ease, border-width .3s ease;
-}
-
-html.is-scrolling ::-webkit-scrollbar-thumb,
-html.is-scrolling::-webkit-scrollbar-thumb {
-  border-width: 2px;
+  border: 0 solid transparent;
   background-color: #ef8b4c;
   background-image: linear-gradient(180deg, #f5b169 0%, #ef8b4c 50%, var(--rose) 100%);
+  transition: border-width .32s cubic-bezier(.22, 1, .36, 1);
+}
+
+/* estado escondido: barra empurrada pra fora (direita / baixo) */
+::-webkit-scrollbar-thumb:vertical   { border-left-width: 10px; border-right-width: 0; }
+::-webkit-scrollbar-thumb:horizontal { border-top-width: 10px; border-bottom-width: 0; }
+
+/* rolando: desliza pra dentro */
+html.is-scrolling ::-webkit-scrollbar-thumb:vertical,
+html.is-scrolling::-webkit-scrollbar-thumb:vertical {
+  border-left-width: 2px; border-right-width: 2px;
+}
+html.is-scrolling ::-webkit-scrollbar-thumb:horizontal,
+html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
+  border-top-width: 2px; border-bottom-width: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  border-width: 2px;
-  background-color: #f4874a;
   background-image: linear-gradient(180deg, #ef8b4c 0%, var(--rose) 100%);
 }
 
-/* Firefox: não suporta degradê na barra; usa laranja sólido da paleta,
-   também só enquanto rola. */
+/* Firefox: não suporta degradê nem esse deslize; usa laranja sólido da
+   paleta, também só enquanto rola. */
 @supports (-moz-appearance: none) {
   * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
   html.is-scrolling, html.is-scrolling * { scrollbar-color: #ef8b4c transparent; }
