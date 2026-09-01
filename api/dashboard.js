@@ -100,6 +100,47 @@ function cronsDaConfig(cfg) {
   return crons.filter((c) => (vistos.has(c.expression) ? false : vistos.add(c.expression)));
 }
 
+
+// Decide, pelo relogio de agora, se o leilao deveria estar ativo ou pausado
+// segundo a config. Mesma regra do IF no fluxo n8n.
+function estadoPelaConfig(cfg, agora = new Date()) {
+  const spNow = new Date(agora.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const dia = spNow.getDay();
+  const horaMin = spNow.getHours() + spNow.getMinutes() / 60;
+  const diaMes = spNow.getDate();
+
+  const hIni = Number(cfg.hora_inicio ?? 7);
+  const hFim = Number(cfg.hora_fim ?? 21.5);
+  const dias = Array.isArray(cfg.dias_semana) && cfg.dias_semana.length ? cfg.dias_semana : [1, 2, 3, 4, 5];
+
+  // bloqueio mensal (virada de folha)
+  if (cfg.bloqueio_ativo !== false) {
+    const bDiaI = Number(cfg.bloqueio_dia_inicio ?? 20);
+    const bHoraI = Number(cfg.bloqueio_hora_inicio ?? 21.5);
+    const bDiaF = Number(cfg.bloqueio_dia_fim ?? 23);
+    const bHoraF = Number(cfg.bloqueio_hora_fim ?? 8);
+    const depoisDoInicio = diaMes > bDiaI || (diaMes === bDiaI && horaMin >= bHoraI);
+    const antesDoFim = diaMes < bDiaF || (diaMes === bDiaF && horaMin <= bHoraF);
+    if (depoisDoInicio && antesDoFim) return 'pausado';
+  }
+
+  if (cfg.fim_semana_pausado !== false && (dia === 0 || dia === 6)) return 'pausado';
+  if (!dias.includes(dia)) return 'pausado';
+  return horaMin >= hIni && horaMin < hFim ? 'ativo' : 'pausado';
+}
+
+// Aplica o estado na data table do n8n na hora (mesmo webhook usado pelos
+// botoes de acao imediata).
+async function aplicaEstadoLeilao(estado) {
+  const r = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/leilao-estado', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado }),
+  });
+  if (!r.ok) throw new Error(`webhook respondeu ${r.status}`);
+  return r.json().catch(() => ({}));
+}
+
 async function sincronizaCronLeilao(cfg) {
   const apiKey = process.env.N8N_API_KEY;
   if (!apiKey) return { ok: false, motivo: 'N8N_API_KEY nao configurada' };
@@ -277,9 +318,15 @@ export default async function handler(req, res) {
             b.atualizado_por || null,
           ]
         );
-        // aplica os horarios no cron do fluxo, pra valer na hora
-        const sync = await sincronizaCronLeilao(r.rows[0]).catch((e) => ({ ok: false, motivo: e.message }));
-        return res.status(200).json({ ok: true, data: r.rows[0], sync });
+        const cfg = r.rows[0];
+        // 1) reescreve o cron pra disparar nos horarios novos
+        const sync = await sincronizaCronLeilao(cfg).catch((e) => ({ ok: false, motivo: e.message }));
+        // 2) aplica AGORA o estado que a nova config manda, sem esperar o cron
+        const estado = estadoPelaConfig(cfg);
+        const aplicado = await aplicaEstadoLeilao(estado)
+          .then(() => ({ ok: true, estado }))
+          .catch((e) => ({ ok: false, estado, motivo: e.message }));
+        return res.status(200).json({ ok: true, data: cfg, sync, aplicado });
       } catch (e) {
         return res.status(500).json({ error: e.message });
       }
