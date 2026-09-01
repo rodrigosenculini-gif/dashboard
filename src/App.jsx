@@ -4,6 +4,8 @@ import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
+// altura de uma linha do breakdown (padding 7+7, conteúdo ~18, borda 1)
+const BREAKDOWN_ROW_H = 33
 const VISIBLE_DEFAULT = 6
 
 const VIEWS = [
@@ -589,7 +591,7 @@ function ExpandToggle({ expanded, onToggle, hiddenCount }) {
   )
 }
 
-function BreakdownList({ title, items, loading, showInteracoes, showConversao }) {
+function BreakdownList({ title, items, loading, showInteracoes, showConversao, rows }) {
   const totalLeads = items.reduce((acc, i) => acc + (Number(i.leads) || 0), 0)
   const maxShare = Math.max(
     1,
@@ -617,7 +619,7 @@ function BreakdownList({ title, items, loading, showInteracoes, showConversao })
         {showInteracoes && <span className="num">Intera&ccedil;&otilde;es</span>}
         {showConversao && <span className="num">Convers&atilde;o</span>}
       </div>
-      <div className="breakdown-scroll">
+      <div className="breakdown-scroll" style={rows ? { height: rows * BREAKDOWN_ROW_H } : undefined}>
         {items.length === 0 && !loading && (
           <div className="state-msg">Sem dados para os filtros selecionados.</div>
         )}
@@ -3792,6 +3794,14 @@ function VisaoGeral() {
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
 
+  // altura dos tres blocos: usa o que tem MENOS itens, assim nenhum fica
+  // com espaco vazio sobrando (os maiores rolam). Limitado a 5-12 linhas.
+  const breakdownRows = useMemo(() => {
+    const counts = [porConversa.length, porMeta.length, porMensagem.length].filter((n) => n > 0)
+    if (!counts.length) return 8
+    return Math.max(5, Math.min(Math.min(...counts), 12))
+  }, [porConversa, porMeta, porMensagem])
+
   const apiArgsBase = useMemo(() => ({
     campanha: campanha || '',
     origem: origem || '',
@@ -3945,9 +3955,9 @@ function VisaoGeral() {
       <CampanhaDetalhadoList items={campanhas} loading={loading} />
 
       <div className="breakdown-grid">
-        <BreakdownList title="Por Conversa" items={porConversa} loading={loading} />
-        <BreakdownList title="Meta Retorno" items={porMeta} loading={loading} showInteracoes showConversao />
-        <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} showInteracoes showConversao />
+        <BreakdownList title="Por Conversa" items={porConversa} loading={loading} rows={breakdownRows} />
+        <BreakdownList title="Meta Retorno" items={porMeta} loading={loading} showInteracoes showConversao rows={breakdownRows} />
+        <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} showInteracoes showConversao rows={breakdownRows} />
       </div>
 
       {showFunil && <FunilDisparos onClose={() => setShowFunil(false)} />}

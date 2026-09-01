@@ -1803,9 +1803,8 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
    cabeçalho fixo acima (fora do scroll) para as colunas continuarem
    alinhadas */
 .breakdown-scroll {
-  /* altura fixa: os tres blocos terminam na mesma linha, mesmo quando um
-     deles tem menos itens que os outros */
-  height: 322px;
+  /* a altura vem do JS (nº de linhas do bloco com menos itens), pra
+     nenhum dos tres ficar com espaco vazio */
   overflow-y: auto;
   overscroll-behavior: contain;
   /* afasta a barra de rolagem dos numeros da ultima coluna */
