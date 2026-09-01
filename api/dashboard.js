@@ -161,6 +161,41 @@ export default async function handler(req, res) {
       }
     }
 
+    if (type === 'leilao_config_salvar') {
+      try {
+        const b = req.body || {};
+        const num = (v, d) => (v === undefined || v === null || v === '' ? d : Number(v));
+        const client = getPool();
+        const r = await client.query(
+          `update leilao_config set
+             hora_inicio = $1, hora_fim = $2,
+             dias_semana = $3::int[],
+             fim_semana_pausado = $4,
+             bloqueio_ativo = $5,
+             bloqueio_dia_inicio = $6, bloqueio_hora_inicio = $7,
+             bloqueio_dia_fim = $8, bloqueio_hora_fim = $9,
+             atualizado_em = now(), atualizado_por = $10
+           where id = 1
+           returning *`,
+          [
+            num(b.hora_inicio, 7),
+            num(b.hora_fim, 21.5),
+            Array.isArray(b.dias_semana) && b.dias_semana.length ? b.dias_semana : [1, 2, 3, 4, 5],
+            b.fim_semana_pausado !== false,
+            b.bloqueio_ativo !== false,
+            num(b.bloqueio_dia_inicio, 20),
+            num(b.bloqueio_hora_inicio, 21.5),
+            num(b.bloqueio_dia_fim, 23),
+            num(b.bloqueio_hora_fim, 8),
+            b.atualizado_por || null,
+          ]
+        );
+        return res.status(200).json({ ok: true, data: r.rows[0] });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     return res.status(400).json({ error: `type inválido para POST: ${type}` });
   }
 
@@ -200,6 +235,16 @@ export default async function handler(req, res) {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.status(200).send(csv);
   };
+
+  if (type === 'leilao_config') {
+    try {
+      const client = getPool();
+      const r = await client.query('select * from leilao_config where id = 1');
+      return res.json({ data: r.rows[0] || null });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   if (type === 'vendas_export') {
     try {

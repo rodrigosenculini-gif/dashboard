@@ -3766,6 +3766,145 @@ function VendasView() {
   )
 }
 
+// Configuração da janela de funcionamento do leilão. O fluxo n8n
+// "leilao - monitor de saude e trava de entrada" lê esses valores da tabela
+// leilao_config, então dá pra mudar o horário sem editar o fluxo.
+function LeilaoConfigOverlay({ onClose }) {
+  const [cfg, setCfg] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [salvando, setSalvando] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [erro, setErro] = useState('')
+
+  useEffect(() => {
+    fetch('/api/dashboard?type=leilao_config')
+      .then((r) => r.json())
+      .then((r) => { if (r.error) throw new Error(r.error); setCfg(r.data) })
+      .catch((e) => setErro(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const set = (k, v) => setCfg((c) => ({ ...c, [k]: v }))
+
+  const paraHora = (n) => {
+    const v = Number(n ?? 0)
+    const h = Math.floor(v)
+    const m = Math.round((v - h) * 60)
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+  const paraNumero = (txt) => {
+    const [h, m] = String(txt || '0:0').split(':').map(Number)
+    return (h || 0) + (m || 0) / 60
+  }
+
+  const salvar = async () => {
+    setSalvando(true); setMsg(''); setErro('')
+    try {
+      const res = await fetch('/api/dashboard?type=leilao_config_salvar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg),
+      })
+      const r = await res.json()
+      if (!res.ok || r.error) throw new Error(r.error || 'Erro ao salvar')
+      setCfg(r.data)
+      setMsg('Configuração salva. O fluxo usa esses horários na próxima verificação.')
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const DIAS = [
+    { n: 1, l: 'Seg' }, { n: 2, l: 'Ter' }, { n: 3, l: 'Qua' },
+    { n: 4, l: 'Qui' }, { n: 5, l: 'Sex' }, { n: 6, l: 'Sáb' }, { n: 0, l: 'Dom' },
+  ]
+  const toggleDia = (n) => {
+    const atual = cfg.dias_semana || []
+    set('dias_semana', atual.includes(n) ? atual.filter((d) => d !== n) : [...atual, n].sort())
+  }
+
+  return (
+    <div className="funil-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="funil-sheet" style={{ maxWidth: 620 }}>
+        <div className="funil-head">
+          <div>
+            <div className="funil-title">Leilão — janela de funcionamento</div>
+            <div className="funil-sub">
+              Fora dessa janela o leilão fica pausado. Usado pelo fluxo de monitoramento no n8n.
+            </div>
+          </div>
+          <button className="reset-btn" onClick={onClose}>Fechar ✕</button>
+        </div>
+
+        <div className="funil-body">
+          {loading && <div className="state-msg">Carregando…</div>}
+          {erro && <div className="state-msg error">Erro: {erro}</div>}
+
+          {cfg && (
+            <div className="leilao-form">
+              <div className="leilao-linha">
+                <label>Liga às</label>
+                <input type="time" value={paraHora(cfg.hora_inicio)} onChange={(e) => set('hora_inicio', paraNumero(e.target.value))} />
+                <label>Desliga às</label>
+                <input type="time" value={paraHora(cfg.hora_fim)} onChange={(e) => set('hora_fim', paraNumero(e.target.value))} />
+              </div>
+
+              <div className="leilao-linha leilao-dias">
+                <label>Dias ativos</label>
+                <div className="leilao-chips">
+                  {DIAS.map((d) => (
+                    <button
+                      key={d.n}
+                      className={`leilao-chip ${(cfg.dias_semana || []).includes(d.n) ? 'on' : ''}`}
+                      onClick={() => toggleDia(d.n)}
+                    >{d.l}</button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="leilao-check">
+                <input type="checkbox" checked={!!cfg.fim_semana_pausado} onChange={(e) => set('fim_semana_pausado', e.target.checked)} />
+                <span>Manter pausado no fim de semana</span>
+              </label>
+
+              <div className="leilao-sep" />
+
+              <label className="leilao-check">
+                <input type="checkbox" checked={!!cfg.bloqueio_ativo} onChange={(e) => set('bloqueio_ativo', e.target.checked)} />
+                <span>Bloqueio mensal (virada de folha)</span>
+              </label>
+
+              {cfg.bloqueio_ativo && (
+                <div className="leilao-linha">
+                  <label>Do dia</label>
+                  <input type="number" min="1" max="31" value={cfg.bloqueio_dia_inicio} onChange={(e) => set('bloqueio_dia_inicio', e.target.value)} />
+                  <input type="time" value={paraHora(cfg.bloqueio_hora_inicio)} onChange={(e) => set('bloqueio_hora_inicio', paraNumero(e.target.value))} />
+                  <label>até o dia</label>
+                  <input type="number" min="1" max="31" value={cfg.bloqueio_dia_fim} onChange={(e) => set('bloqueio_dia_fim', e.target.value)} />
+                  <input type="time" value={paraHora(cfg.bloqueio_hora_fim)} onChange={(e) => set('bloqueio_hora_fim', paraNumero(e.target.value))} />
+                </div>
+              )}
+
+              {msg && <div className="state-msg" style={{ color: 'var(--lime)' }}>{msg}</div>}
+
+              <div className="leilao-acoes">
+                <span className="leilao-hint">
+                  {cfg.atualizado_em ? `última alteração: ${new Date(cfg.atualizado_em).toLocaleString('pt-BR')}` : ''}
+                </span>
+                <button className="refresh-btn" onClick={salvar} disabled={salvando}>
+                  {salvando ? 'Salvando…' : 'Salvar configuração'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function VisaoGeral() {
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [], tiposEnvio: [], mensagens: [] })
   const [campanhaSel, setCampanhaSel] = useState([])
@@ -3783,6 +3922,7 @@ function VisaoGeral() {
   const [horaInicio, setHoraInicio] = useState('')
   const [horaFim, setHoraFim] = useState('')
   const [showFunil, setShowFunil] = useState(false)
+  const [showLeilao, setShowLeilao] = useState(false)
 
   const [kpis, setKpis] = useState(null)
   const [envios, setEnvios] = useState([])
@@ -3897,6 +4037,9 @@ function VisaoGeral() {
           <button className="refresh-btn" onClick={loadDados} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
+          <button className="dots-btn" onClick={() => setShowLeilao(true)} title="Configurar janela do leilão">
+            &#9881;
+          </button>
           <button className="dots-btn" onClick={() => setShowFunil(true)} title="Funil de Disparos">
             &#8942;
           </button>
@@ -3961,6 +4104,7 @@ function VisaoGeral() {
       </div>
 
       {showFunil && <FunilDisparos onClose={() => setShowFunil(false)} />}
+      {showLeilao && <LeilaoConfigOverlay onClose={() => setShowLeilao(false)} />}
     </>
   )
 }
