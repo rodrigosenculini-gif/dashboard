@@ -657,8 +657,6 @@ function BreakdownList({ title, items, loading, showInteracoes, showConversao })
 }
 
 function CampanhaDetalhadoList({ items, loading }) {
-  const [expanded, setExpanded] = useState(false)
-  const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
   const cols = '1.6fr 0.9fr 1fr 1.1fr 1fr 0.7fr 1fr'
   return (
     <div className="panel table-panel">
@@ -676,7 +674,7 @@ function CampanhaDetalhadoList({ items, loading }) {
         <div className="state-msg">Nenhum dado para os filtros selecionados.</div>
       )}
       <div className="scroll-table">
-        {visible.map((c) => (
+        {items.map((c) => (
           <div className="template-row" key={c.campanha} style={{ gridTemplateColumns: cols }}>
             <span className="campanha-nome">{c.campanha}</span>
             <span>{fmtInt(c.leads_totais)}</span>
@@ -688,11 +686,6 @@ function CampanhaDetalhadoList({ items, loading }) {
           </div>
         ))}
       </div>
-      <ExpandToggle
-        expanded={expanded}
-        onToggle={() => setExpanded((v) => !v)}
-        hiddenCount={items.length - VISIBLE_DEFAULT}
-      />
     </div>
   )
 }

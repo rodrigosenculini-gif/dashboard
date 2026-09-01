@@ -184,6 +184,9 @@ body {
 .scroll-table {
   max-height: 420px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 8px;
 }
 
 .breakdown-grid {
@@ -1800,11 +1803,20 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
    cabeçalho fixo acima (fora do scroll) para as colunas continuarem
    alinhadas */
 .breakdown-scroll {
-  max-height: 322px;
+  /* altura fixa: os tres blocos terminam na mesma linha, mesmo quando um
+     deles tem menos itens que os outros */
+  height: 322px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* afasta a barra de rolagem dos numeros da ultima coluna */
+  padding-right: 10px;
 }
 .breakdown-scroll .breakdown-row:last-child { border-bottom: none; }
 /* alinha as linhas com o cabeçalho mesmo quando a barra de rolagem
    aparece/some (barra sobreposta, sem empurrar o conteúdo) */
 .breakdown-scroll { scrollbar-gutter: stable; }
+.breakdown .breakdown-row.head { padding-right: 10px; }
+.table-panel .template-row.head { padding-right: 8px; }
+/* os tres paineis do breakdown viram flex pra o scroll ocupar o espaco
+   restante e todos terminarem alinhados */
+.breakdown-grid > .breakdown { display: flex; flex-direction: column; }
