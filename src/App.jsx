@@ -619,7 +619,7 @@ function BreakdownList({ title, items, loading, showInteracoes, showConversao, r
         {showInteracoes && <span className="num">Intera&ccedil;&otilde;es</span>}
         {showConversao && <span className="num">Convers&atilde;o</span>}
       </div>
-      <div className="breakdown-scroll" style={rows ? { height: rows * BREAKDOWN_ROW_H } : undefined}>
+      <div className="breakdown-scroll" style={rows ? { maxHeight: rows * BREAKDOWN_ROW_H } : undefined}>
         {items.length === 0 && !loading && (
           <div className="state-msg">Sem dados para os filtros selecionados.</div>
         )}

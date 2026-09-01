@@ -1819,3 +1819,6 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 /* os tres paineis do breakdown viram flex pra o scroll ocupar o espaco
    restante e todos terminarem alinhados */
 .breakdown-grid > .breakdown { display: flex; flex-direction: column; }
+/* cada painel fica do tamanho do proprio conteudo; sem isso o grid
+   estica todos ate a altura do mais alto e sobra espaco vazio embaixo */
+.breakdown-grid { align-items: start; }
