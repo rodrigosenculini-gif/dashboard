@@ -3773,6 +3773,7 @@ function LeilaoConfigOverlay({ onClose }) {
   const [cfg, setCfg] = useState(null)
   const [loading, setLoading] = useState(true)
   const [salvando, setSalvando] = useState(false)
+  const [aplicando, setAplicando] = useState('')
   const [msg, setMsg] = useState('')
   const [erro, setErro] = useState('')
 
@@ -3816,6 +3817,27 @@ function LeilaoConfigOverlay({ onClose }) {
     }
   }
 
+  // liga/desliga na hora, sem esperar o proximo ciclo do agendamento
+  const aplicarEstado = async (estado) => {
+    setAplicando(estado); setMsg(''); setErro('')
+    try {
+      const res = await fetch('/api/dashboard?type=leilao_estado', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado }),
+      })
+      const r = await res.json()
+      if (!res.ok || r.error) throw new Error(r.error || 'Erro ao aplicar')
+      setMsg(estado === 'ativo'
+        ? 'Leilão ativado agora. O agendamento volta a valer no próximo horário configurado.'
+        : 'Leilão pausado agora. O agendamento volta a valer no próximo horário configurado.')
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setAplicando('')
+    }
+  }
+
   const DIAS = [
     { n: 1, l: 'Seg' }, { n: 2, l: 'Ter' }, { n: 3, l: 'Qua' },
     { n: 4, l: 'Qui' }, { n: 5, l: 'Sex' }, { n: 6, l: 'Sáb' }, { n: 0, l: 'Dom' },
@@ -3844,6 +3866,31 @@ function LeilaoConfigOverlay({ onClose }) {
 
           {cfg && (
             <div className="leilao-form">
+              <div className="leilao-agora">
+                <div>
+                  <strong>Ação imediata</strong>
+                  <span>Aplica agora, sem esperar o horário. O agendamento volta a valer no próximo ciclo.</span>
+                </div>
+                <div className="leilao-agora-btns">
+                  <button
+                    className="leilao-btn-on"
+                    disabled={!!aplicando}
+                    onClick={() => aplicarEstado('ativo')}
+                  >
+                    {aplicando === 'ativo' ? 'Ativando…' : '▶ Ativar agora'}
+                  </button>
+                  <button
+                    className="leilao-btn-off"
+                    disabled={!!aplicando}
+                    onClick={() => aplicarEstado('pausado')}
+                  >
+                    {aplicando === 'pausado' ? 'Pausando…' : '⏸ Desativar agora'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="leilao-sep" />
+
               <div className="leilao-linha">
                 <label>Liga às</label>
                 <input type="time" value={paraHora(cfg.hora_inicio)} onChange={(e) => set('hora_inicio', paraNumero(e.target.value))} />

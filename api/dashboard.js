@@ -161,6 +161,27 @@ export default async function handler(req, res) {
       }
     }
 
+    // Liga/desliga o leilao na hora (grava direto na data table do n8n,
+    // sem esperar o proximo ciclo do agendamento)
+    if (type === 'leilao_estado') {
+      try {
+        const estado = String(req.body?.estado || '');
+        if (!['ativo', 'pausado'].includes(estado)) {
+          return res.status(400).json({ error: "estado deve ser 'ativo' ou 'pausado'" });
+        }
+        const r = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/leilao-estado', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ estado }),
+        });
+        if (!r.ok) throw new Error(`n8n respondeu ${r.status}`);
+        const data = await r.json().catch(() => ({}));
+        return res.status(200).json({ ok: true, estado, envio: data?.envio ?? null });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type === 'leilao_config_salvar') {
       try {
         const b = req.body || {};

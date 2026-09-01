@@ -1945,3 +1945,26 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
   flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--border);
 }
 .leilao-hint { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
+
+/* ação imediata (ativar/desativar leilão) */
+.leilao-agora {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+}
+.leilao-agora strong {
+  display: block; font-size: 13px; font-weight: 600; color: var(--text);
+  font-family: var(--font-display); margin-bottom: 3px;
+}
+.leilao-agora span { font-size: 11.5px; color: var(--muted); max-width: 320px; display: block; }
+.leilao-agora-btns { display: flex; gap: 8px; flex-shrink: 0; }
+.leilao-btn-on, .leilao-btn-off {
+  font-family: var(--font-display); font-size: 12.5px; padding: 9px 15px;
+  border-radius: 9px; cursor: pointer; background: transparent; transition: background .15s;
+}
+.leilao-btn-on { border: 1px solid var(--lime); color: var(--lime); }
+.leilao-btn-on:hover:not(:disabled) { background: rgba(169,217,127,.12); }
+.leilao-btn-off { border: 1px solid var(--rose); color: var(--rose); }
+.leilao-btn-off:hover:not(:disabled) { background: rgba(217,144,137,.12); }
+.leilao-btn-on:disabled, .leilao-btn-off:disabled { opacity: .5; cursor: default; }
