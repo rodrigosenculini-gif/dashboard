@@ -1822,3 +1822,12 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 /* cada painel fica do tamanho do proprio conteudo; sem isso o grid
    estica todos ate a altura do mais alto e sobra espaco vazio embaixo */
 .breakdown-grid { align-items: start; }
+
+/* cabeçalho do breakdown sempre em uma linha só — se quebrar em duas, os
+   três blocos ficam desalinhados entre si */
+.breakdown-row.head > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.breakdown-row.head { min-height: 26px; align-items: end; }

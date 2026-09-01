@@ -614,7 +614,7 @@ function BreakdownList({ title, items, loading, showInteracoes, showConversao, r
       <div className="breakdown-row head" style={grid}>
         <span>Valor</span>
         <span className={showConversao ? undefined : 'num'}>
-          {showConversao ? 'Participa\u00e7\u00e3o / convers\u00e3o' : 'Leads'}
+          {showConversao ? 'Part. / conv.' : 'Leads'}
         </span>
         {showInteracoes && <span className="num">Intera&ccedil;&otilde;es</span>}
         {showConversao && <span className="num">Convers&atilde;o</span>}
