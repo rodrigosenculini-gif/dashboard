@@ -1706,31 +1706,37 @@ body {
 }
 
 /* ---------- BARRA DE ROLAGEM (só aparece rolando, degradê laranja) ---------- */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color .35s ease;
-}
-html.is-scrolling * {
-  scrollbar-color: #e8834a transparent;
-}
-
-::-webkit-scrollbar { width: 9px; height: 9px; }
+/* Chrome/Edge/Safari: NÃO declarar scrollbar-width/scrollbar-color aqui —
+   a partir do Chrome 121 essas propriedades padrão desativam todas as
+   regras ::-webkit-scrollbar (e o degradê some junto). */
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-corner { background: transparent; }
+
 ::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  background-image: linear-gradient(180deg, #f0a75c 0%, #f4874a 45%, var(--rose) 100%);
+  border: 3px solid transparent;
   background-clip: padding-box;
-  border: 2px solid transparent;
   border-radius: 999px;
-  opacity: 0;
-  transition: opacity .35s ease, background-image .35s ease;
+  background-color: transparent;
+  transition: background-color .3s ease, border-width .3s ease;
 }
+
 html.is-scrolling ::-webkit-scrollbar-thumb,
 html.is-scrolling::-webkit-scrollbar-thumb {
-  opacity: 1;
+  border-width: 2px;
+  background-color: #ef8b4c;
+  background-image: linear-gradient(180deg, #f5b169 0%, #ef8b4c 50%, var(--rose) 100%);
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background-image: linear-gradient(180deg, #f4874a 0%, var(--rose) 100%);
+  border-width: 2px;
+  background-color: #f4874a;
+  background-image: linear-gradient(180deg, #ef8b4c 0%, var(--rose) 100%);
+}
+
+/* Firefox: não suporta degradê na barra; usa laranja sólido da paleta,
+   também só enquanto rola. */
+@supports (-moz-appearance: none) {
+  * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  html.is-scrolling, html.is-scrolling * { scrollbar-color: #ef8b4c transparent; }
 }
