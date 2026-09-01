@@ -100,6 +100,74 @@ export function IconePasta({ size = 20 }) {
   )
 }
 
+function IconeCopiar({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
+function IconeBaixar({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v12m0 0-4-4m4 4 4-4" />
+      <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+    </svg>
+  )
+}
+function IconeAbrir({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 4h6v6" /><path d="M10 14 20 4" />
+      <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+    </svg>
+  )
+}
+function IconeTrofeu({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 4h8v4a4 4 0 0 1-8 0V4Z" />
+      <path d="M8 5H5a2 2 0 0 0 2 4" />
+      <path d="M16 5h3a2 2 0 0 1-2 4" />
+      <path d="M12 12v3" />
+      <path d="M9 19h6" />
+      <path d="M9.5 16h5l.5 3H9l.5-3Z" />
+    </svg>
+  )
+}
+function IconeMenu({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  )
+}
+
+// tenta copiar o arquivo de verdade (funciona pra imagens); pra outros tipos
+// (video, pdf, planilha...) o clipboard do navegador so aceita link/texto
+async function copiarArquivo(arq) {
+  const url = publicUrl(arq.storage_path)
+  const kind = kindOf(arq)
+  if (kind === 'imagem' && navigator.clipboard?.write) {
+    try {
+      const resp = await fetch(url)
+      const blob = await resp.blob()
+      await navigator.clipboard.write([new window.ClipboardItem({ [blob.type]: blob })])
+      return 'imagem'
+    } catch {
+      // cai pro fallback de link abaixo
+    }
+  }
+  await navigator.clipboard.writeText(url)
+  return 'link'
+}
+
 function IconeArquivoGrande({ kind }) {
   const label = { pdf: 'PDF', planilha: 'XLS', doc: 'DOC', video: 'VID', audio: 'AUD', outro: 'FILE' }[kind] || 'FILE'
   return (
@@ -159,7 +227,19 @@ function ArquivosModal({ dono, onClose }) {
   const [busca, setBusca] = useState('')
   const [preview, setPreview] = useState(null)
   const [enviando, setEnviando] = useState(0) // qtd em andamento
+  const [copiado, setCopiado] = useState(null) // id do arquivo com feedback "copiado" ativo
   const fileRef = useRef(null)
+
+  async function handleCopiar(a, e) {
+    e.stopPropagation()
+    try {
+      const tipo = await copiarArquivo(a)
+      setCopiado({ id: a.id, tipo })
+      setTimeout(() => setCopiado((c) => (c?.id === a.id ? null : c)), 1800)
+    } catch (err) {
+      setErro('Não foi possível copiar: ' + err.message)
+    }
+  }
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro('')
@@ -311,20 +391,24 @@ function ArquivosModal({ dono, onClose }) {
         <div className="nuvem-body">
           {/* ---- lateral: pastas ---- */}
           <aside className="nuvem-side">
-            <button
-              className={`nuvem-pasta ${pastaAtiva === 'todos' ? 'active' : ''}`}
-              onClick={() => setPastaAtiva('todos')}
-            >
-              <IconePasta size={16} /><span>Todos</span>
-              <em>{arquivos.length}</em>
-            </button>
-            <button
-              className={`nuvem-pasta ${pastaAtiva === 'raiz' ? 'active' : ''}`}
-              onClick={() => setPastaAtiva('raiz')}
-            >
-              <IconePasta size={16} /><span>Sem pasta</span>
-              <em>{contagem.raiz || 0}</em>
-            </button>
+            <div className="nuvem-pasta-row">
+              <button
+                className={`nuvem-pasta ${pastaAtiva === 'todos' ? 'active' : ''}`}
+                onClick={() => setPastaAtiva('todos')}
+              >
+                <IconePasta size={16} /><span>Todos</span>
+                <em>{arquivos.length}</em>
+              </button>
+            </div>
+            <div className="nuvem-pasta-row">
+              <button
+                className={`nuvem-pasta ${pastaAtiva === 'raiz' ? 'active' : ''}`}
+                onClick={() => setPastaAtiva('raiz')}
+              >
+                <IconePasta size={16} /><span>Sem pasta</span>
+                <em>{contagem.raiz || 0}</em>
+              </button>
+            </div>
 
             <div className="nuvem-side-label">Pastas</div>
             {pastas.map((p) => (
@@ -384,7 +468,20 @@ function ArquivosModal({ dono, onClose }) {
               )}
               {visiveis.map((a) => (
                 <div key={a.id} className="nuvem-card" onClick={() => setPreview(a)} title={a.nome}>
-                  <div className="nuvem-thumb"><Previa arq={a} /></div>
+                  <div className="nuvem-thumb">
+                    <Previa arq={a} />
+                    <div className="nuvem-thumb-hover">
+                      {copiado?.id === a.id ? (
+                        <span className="nuvem-copiado-msg">{copiado.tipo === 'imagem' ? 'Imagem copiada' : 'Link copiado'}</span>
+                      ) : (
+                        <>
+                          <button title="Copiar" onClick={(e) => handleCopiar(a, e)}><IconeCopiar /></button>
+                          <a title="Baixar" href={publicUrl(a.storage_path)} download={a.nome} onClick={(e) => e.stopPropagation()}><IconeBaixar /></a>
+                          <a title="Abrir" href={publicUrl(a.storage_path)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><IconeAbrir /></a>
+                        </>
+                      )}
+                    </div>
+                  </div>
                   <div className="nuvem-card-meta">
                     <div className="nuvem-card-nome">{a.nome}</div>
                     <div className="nuvem-card-sub">
@@ -409,6 +506,9 @@ function ArquivosModal({ dono, onClose }) {
                   </div>
                 </div>
                 <div className="nuvem-preview-actions">
+                  <button className="reset-btn" onClick={(e) => handleCopiar(preview, e)}>
+                    {copiado?.id === preview.id ? (copiado.tipo === 'imagem' ? '✓ Imagem copiada' : '✓ Link copiado') : '⧉ Copiar'}
+                  </button>
                   <a className="reset-btn" href={publicUrl(preview.storage_path)} target="_blank" rel="noreferrer">↗ Abrir</a>
                   <a className="reset-btn" href={publicUrl(preview.storage_path)} download={preview.nome}>↓ Baixar</a>
                   {podeEditar(preview) && (

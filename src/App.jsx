@@ -1939,6 +1939,36 @@ const PLAYBOOK_BASE_URL = 'https://hotline-playbook.vercel.app'
 // Botão "Info Produtos": abre direto a Home do site de playbooks (sem
 // menuzinho de seleção) num iframe em cima de tudo — o usuário escolhe o
 // produto lá dentro.
+// Menu genérico de "mais opções" (três risquinhos) — agrupa ações menos
+// usadas do topbar num só botão, pra não lotar a barra de filtros.
+function MenuOpcoes({ itens, title = 'Mais opções' }) {
+  const [aberto, setAberto] = useState(false)
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex' }}>
+      <button className="dots-btn" onClick={() => setAberto((v) => !v)} title={title} style={{ fontSize: 15 }}>
+        &#9776;
+      </button>
+      {aberto && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setAberto(false)} />
+          <div className="playbook-dropdown" style={{ width: 200 }}>
+            {itens.map((it, i) => (
+              <button
+                key={i}
+                className="playbook-dropdown-item"
+                disabled={it.disabled}
+                onClick={() => { it.onClick(); setAberto(false) }}
+              >
+                {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function PlaybookMenuButton() {
   const [aberto, setAberto] = useState(false)
 
@@ -3077,11 +3107,8 @@ function VendedorasView() {
           <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
           </button>
-          <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras">
-            &#8942;
-          </button>
-          <button className="refresh-btn" onClick={abrirMetaConfig} title="Configurar meta">
-            &#9881; Meta
+          <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras" style={{ fontSize: 15 }}>
+            &#127942;
           </button>
           <button className="refresh-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
             {modo === 'valor' ? '⇄ Ver em pontos' : '⇄ Ver em valor'}
@@ -3096,12 +3123,14 @@ function VendedorasView() {
           <button className="refresh-btn" onClick={handleImportClick} disabled={importing} title="Importar vendas de um arquivo CSV">
             {importing ? 'Importando...' : '↑ Importar'}
           </button>
-          <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
-            {syncing ? 'Sincronizando...' : '↻ Sincronizar'}
-          </button>
-          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
-            &#8635; Atualizar
-          </button>
+          <MenuOpcoes
+            title="Meta, sincronizar e atualizar"
+            itens={[
+              { label: '⚙ Configurar meta', onClick: abrirMetaConfig },
+              { label: syncing ? 'Sincronizando...' : '↻ Sincronizar', onClick: handleSync, disabled: syncing },
+              { label: loading ? 'Atualizando...' : '⟳ Atualizar agora', onClick: load, disabled: loading },
+            ]}
+          />
         </div>
       </div>
 
