@@ -23,6 +23,10 @@ function publicUrl(path) {
     .join('/')}`
 }
 
+function downloadUrl(path, nome) {
+  return `${publicUrl(path)}?download=${encodeURIComponent(nome || '')}`
+}
+
 async function uploadToStorage(path, file) {
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
     method: 'POST',
@@ -147,6 +151,16 @@ function IconeMenu({ size = 16 }) {
       <path d="M4 6h16M4 12h16M4 18h16" />
     </svg>
   )
+}
+
+// abre numa aba nova mantendo o foco na aba atual (o padrao do navegador
+// e trocar de aba; ctrl/cmd+clique do usuario continua funcionando)
+function abrirEmSegundoPlano(e, url) {
+  if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return
+  e.preventDefault()
+  const w = window.open(url, '_blank', 'noopener,noreferrer')
+  if (w) w.blur()
+  window.focus()
 }
 
 // tenta copiar o arquivo de verdade (funciona pra imagens); pra outros tipos
@@ -465,8 +479,8 @@ function ArquivosModal({ dono, onClose }) {
                       ) : (
                         <>
                           <button title="Copiar" onClick={(e) => handleCopiar(a, e)}><IconeCopiar /></button>
-                          <a title="Baixar" href={publicUrl(a.storage_path)} download={a.nome} onClick={(e) => e.stopPropagation()}><IconeBaixar /></a>
-                          <a title="Abrir" href={publicUrl(a.storage_path)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><IconeAbrir /></a>
+                          <a title="Baixar" href={downloadUrl(a.storage_path, a.nome)} download={a.nome} onClick={(e) => e.stopPropagation()}><IconeBaixar /></a>
+                          <a title="Abrir em nova aba" href={publicUrl(a.storage_path)} target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); abrirEmSegundoPlano(e, publicUrl(a.storage_path)) }}><IconeAbrir /></a>
                         </>
                       )}
                     </div>
@@ -498,8 +512,8 @@ function ArquivosModal({ dono, onClose }) {
                   <button className="reset-btn" onClick={(e) => handleCopiar(preview, e)}>
                     {copiado?.id === preview.id ? (copiado.tipo === 'imagem' ? '✓ Imagem copiada' : '✓ Link copiado') : '⧉ Copiar'}
                   </button>
-                  <a className="reset-btn" href={publicUrl(preview.storage_path)} target="_blank" rel="noreferrer">↗ Abrir</a>
-                  <a className="reset-btn" href={publicUrl(preview.storage_path)} download={preview.nome}>↓ Baixar</a>
+                  <a className="reset-btn" href={publicUrl(preview.storage_path)} target="_blank" rel="noopener noreferrer" onClick={(e) => abrirEmSegundoPlano(e, publicUrl(preview.storage_path))}>↗ Abrir</a>
+                  <a className="reset-btn" href={downloadUrl(preview.storage_path, preview.nome)} download={preview.nome}>↓ Baixar</a>
                   {podeEditar(preview) && (
                     <>
                       <select
