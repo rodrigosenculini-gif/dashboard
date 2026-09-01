@@ -188,9 +188,9 @@ body {
 
 .breakdown-grid {
   display: grid;
-  /* "Por Conversa" nao tem interacoes/conversao, entao pode ser mais
-     estreito e dar espaco pros outros dois blocos */
-  grid-template-columns: 0.8fr 1.1fr 1.1fr;
+  /* "Por Conversa" nao tem barra nem colunas extras, entao fica bem mais
+     estreito e sobra espaco pros outros dois blocos */
+  grid-template-columns: 0.62fr 1.19fr 1.19fr;
   gap: 18px;
   margin-top: 18px;
 }
@@ -1795,3 +1795,16 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .bar-dual-fill { height: 100%; }
 .bar-dual-fill.share { background: var(--lime); border-radius: 4px 0 0 4px; }
 .bar-dual-fill.conv { background: var(--gold); border-radius: 0 4px 4px 0; }
+
+/* área rolável dos breakdowns: mostra ~10 linhas e rola o resto, com o
+   cabeçalho fixo acima (fora do scroll) para as colunas continuarem
+   alinhadas */
+.breakdown-scroll {
+  max-height: 322px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.breakdown-scroll .breakdown-row:last-child { border-bottom: none; }
+/* alinha as linhas com o cabeçalho mesmo quando a barra de rolagem
+   aparece/some (barra sobreposta, sem empurrar o conteúdo) */
+.breakdown-scroll { scrollbar-gutter: stable; }
