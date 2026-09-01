@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
 import IATreinamento from './IATreinamento'
+import ArquivosButton from './ArquivosNuvem'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 const VISIBLE_DEFAULT = 6
@@ -2640,6 +2641,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <img src="/tiger-icon.png" alt="" className="app-logo" />
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ArquivosButton dono={vendedor} />
           <PlaybookMenuButton />
           <span ref={tourAiRef} style={{ display: 'inline-flex' }}><AIChatButton vendedor={vendedor} /></span>
           <button className="reset-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
@@ -3919,10 +3921,13 @@ function Dashboard() {
       <div className="app-header">
         <img src="/tiger-icon.png" alt="" className="app-logo" />
         <ViewSwitcher view={view} setView={changeView} />
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <PlaybookMenuButton />
-          <AIChatButton vendedor={undefined} />
-        </div>
+        {view === 'vendedoras' && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ArquivosButton dono={null} />
+            <PlaybookMenuButton />
+            <AIChatButton vendedor={undefined} />
+          </div>
+        )}
       </div>
       {view === 'geral' && <VisaoGeral />}
       {view === 'leilao' && <LeilaoDetalhado />}
