@@ -1831,3 +1831,81 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
   text-overflow: ellipsis;
 }
 .breakdown-row.head { min-height: 26px; align-items: end; }
+
+/* ---------- IA Treinamento: padronização visual ---------- */
+
+/* valor dos KPIs (só o rótulo tinha estilo; o número herdava o <strong> cru) */
+.ia-kpi strong {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.ia-kpi-alerta strong { color: var(--rose); }
+
+/* variações de tag que faltavam (só .warn existia) */
+.ia-tag.ok {
+  color: var(--lime);
+  border-color: var(--lime);
+  background: rgba(169, 217, 127, 0.1);
+}
+.ia-tag.off {
+  color: var(--rose);
+  border-color: var(--rose);
+  background: rgba(217, 144, 137, 0.1);
+}
+
+/* linhas clicáveis das tabelas */
+.ia-tabela tr.ia-linha-ativa td {
+  background: var(--surface-2);
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+.ia-td-acao {
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+.ia-tabela tr:hover .ia-td-acao { color: var(--gold); }
+
+/* cabeçalho da seção de detalhe (título + ações na mesma linha) */
+.ia-detalhe-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 26px 0 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.ia-detalhe-acoes {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.ia-detalhe-acoes button {
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.ia-detalhe-acoes button:hover { color: var(--text); border-color: var(--rose); }
+.ia-detalhe-acoes .ia-btn-primary {
+  border-color: var(--lime);
+  color: var(--lime);
+  background: rgba(169, 217, 127, 0.08);
+}
+
+/* espaçamento consistente entre seções dos overlays */
+.ia-overlay-body .ia-h4 + .ia-sub { margin: -4px 0 12px; }
+.ia-overlay-body > .ia-chart:last-child,
+.ia-overlay-body > .ia-tabela-wrap:last-child { margin-bottom: 0; }

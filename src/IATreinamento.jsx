@@ -338,44 +338,21 @@ function TrilhaOverlay({ vendedor, onClose }) {
   const [serie, setSerie] = useState([])
   const [resumo, setResumo] = useState([])
   const [treinos, setTreinos] = useState([])
-  const [etapas, setEtapas] = useState([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
-  // etapa aberta pra ver as respostas individuais
-  const [detalhe, setDetalhe] = useState(null) // { etapa_id, pergunta }
-  const [respostas, setRespostas] = useState([])
-  const [carregandoResp, setCarregandoResp] = useState(false)
-  const [soErros, setSoErros] = useState(false)
 
   useEffect(() => {
     let vivo = true
     setLoading(true); setErro('')
-    Promise.all([
-      iaGet('trilha', { vendedor }),
-      iaGet('treinos', { vendedor }),
-      iaGet('trilha_etapas', { vendedor }),
-    ])
-      .then(([t, s, e]) => {
+    Promise.all([iaGet('trilha', { vendedor }), iaGet('treinos', { vendedor })])
+      .then(([t, s]) => {
         if (!vivo) return
         setSerie(t.data || []); setResumo(t.resumo || []); setTreinos(s.data || [])
-        setEtapas(e.data || [])
       })
       .catch((e) => vivo && setErro(e.message))
       .finally(() => vivo && setLoading(false))
     return () => { vivo = false }
   }, [vendedor])
-
-  // carrega as respostas da etapa aberta
-  useEffect(() => {
-    if (!detalhe) { setRespostas([]); return }
-    let vivo = true
-    setCarregandoResp(true)
-    iaGet('trilha_respostas', { vendedor, etapa: detalhe.etapa_id, erros: soErros ? '1' : '' })
-      .then((r) => vivo && setRespostas(r.data || []))
-      .catch(() => vivo && setRespostas([]))
-      .finally(() => vivo && setCarregandoResp(false))
-    return () => { vivo = false }
-  }, [detalhe, vendedor, soErros])
 
   // uma linha por dia, com as duas fontes lado a lado
   const dados = useMemo(() => {
@@ -440,124 +417,6 @@ function TrilhaOverlay({ vendedor, onClose }) {
             </ResponsiveContainer>
           </div>
 
-          <h4 className="ia-h4">Desempenho por etapa da trilha</h4>
-          <p className="ia-sub">
-            Ordenado da etapa com menor acerto para a maior — as primeiras são os pontos que mais precisam de reforço.
-            Clique em uma barra (ou numa linha da tabela) para ver as respostas.
-          </p>
-          {etapas.length === 0 ? (
-            <div className="ia-vazio" style={{ padding: '18px 0' }}>Nenhuma resposta registrada na trilha ainda.</div>
-          ) : (
-            <>
-              <div className="ia-chart">
-                <ResponsiveContainer width="100%" height={Math.max(240, Math.min(etapas.length, 15) * 26 + 40)}>
-                  <BarChart
-                    data={etapas.slice(0, 15)}
-                    layout="vertical"
-                    margin={{ left: 8, right: 24 }}
-                    onClick={(e) => {
-                      const p = e?.activePayload?.[0]?.payload
-                      if (p) setDetalhe({ etapa_id: p.etapa_id, pergunta: p.pergunta })
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={false} />
-                    <XAxis type="number" domain={[0, 100]} unit="%" />
-                    <YAxis type="category" dataKey="etapa_id" width={112} tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      formatter={(v) => [`${v}%`, 'Acerto']}
-                      labelFormatter={(l) => {
-                        const it = etapas.find((x) => x.etapa_id === l)
-                        return it?.pergunta ? `${l} — ${it.pergunta}` : l
-                      }}
-                    />
-                    <Bar dataKey="pct_acerto" name="Acerto (%)" radius={[0, 4, 4, 0]} cursor="pointer" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="ia-tabela-wrap">
-                <table className="ia-tabela">
-                  <thead>
-                    <tr>
-                      <th>Etapa</th><th>Pergunta</th><th>Origem</th>
-                      <th>Respostas</th><th>Acertos</th><th>Erros</th><th>% acerto</th><th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {etapas.map((e) => (
-                      <tr
-                        key={`${e.etapa_id}-${e.origem}`}
-                        onClick={() => setDetalhe({ etapa_id: e.etapa_id, pergunta: e.pergunta })}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <td>{e.etapa_id}</td>
-                        <td className="ia-td-obs">{e.pergunta || '—'}</td>
-                        <td>{e.origem}</td>
-                        <td>{e.respostas}</td>
-                        <td>{e.acertos}</td>
-                        <td>{e.erros}</td>
-                        <td>
-                          <span className={`ia-tag ${Number(e.pct_acerto) >= 80 ? 'ok' : Number(e.pct_acerto) >= 60 ? 'warn' : 'off'}`}>
-                            {String(e.pct_acerto).replace('.', ',')}%
-                          </span>
-                        </td>
-                        <td>ver respostas ›</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          {detalhe && (
-            <>
-              <h4 className="ia-h4">
-                Respostas — {detalhe.etapa_id}
-                <button className="ia-btn ia-btn-ghost" style={{ marginLeft: 10 }} onClick={() => setDetalhe(null)}>✕ fechar</button>
-                <button
-                  className={`ia-btn ${soErros ? 'ia-btn-primary' : 'ia-btn-ghost'}`}
-                  style={{ marginLeft: 6 }}
-                  onClick={() => setSoErros((v) => !v)}
-                >
-                  {soErros ? 'mostrando só erros' : 'só erros'}
-                </button>
-              </h4>
-              {detalhe.pergunta && <p className="ia-sub">{detalhe.pergunta}</p>}
-              <div className="ia-tabela-wrap">
-                <table className="ia-tabela">
-                  <thead>
-                    <tr>
-                      <th>Quando</th><th>Vendedora</th><th>Origem</th>
-                      <th>Respondeu</th><th>Correta</th><th>Resultado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {carregandoResp && <tr><td colSpan={6} className="ia-vazio">Carregando…</td></tr>}
-                    {!carregandoResp && respostas.length === 0 && (
-                      <tr><td colSpan={6} className="ia-vazio">Nenhuma resposta para esse filtro.</td></tr>
-                    )}
-                    {!carregandoResp && respostas.map((r) => (
-                      <tr key={r.id}>
-                        <td>{fmtDataHora(r.criado_em)}</td>
-                        <td>{r.vendedor || '(sem nome)'}</td>
-                        <td>{r.origem || '—'}</td>
-                        <td className="ia-td-obs">{r.resposta_dada || '—'}</td>
-                        <td className="ia-td-obs">{r.resposta_correta || '—'}</td>
-                        <td>
-                          <span className={`ia-tag ${r.acertou ? 'ok' : 'off'}`}>
-                            {r.acertou ? 'acertou' : 'errou'}
-                          </span>
-                          {r.motivo_especial ? ` · ${r.motivo_especial}` : ''}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
           <h4 className="ia-h4">Sessões de treinamento</h4>
           <div className="ia-tabela-wrap">
             <table className="ia-tabela">
@@ -590,6 +449,232 @@ function TrilhaOverlay({ vendedor, onClose }) {
               </tbody>
             </table>
           </div>
+        </>
+      )}
+    </Overlay>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Trilha do especialista — desempenho por etapa e respostas            */
+/* ------------------------------------------------------------------ */
+
+function TrilhaEtapasOverlay({ vendedor, onClose }) {
+  const [etapas, setEtapas] = useState([])
+  const [resumo, setResumo] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState('')
+  const [detalhe, setDetalhe] = useState(null) // { etapa_id, pergunta }
+  const [respostas, setRespostas] = useState([])
+  const [carregandoResp, setCarregandoResp] = useState(false)
+  const [soErros, setSoErros] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    setLoading(true); setErro('')
+    Promise.all([iaGet('trilha_etapas', { vendedor }), iaGet('trilha', { vendedor })])
+      .then(([e, t]) => {
+        if (!vivo) return
+        setEtapas(e.data || [])
+        setResumo(t.resumo || [])
+      })
+      .catch((e) => vivo && setErro(e.message))
+      .finally(() => vivo && setLoading(false))
+    return () => { vivo = false }
+  }, [vendedor])
+
+  useEffect(() => {
+    if (!detalhe) { setRespostas([]); return }
+    let vivo = true
+    setCarregandoResp(true)
+    iaGet('trilha_respostas', { vendedor, etapa: detalhe.etapa_id, erros: soErros ? '1' : '' })
+      .then((r) => vivo && setRespostas(r.data || []))
+      .catch(() => vivo && setRespostas([]))
+      .finally(() => vivo && setCarregandoResp(false))
+    return () => { vivo = false }
+  }, [detalhe, vendedor, soErros])
+
+  const totais = useMemo(() => {
+    const respostasTot = etapas.reduce((a, e) => a + Number(e.respostas || 0), 0)
+    const acertosTot = etapas.reduce((a, e) => a + Number(e.acertos || 0), 0)
+    const criticas = etapas.filter((e) => Number(e.pct_acerto) < 60).length
+    return {
+      respostas: respostasTot,
+      pct: respostasTot ? (100 * acertosTot) / respostasTot : null,
+      etapas: etapas.length,
+      criticas,
+    }
+  }, [etapas])
+
+  const grafico = etapas.slice(0, 12)
+
+  return (
+    <Overlay
+      titulo={`Trilha do especialista — ${vendedor || 'todas as vendedoras'}`}
+      subtitulo="Acerto por etapa da trilha, da mais crítica para a melhor. Clique numa etapa para ver o que cada vendedora respondeu."
+      onClose={onClose}
+      largura={1040}
+    >
+      {loading && <div className="ia-msg">Carregando…</div>}
+      {erro && <div className="ia-msg ia-erro">{erro}</div>}
+
+      {!loading && !erro && (
+        <>
+          <div className="ia-kpis">
+            <div className="ia-kpi"><span>Respostas</span><strong>{totais.respostas}</strong></div>
+            <div className="ia-kpi">
+              <span>Acerto geral</span>
+              <strong>{totais.pct === null ? '—' : `${totais.pct.toFixed(1).replace('.', ',')}%`}</strong>
+            </div>
+            <div className="ia-kpi"><span>Etapas avaliadas</span><strong>{totais.etapas}</strong></div>
+            <div className={`ia-kpi ${totais.criticas > 0 ? 'ia-kpi-alerta' : ''}`}>
+              <span>Etapas críticas (&lt;60%)</span><strong>{totais.criticas}</strong>
+            </div>
+          </div>
+
+          {etapas.length === 0 ? (
+            <div className="ia-vazio">Nenhuma resposta registrada na trilha ainda.</div>
+          ) : (
+            <>
+              <h4 className="ia-h4">Etapas com mais erro</h4>
+              <div className="ia-chart">
+                <ResponsiveContainer width="100%" height={Math.max(220, grafico.length * 28 + 30)}>
+                  <BarChart
+                    data={grafico}
+                    layout="vertical"
+                    margin={{ left: 4, right: 28, top: 4, bottom: 4 }}
+                    onClick={(e) => {
+                      const p = e?.activePayload?.[0]?.payload
+                      if (p) setDetalhe({ etapa_id: p.etapa_id, pergunta: p.pergunta })
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.12} horizontal={false} />
+                    <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="etapa_id" width={118} tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                      formatter={(v, _n, o) => [`${v}% (${o.payload.acertos}/${o.payload.respostas})`, 'Acerto']}
+                      labelFormatter={(l) => {
+                        const it = etapas.find((x) => x.etapa_id === l)
+                        return it?.pergunta ? `${l} — ${it.pergunta}` : l
+                      }}
+                    />
+                    <Bar dataKey="pct_acerto" name="Acerto (%)" radius={[0, 5, 5, 0]} cursor="pointer" barSize={14} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <h4 className="ia-h4">Todas as etapas</h4>
+              <div className="ia-tabela-wrap">
+                <table className="ia-tabela">
+                  <thead>
+                    <tr>
+                      <th>Etapa</th><th>Pergunta</th><th>Origem</th>
+                      <th>Respostas</th><th>Acertos</th><th>Erros</th><th>Acerto</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {etapas.map((e) => (
+                      <tr
+                        key={`${e.etapa_id}-${e.origem}`}
+                        onClick={() => setDetalhe({ etapa_id: e.etapa_id, pergunta: e.pergunta })}
+                        className={detalhe?.etapa_id === e.etapa_id ? 'ia-linha-ativa' : undefined}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td>{e.etapa_id}</td>
+                        <td className="ia-td-obs">{e.pergunta || '—'}</td>
+                        <td>{e.origem}</td>
+                        <td>{e.respostas}</td>
+                        <td>{e.acertos}</td>
+                        <td>{e.erros}</td>
+                        <td>
+                          <span className={`ia-tag ${Number(e.pct_acerto) >= 80 ? 'ok' : Number(e.pct_acerto) >= 60 ? 'warn' : 'off'}`}>
+                            {String(e.pct_acerto).replace('.', ',')}%
+                          </span>
+                        </td>
+                        <td className="ia-td-acao">ver ›</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {resumo.length > 0 && (
+            <>
+              <h4 className="ia-h4">Por vendedora</h4>
+              <div className="ia-tabela-wrap">
+                <table className="ia-tabela">
+                  <thead>
+                    <tr><th>Vendedora</th><th>Respostas</th><th>Acertos</th><th>Erros</th><th>Acerto</th><th>Etapas</th><th>Sessões</th></tr>
+                  </thead>
+                  <tbody>
+                    {resumo.map((r) => (
+                      <tr key={r.vendedor}>
+                        <td>{r.vendedor}</td>
+                        <td>{r.respostas}</td>
+                        <td>{r.acertos}</td>
+                        <td>{r.erros}</td>
+                        <td>
+                          <span className={`ia-tag ${Number(r.pct_acerto) >= 80 ? 'ok' : Number(r.pct_acerto) >= 60 ? 'warn' : 'off'}`}>
+                            {String(r.pct_acerto).replace('.', ',')}%
+                          </span>
+                        </td>
+                        <td>{r.etapas_tocadas}</td>
+                        <td>{r.sessoes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {detalhe && (
+            <>
+              <div className="ia-detalhe-head">
+                <div>
+                  <h4 className="ia-h4" style={{ margin: 0 }}>Respostas — {detalhe.etapa_id}</h4>
+                  {detalhe.pergunta && <p className="ia-sub" style={{ marginTop: 4 }}>{detalhe.pergunta}</p>}
+                </div>
+                <div className="ia-detalhe-acoes">
+                  <button
+                    className={soErros ? 'ia-btn-primary' : 'ia-btn-ghost'}
+                    onClick={() => setSoErros((v) => !v)}
+                  >
+                    {soErros ? 'Mostrando só erros' : 'Só erros'}
+                  </button>
+                  <button className="ia-btn-ghost" onClick={() => setDetalhe(null)}>Fechar ✕</button>
+                </div>
+              </div>
+              <div className="ia-tabela-wrap">
+                <table className="ia-tabela">
+                  <thead>
+                    <tr><th>Quando</th><th>Vendedora</th><th>Origem</th><th>Respondeu</th><th>Correta</th><th>Resultado</th></tr>
+                  </thead>
+                  <tbody>
+                    {carregandoResp && <tr><td colSpan={6} className="ia-vazio">Carregando…</td></tr>}
+                    {!carregandoResp && respostas.length === 0 && (
+                      <tr><td colSpan={6} className="ia-vazio">Nenhuma resposta para esse filtro.</td></tr>
+                    )}
+                    {!carregandoResp && respostas.map((r) => (
+                      <tr key={r.id}>
+                        <td>{fmtDataHora(r.criado_em)}</td>
+                        <td>{r.vendedor}</td>
+                        <td>{r.origem || '—'}</td>
+                        <td className="ia-td-obs">{r.resposta_dada || '—'}</td>
+                        <td className="ia-td-obs">{r.resposta_correta || '—'}</td>
+                        <td>
+                          <span className={`ia-tag ${r.acertou ? 'ok' : 'off'}`}>{r.acertou ? 'acertou' : 'errou'}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
     </Overlay>
@@ -690,6 +775,9 @@ export default function IATreinamento() {
           <button className="ia-btn" onClick={() => setOverlay('trilha')}>
             📈 Treinamento × Trilha
           </button>
+          <button className="ia-btn" onClick={() => setOverlay('trilha_etapas')}>
+            🧭 Trilha do especialista
+          </button>
         </div>
       </div>
 
@@ -756,6 +844,9 @@ export default function IATreinamento() {
       )}
       {overlay === 'trilha' && (
         <TrilhaOverlay vendedor={vendedorFiltro} onClose={() => setOverlay(null)} />
+      )}
+      {overlay === 'trilha_etapas' && (
+        <TrilhaEtapasOverlay vendedor={vendedorFiltro} onClose={() => setOverlay(null)} />
       )}
     </div>
   )
