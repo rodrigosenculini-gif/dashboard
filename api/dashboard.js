@@ -177,9 +177,19 @@ export default async function handler(req, res) {
   const p_tipo_envio = tipo_envio || null;
   const p_mensagem = mensagem || null;
 
+  // O CSV usa ';' como separador (padrao pt-BR), entao os numeros precisam
+  // sair com virgula decimal. Com ponto ("5839.6580"), o Excel em portugues
+  // le o ponto como separador de milhar e mostra 58.396.580.
   const csvEsc = (v) => {
     if (v === null || v === undefined) return '';
+    if (typeof v === 'number') {
+      return String(Number.isInteger(v) ? v : Number(v.toFixed(2))).replace('.', ',');
+    }
     const s = String(v);
+    // valores numericos vindos do Postgres chegam como string ("5839.6580")
+    if (/^-?\d+\.\d+$/.test(s)) {
+      return String(Number(Number(s).toFixed(2))).replace('.', ',');
+    }
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const sendCsv = (res, cols, rows, filename) => {
