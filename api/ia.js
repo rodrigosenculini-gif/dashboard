@@ -126,6 +126,49 @@ async function handleGet(type, req, res) {
     return res.json({ data: serie, resumo });
   }
 
+  // Desempenho por etapa/pergunta da trilha — mostra onde as vendedoras
+  // mais erram (a "pontuação de critérios" da trilha)
+  if (type === 'trilha_etapas') {
+    return res.json({
+      data: await q(
+        `select etapa_id,
+                coalesce(origem, '(sem origem)') as origem,
+                max(pergunta) as pergunta,
+                count(*) as respostas,
+                count(*) filter (where acertou) as acertos,
+                count(*) filter (where not acertou) as erros,
+                round(100.0 * count(*) filter (where acertou) / nullif(count(*), 0), 1) as pct_acerto,
+                count(distinct vendedor) as vendedores
+           from trilha_respostas
+          where vendedor is not null and btrim(vendedor) <> ''
+            and ($1::text is null or vendedor = $1)
+          group by etapa_id, coalesce(origem, '(sem origem)')
+          order by pct_acerto asc, respostas desc`,
+        [vendedor]
+      ),
+    });
+  }
+
+  // Respostas individuais — permite abrir o que cada vendedora respondeu
+  if (type === 'trilha_respostas') {
+    const etapa = req.query.etapa || null;
+    const somenteErros = String(req.query.erros || '') === '1';
+    return res.json({
+      data: await q(
+        `select id, sessao_id, vendedor, origem, etapa_id, pergunta,
+                resposta_dada, resposta_correta, acertou, motivo_especial, criado_em
+           from trilha_respostas
+          where vendedor is not null and btrim(vendedor) <> ''
+            and ($1::text is null or vendedor = $1)
+            and ($2::text is null or etapa_id = $2)
+            and ($3::boolean is false or not acertou)
+          order by criado_em desc
+          limit 500`,
+        [vendedor, etapa, somenteErros]
+      ),
+    });
+  }
+
   if (type === 'atendimentos') {
     return res.json({
       data: await q(
