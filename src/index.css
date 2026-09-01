@@ -1722,7 +1722,7 @@ body {
   border: 0 solid transparent;
   background-color: #ef8b4c;
   background-image: linear-gradient(180deg, #f5b169 0%, #ef8b4c 50%, var(--rose) 100%);
-  transition: border-width .32s cubic-bezier(.22, 1, .36, 1);
+  transition: border-width .55s cubic-bezier(.22, 1, .36, 1);
 }
 
 /* estado escondido: barra empurrada pra fora (direita / baixo) */

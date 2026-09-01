@@ -14,7 +14,7 @@ document.addEventListener(
     clearTimeout(scrollHideTimer)
     scrollHideTimer = setTimeout(() => {
       document.documentElement.classList.remove('is-scrolling')
-    }, 700)
+    }, 1100)
   },
   { capture: true, passive: true }
 )
