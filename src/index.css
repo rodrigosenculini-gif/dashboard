@@ -1762,3 +1762,36 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 }
 .breakdown-row.head .num { font-size: 10.5px; }
 .breakdown .bar-track { min-width: 28px; }
+
+/* barra dupla: esquerda = participação nos leads, direita = conversão */
+.bar-dual {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 9px;
+  min-width: 60px;
+}
+.bar-dual-side {
+  flex: 1;
+  height: 100%;
+  background: var(--surface-2);
+  display: flex;
+  overflow: hidden;
+}
+.bar-dual-side.left {
+  justify-content: flex-end;
+  border-radius: 4px 0 0 4px;
+}
+.bar-dual-side.right {
+  justify-content: flex-start;
+  border-radius: 0 4px 4px 0;
+}
+.bar-dual-mid {
+  width: 1px;
+  height: 130%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.bar-dual-fill { height: 100%; }
+.bar-dual-fill.share { background: var(--lime); border-radius: 4px 0 0 4px; }
+.bar-dual-fill.conv { background: var(--gold); border-radius: 0 4px 4px 0; }

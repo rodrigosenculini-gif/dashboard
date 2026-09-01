@@ -592,39 +592,71 @@ function ExpandToggle({ expanded, onToggle, hiddenCount }) {
 function BreakdownList({ title, items, loading, showInteracoes, showConversao }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
-  const max = Math.max(1, ...items.map((i) => Number(i.leads) || 0))
-  // colunas: valor + barra/leads + (interações) + (conversão)
+
+  // participação = fatia daquele item no total de leads da lista
+  const totalLeads = items.reduce((acc, i) => acc + (Number(i.leads) || 0), 0)
+  const maxShare = Math.max(
+    1,
+    ...items.map((i) => (totalLeads ? (Number(i.leads) / totalLeads) * 100 : 0))
+  )
+  // conversão é escalada pelo maior valor da lista, senão (valores <1%)
+  // a barra ficaria invisível
+  const maxConv = Math.max(0.0001, ...items.map((i) => Number(i.conversao) || 0))
+
   const cols = showInteracoes && showConversao
     ? '1.1fr 1.5fr 0.6fr 0.6fr'
     : showInteracoes || showConversao
       ? '1.2fr 1.6fr 0.7fr'
       : '1.3fr 1.7fr'
   const grid = { gridTemplateColumns: cols }
+
   return (
     <div className="panel table-panel breakdown">
       <p className="section-label">{title}</p>
       <div className="breakdown-row head" style={grid}>
         <span>Valor</span>
-        <span>Leads</span>
+        <span>{showConversao ? 'Participa\u00e7\u00e3o / convers\u00e3o' : 'Leads'}</span>
         {showInteracoes && <span className="num">Intera&ccedil;&otilde;es</span>}
         {showConversao && <span className="num">Convers&atilde;o</span>}
       </div>
       {items.length === 0 && !loading && (
         <div className="state-msg">Sem dados para os filtros selecionados.</div>
       )}
-      {visible.map((i) => (
-        <div className="breakdown-row" key={i.valor} style={grid}>
-          <span className="campanha-nome">{i.valor}</span>
-          <span className="bar-cell">
-            <span className="bar-track">
-              <span className="bar-fill" style={{ width: `${(Number(i.leads) / max) * 100}%` }} />
-            </span>
-            <span className="bar-value">{fmtInt(i.leads)}</span>
-          </span>
-          {showInteracoes && <span className="num">{fmtInt(i.interacoes)}</span>}
-          {showConversao && <span className="num">{fmtPct(i.conversao)}</span>}
-        </div>
-      ))}
+      {visible.map((i) => {
+        const share = totalLeads ? (Number(i.leads) / totalLeads) * 100 : 0
+        const conv = Number(i.conversao) || 0
+        return (
+          <div className="breakdown-row" key={i.valor} style={grid}>
+            <span className="campanha-nome">{i.valor}</span>
+            {showConversao ? (
+              <span className="bar-cell">
+                <span
+                  className="bar-dual"
+                  title={`${share.toFixed(1)}% dos leads \u00b7 ${fmtPct(conv)} de convers\u00e3o`}
+                >
+                  <span className="bar-dual-side left">
+                    <span className="bar-dual-fill share" style={{ width: `${(share / maxShare) * 100}%` }} />
+                  </span>
+                  <span className="bar-dual-mid" />
+                  <span className="bar-dual-side right">
+                    <span className="bar-dual-fill conv" style={{ width: `${(conv / maxConv) * 100}%` }} />
+                  </span>
+                </span>
+                <span className="bar-value">{fmtInt(i.leads)}</span>
+              </span>
+            ) : (
+              <span className="bar-cell">
+                <span className="bar-track" title={`${share.toFixed(1)}% dos leads`}>
+                  <span className="bar-fill" style={{ width: `${(share / maxShare) * 100}%` }} />
+                </span>
+                <span className="bar-value">{fmtInt(i.leads)}</span>
+              </span>
+            )}
+            {showInteracoes && <span className="num">{fmtInt(i.interacoes)}</span>}
+            {showConversao && <span className="num">{fmtPct(i.conversao)}</span>}
+          </div>
+        )
+      })}
       <ExpandToggle
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
