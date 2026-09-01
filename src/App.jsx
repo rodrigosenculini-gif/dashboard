@@ -3809,7 +3809,11 @@ function LeilaoConfigOverlay({ onClose }) {
       const r = await res.json()
       if (!res.ok || r.error) throw new Error(r.error || 'Erro ao salvar')
       setCfg(r.data)
-      setMsg('Configuração salva. O fluxo usa esses horários na próxima verificação.')
+      setMsg(
+        r.sync?.ok
+          ? 'Configuração salva e aplicada no agendamento do fluxo.'
+          : `Configuração salva, mas o agendamento do fluxo não foi atualizado${r.sync?.motivo ? ` (${r.sync.motivo})` : ''}. Os horários novos valem a partir do próximo ciclo.`
+      )
     } catch (e) {
       setErro(e.message)
     } finally {

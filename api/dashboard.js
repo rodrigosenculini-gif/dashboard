@@ -56,6 +56,72 @@ const SENHAS = {
   '345612': { role: 'entradas_lp', vendedor: null },
 };
 
+
+// ---------------------------------------------------------------------
+// Sincroniza o Schedule Trigger do fluxo de leilao com a config salva.
+// Assim o cron dispara exatamente nos horarios configurados (sem varrer
+// de 15 em 15 min) e a mudanca vale na hora, sem esperar o proximo ciclo.
+const N8N_BASE = 'https://hotn8n.querosacarfgts.com.br';
+const N8N_LEILAO_WF = 'TKxMAT4NMFgh87zq';
+
+function cronsDaConfig(cfg) {
+  const hm = (v) => {
+    const n = Number(v || 0);
+    const h = Math.floor(n);
+    const m = Math.round((n - h) * 60);
+    return { h, m };
+  };
+  const dias = (Array.isArray(cfg.dias_semana) && cfg.dias_semana.length ? cfg.dias_semana : [1, 2, 3, 4, 5])
+    .slice().sort((a, b) => a - b).join(',');
+
+  const ini = hm(cfg.hora_inicio);
+  const fim = hm(cfg.hora_fim);
+  const crons = [
+    // liga e desliga nos horarios da janela, nos dias ativos
+    { field: 'cronExpression', expression: `${ini.m} ${ini.h} * * ${dias}` },
+    { field: 'cronExpression', expression: `${fim.m} ${fim.h} * * ${dias}` },
+  ];
+
+  if (cfg.bloqueio_ativo !== false) {
+    const bi = hm(cfg.bloqueio_hora_inicio);
+    const bf = hm(cfg.bloqueio_hora_fim);
+    // entra e sai do bloqueio mensal
+    crons.push({ field: 'cronExpression', expression: `${bi.m} ${bi.h} ${Number(cfg.bloqueio_dia_inicio) || 20} * *` });
+    crons.push({ field: 'cronExpression', expression: `${bf.m} ${bf.h} ${Number(cfg.bloqueio_dia_fim) || 23} * *` });
+  }
+
+  if (cfg.fim_semana_pausado !== false) {
+    // garante o estado pausado logo no inicio do sabado
+    crons.push({ field: 'cronExpression', expression: '0 0 * * 6' });
+  }
+
+  // remove duplicatas
+  const vistos = new Set();
+  return crons.filter((c) => (vistos.has(c.expression) ? false : vistos.add(c.expression)));
+}
+
+async function sincronizaCronLeilao(cfg) {
+  const apiKey = process.env.N8N_API_KEY;
+  if (!apiKey) return { ok: false, motivo: 'N8N_API_KEY nao configurada' };
+  const h = { 'X-N8N-API-KEY': apiKey, 'Content-Type': 'application/json' };
+
+  const rGet = await fetch(`${N8N_BASE}/api/v1/workflows/${N8N_LEILAO_WF}`, { headers: h });
+  if (!rGet.ok) return { ok: false, motivo: `GET workflow ${rGet.status}` };
+  const wf = await rGet.json();
+
+  const trigger = wf.nodes.find((n) => n.type === 'n8n-nodes-base.scheduleTrigger');
+  if (!trigger) return { ok: false, motivo: 'Schedule Trigger nao encontrado' };
+  trigger.parameters = { rule: { interval: cronsDaConfig(cfg) } };
+
+  const rPut = await fetch(`${N8N_BASE}/api/v1/workflows/${N8N_LEILAO_WF}`, {
+    method: 'PUT',
+    headers: h,
+    body: JSON.stringify({ name: wf.name, nodes: wf.nodes, connections: wf.connections, settings: {} }),
+  });
+  if (!rPut.ok) return { ok: false, motivo: `PUT workflow ${rPut.status}` };
+  return { ok: true, crons: cronsDaConfig(cfg).map((c) => c.expression) };
+}
+
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -211,7 +277,9 @@ export default async function handler(req, res) {
             b.atualizado_por || null,
           ]
         );
-        return res.status(200).json({ ok: true, data: r.rows[0] });
+        // aplica os horarios no cron do fluxo, pra valer na hora
+        const sync = await sincronizaCronLeilao(r.rows[0]).catch((e) => ({ ok: false, motivo: e.message }));
+        return res.status(200).json({ ok: true, data: r.rows[0], sync });
       } catch (e) {
         return res.status(500).json({ error: e.message });
       }
