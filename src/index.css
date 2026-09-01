@@ -1727,7 +1727,8 @@ html.is-scrolling * {
   opacity: 0;
   transition: opacity .35s ease, background-image .35s ease;
 }
-html.is-scrolling ::-webkit-scrollbar-thumb {
+html.is-scrolling ::-webkit-scrollbar-thumb,
+html.is-scrolling::-webkit-scrollbar-thumb {
   opacity: 1;
 }
 ::-webkit-scrollbar-thumb:hover {
