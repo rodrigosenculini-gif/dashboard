@@ -223,7 +223,7 @@ function ArquivosModal({ dono, onClose }) {
   const [arquivos, setArquivos] = useState([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
-  const [pastaAtiva, setPastaAtiva] = useState('todos') // 'todos' | 'raiz' | id
+  const [pastaAtiva, setPastaAtiva] = useState('todos') // 'todos' | id da pasta
   const [busca, setBusca] = useState('')
   const [preview, setPreview] = useState(null)
   const [enviando, setEnviando] = useState(0) // qtd em andamento
@@ -266,8 +266,7 @@ function ArquivosModal({ dono, onClose }) {
 
   const visiveis = useMemo(() => {
     let lista = arquivos
-    if (pastaAtiva === 'raiz') lista = lista.filter((a) => !a.pasta_id)
-    else if (pastaAtiva !== 'todos') lista = lista.filter((a) => a.pasta_id === pastaAtiva)
+    if (pastaAtiva !== 'todos') lista = lista.filter((a) => a.pasta_id === pastaAtiva)
     const b = busca.trim().toLowerCase()
     if (b) lista = lista.filter((a) => a.nome.toLowerCase().includes(b))
     return lista
@@ -275,7 +274,7 @@ function ArquivosModal({ dono, onClose }) {
 
   const contagem = useMemo(() => {
     const m = {}
-    for (const a of arquivos) m[a.pasta_id || 'raiz'] = (m[a.pasta_id || 'raiz'] || 0) + 1
+    for (const a of arquivos) if (a.pasta_id) m[a.pasta_id] = (m[a.pasta_id] || 0) + 1
     return m
   }, [arquivos])
 
@@ -368,8 +367,7 @@ function ArquivosModal({ dono, onClose }) {
 
   const tituloPasta =
     pastaAtiva === 'todos' ? 'Todos os arquivos'
-      : pastaAtiva === 'raiz' ? 'Sem pasta'
-        : pastas.find((p) => p.id === pastaAtiva)?.nome || 'Pasta'
+      : pastas.find((p) => p.id === pastaAtiva)?.nome || 'Pasta'
 
   return (
     <div className="ai-chat-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -398,15 +396,6 @@ function ArquivosModal({ dono, onClose }) {
               >
                 <IconePasta size={16} /><span>Todos</span>
                 <em>{arquivos.length}</em>
-              </button>
-            </div>
-            <div className="nuvem-pasta-row">
-              <button
-                className={`nuvem-pasta ${pastaAtiva === 'raiz' ? 'active' : ''}`}
-                onClick={() => setPastaAtiva('raiz')}
-              >
-                <IconePasta size={16} /><span>Sem pasta</span>
-                <em>{contagem.raiz || 0}</em>
               </button>
             </div>
 
@@ -522,7 +511,7 @@ function ArquivosModal({ dono, onClose }) {
                         }}
                         title="Mover pra pasta"
                       >
-                        <option value="">Sem pasta</option>
+                        <option value="">Nenhuma pasta</option>
                         {pastas.filter((p) => podeEditar(p)).map((p) => (
                           <option key={p.id} value={p.id}>{p.nome}</option>
                         ))}
