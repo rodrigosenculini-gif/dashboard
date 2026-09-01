@@ -188,7 +188,9 @@ body {
 
 .breakdown-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* "Por Conversa" nao tem interacoes/conversao, entao pode ser mais
+     estreito e dar espaco pros outros dois blocos */
+  grid-template-columns: 0.8fr 1.1fr 1.1fr;
   gap: 18px;
   margin-top: 18px;
 }
@@ -902,10 +904,11 @@ body {
 .bar-value {
   font-family: var(--font-mono);
   font-size: 12px;
-  width: 56px;
+  min-width: 46px;
   text-align: right;
   color: var(--text);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .state-msg {
@@ -1749,3 +1752,13 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
   * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
   html.is-scrolling, html.is-scrolling * { scrollbar-color: #ef8b4c transparent; }
 }
+
+/* números das colunas extras do breakdown (interações / conversão) */
+.breakdown-row .num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.breakdown-row.head .num { font-size: 10.5px; }
+.breakdown .bar-track { min-width: 28px; }

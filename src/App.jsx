@@ -589,21 +589,31 @@ function ExpandToggle({ expanded, onToggle, hiddenCount }) {
   )
 }
 
-function BreakdownList({ title, items, loading, showInteracoes }) {
+function BreakdownList({ title, items, loading, showInteracoes, showConversao }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
   const max = Math.max(1, ...items.map((i) => Number(i.leads) || 0))
+  // colunas: valor + barra/leads + (interações) + (conversão)
+  const cols = showInteracoes && showConversao
+    ? '1.1fr 1.5fr 0.6fr 0.6fr'
+    : showInteracoes || showConversao
+      ? '1.2fr 1.6fr 0.7fr'
+      : '1.3fr 1.7fr'
+  const grid = { gridTemplateColumns: cols }
   return (
     <div className="panel table-panel breakdown">
       <p className="section-label">{title}</p>
-      <div className="breakdown-row head" style={showInteracoes ? { gridTemplateColumns: '1fr 1.4fr 0.7fr' } : undefined}>
-        <span>Valor</span><span>Leads</span>{showInteracoes && <span>Intera&ccedil;&otilde;es</span>}
+      <div className="breakdown-row head" style={grid}>
+        <span>Valor</span>
+        <span>Leads</span>
+        {showInteracoes && <span className="num">Intera&ccedil;&otilde;es</span>}
+        {showConversao && <span className="num">Convers&atilde;o</span>}
       </div>
       {items.length === 0 && !loading && (
         <div className="state-msg">Sem dados para os filtros selecionados.</div>
       )}
       {visible.map((i) => (
-        <div className="breakdown-row" key={i.valor} style={showInteracoes ? { gridTemplateColumns: '1fr 1.4fr 0.7fr' } : undefined}>
+        <div className="breakdown-row" key={i.valor} style={grid}>
           <span className="campanha-nome">{i.valor}</span>
           <span className="bar-cell">
             <span className="bar-track">
@@ -611,7 +621,8 @@ function BreakdownList({ title, items, loading, showInteracoes }) {
             </span>
             <span className="bar-value">{fmtInt(i.leads)}</span>
           </span>
-          {showInteracoes && <span>{fmtInt(i.interacoes)}</span>}
+          {showInteracoes && <span className="num">{fmtInt(i.interacoes)}</span>}
+          {showConversao && <span className="num">{fmtPct(i.conversao)}</span>}
         </div>
       ))}
       <ExpandToggle
@@ -3920,8 +3931,8 @@ function VisaoGeral() {
 
       <div className="breakdown-grid">
         <BreakdownList title="Por Conversa" items={porConversa} loading={loading} />
-        <BreakdownList title="Por Meta" items={porMeta} loading={loading} />
-        <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} showInteracoes />
+        <BreakdownList title="Meta Retorno" items={porMeta} loading={loading} showInteracoes showConversao />
+        <BreakdownList title="Por Mensagem" items={porMensagem} loading={loading} showInteracoes showConversao />
       </div>
 
       {showFunil && <FunilDisparos onClose={() => setShowFunil(false)} />}
