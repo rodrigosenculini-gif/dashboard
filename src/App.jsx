@@ -3096,18 +3096,21 @@ function VendedorasView() {
       setMediasGeral(medias?.[0] ?? null)
 
       const porDiaMap = {}
-      const vendedoresVistos = new Set()
+      const totalPorVendedor = {}
       for (const row of dia ?? []) {
-        vendedoresVistos.add(row.vendedor)
+        const total = modo === 'ponto' ? Number(row.pontos_total) : Number(row.valor_total)
+        totalPorVendedor[row.vendedor] = (totalPorVendedor[row.vendedor] || 0) + total
         if (!porDiaMap[row.dia]) porDiaMap[row.dia] = { dia: row.dia }
         porDiaMap[row.dia][`${row.vendedor}__vendas`] = Number(row.vendas)
         porDiaMap[row.dia][row.vendedor] = modo === 'ponto' ? Number(row.pontos_total) : Number(row.valor_total)
         porDiaMap[row.dia][`${row.vendedor}__valor`] = Number(row.valor_total)
         porDiaMap[row.dia][`${row.vendedor}__pontos`] = Number(row.pontos_total)
       }
+      // maior total primeiro — antes ficava na ordem de chegada da query (aleatório)
+      const vendedoresVistos = Object.keys(totalPorVendedor).sort((a, b) => totalPorVendedor[b] - totalPorVendedor[a])
       setPorDia({
         rows: Object.values(porDiaMap).sort((a, b) => (a.dia > b.dia ? 1 : -1)),
-        vendedoresVistos: Array.from(vendedoresVistos),
+        vendedoresVistos,
       })
 
       setTabela({ rows: tab ?? [], total: tab?.[0]?.total_count ? Number(tab[0].total_count) : 0 })
@@ -3783,17 +3786,17 @@ function VendasView() {
         <div className="kpi">
           <p className="kpi-label">M&eacute;dia di&aacute;ria &mdash; pontos | valor</p>
           <p className="kpi-value kpi-split">
-            <span>{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_pontos / kpis.dias_uteis_passados : 0))}</span>
+            <span>{fmtInt(Math.round(kpis?.dias_uteis_periodo > 0 ? kpis.pontos_total / kpis.dias_uteis_periodo : 0))}</span>
             <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_passados > 0 ? kpis.total_mes_valor / kpis.dias_uteis_passados : 0)}</span>
+            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_periodo > 0 ? kpis.valor_total / kpis.dias_uteis_periodo : 0)}</span>
           </p>
         </div>
         <div className="kpi">
           <p className="kpi-label">M&eacute;dia semanal &mdash; pontos | valor</p>
           <p className="kpi-value kpi-split">
-            <span>{fmtInt(Math.round(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_pontos / kpis.dias_uteis_passados) * 5 : 0))}</span>
+            <span>{fmtInt(Math.round(kpis?.dias_uteis_periodo > 0 ? (kpis.pontos_total / kpis.dias_uteis_periodo) * 5 : 0))}</span>
             <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_passados > 0 ? (kpis.total_mes_valor / kpis.dias_uteis_passados) * 5 : 0)}</span>
+            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_periodo > 0 ? (kpis.valor_total / kpis.dias_uteis_periodo) * 5 : 0)}</span>
           </p>
         </div>
         <div className="kpi">
