@@ -59,15 +59,45 @@ async function handleGet(type, req, res) {
     ? String(req.query.vendedor)
     : null;
 
+  // Lista TODAS as vendedoras reais, não só as que já têm linha em
+  // sim_vendedor_fase. Quem nunca foi configurada aparece com status
+  // 'nao_configurado' e pode ser ativada normalmente.
+  // O casamento é por nome normalizado (sem pontos/acentos/caixa), porque
+  // as tabelas gravam em formatos diferentes: "Jeanne.Barboza" x "JEANNE BARBOZA".
   if (type === 'vendedores') {
     return res.json({
       data: await q(
-        `select vendedor, ciclo, fase, status, nota_minima,
-                atendimentos_necessarios, atendimentos_abertos,
-                atendimentos_concluidos, media_fase,
-                inicio_agendado, agendado_por, agendado_em, entrou_na_fase_em
-         from sim_vendedor_fase
-         order by vendedor`
+        `with norm as (
+           select distinct
+             vendedor as nome_vendas,
+             lower(translate(replace(vendedor, '.', ' '),
+                   'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                   'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')) as chave
+           from vendedoras
+           where vendedor is not null and btrim(vendedor) <> '' and vendedor <> 'IA'
+         ),
+         fase as (
+           select *,
+             lower(translate(replace(vendedor, '.', ' '),
+                   'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                   'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')) as chave
+           from sim_vendedor_fase
+         )
+         select
+           coalesce(f.vendedor, n.nome_vendas) as vendedor,
+           n.nome_vendas,
+           coalesce(f.ciclo, 1) as ciclo,
+           coalesce(f.fase, 1) as fase,
+           coalesce(f.status, 'nao_configurado') as status,
+           f.nota_minima, f.atendimentos_necessarios,
+           coalesce(f.atendimentos_abertos, 0) as atendimentos_abertos,
+           coalesce(f.atendimentos_concluidos, 0) as atendimentos_concluidos,
+           f.media_fase, f.inicio_agendado, f.agendado_por, f.agendado_em,
+           f.entrou_na_fase_em,
+           (f.vendedor is not null) as configurado
+         from norm n
+         full outer join fase f on f.chave = n.chave
+         order by 1`
       ),
     });
   }

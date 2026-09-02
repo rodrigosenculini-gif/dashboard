@@ -817,7 +817,11 @@ export default function IATreinamento() {
                 {vendedores.map((v) => (
                   <tr key={v.vendedor}>
                     <td>{v.vendedor}</td>
-                    <td><span className={`ia-tag ${v.status === 'ativo' ? 'ok' : 'off'}`}>{v.status}</span></td>
+                    <td>
+                      <span className={`ia-tag ${v.status === 'ativo' ? 'ok' : v.status === 'nao_configurado' ? 'warn' : 'off'}`}>
+                        {v.status === 'nao_configurado' ? 'não configurado' : v.status}
+                      </span>
+                    </td>
                     <td>{v.ciclo}</td>
                     <td>{v.fase} — {FASE_LABEL[v.fase]}</td>
                     <td>{v.atendimentos_concluidos}/{v.atendimentos_necessarios}</td>
