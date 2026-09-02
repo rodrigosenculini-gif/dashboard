@@ -1878,11 +1878,16 @@ function MilestoneDot(props) {
 // código certo em vez de digitar parcela/seguro)
 const BANCOS_POR_CODIGO = ['FACTA']
 
-// Novo Saque e FGTSV8 (linha Acelera) não são nem por código nem por
-// parcela/seguro — o peso vem do NOME da tabela, então usam esse terceiro modo.
+// Novo Saque, FGTSV8 (linha Acelera) e C6 não são nem por código nem por
+// parcela/seguro sozinhos — o peso vem do NOME da tabela (C6 também precisa
+// de parcelas, pois o mesmo nome pode valer pesos diferentes por prazo).
 // V8 (consignado CLT) continua no modo parcela + seguro, como sempre foi.
-const BANCOS_POR_TABELA_NOME = ['NOVO SAQUE', 'FGTSV8']
+const BANCOS_POR_TABELA_NOME = ['NOVO SAQUE', 'FGTSV8', 'C6']
+// Dentre os bancos acima, só o C6 ainda precisa do campo Parcelas — os
+// demais (Novo Saque, FGTSV8) têm peso fixo por nome de tabela.
+const BANCOS_TABELA_NOME_COM_PARCELAS = ['C6']
 
+// Valores vigentes a partir de 01/09/2026 (tabela_pontos)
 const NOVO_SAQUE_TABELAS = [
   { valor: 'TABELA NS', label: 'TABELA NS (12,00)' },
   { valor: 'TABELA CAMPANHA', label: 'TABELA CAMPANHA (9,50)' },
@@ -1895,18 +1900,48 @@ const NOVO_SAQUE_TABELAS = [
   { valor: 'TABELA ZERO', label: 'TABELA ZERO (0,70)' },
 ]
 
-// FGTSV8 - linha Acelera: peso pelo nome da tabela, 1 a 5 parcelas
+// FGTSV8 - linha Acelera: peso pelo nome da tabela, 1 a 5 parcelas.
+// Valores vigentes a partir de 01/09/2026 (tabela_pontos) — GRID, NORMAL e
+// PIT STOP não mudaram; ACELERA 2.0, COMETA e TURBO tiveram ajuste de peso.
 const FGTSV8_TABELAS = [
-  { valor: 'ACELERA 2.0', label: 'ACELERA 2.0 (12,00)' },
-  { valor: 'COMETA EXCLUSIVA BMP', label: 'COMETA EXCLUSIVA BMP (9,00)' },
+  { valor: 'ACELERA 2.0', label: 'ACELERA 2.0 (11,50)' },
+  { valor: 'COMETA EXCLUSIVA BMS', label: 'COMETA EXCLUSIVA BMS (8,80)' },
   { valor: 'GRID', label: 'GRID (6,00)' },
-  { valor: 'TURBO', label: 'TURBO (5,50)' },
+  { valor: 'TURBO', label: 'TURBO (5,80)' },
   { valor: 'NORMAL', label: 'NORMAL (4,50)' },
   { valor: 'PIT STOP', label: 'PIT STOP (1,80)' },
 ]
 
+// C6 Consignado Privado — peso por nome da tabela + parcelas (tabela_pontos,
+// vigente a partir de 01/09/2026). Vários nomes se repetem em prazos
+// diferentes com pesos diferentes — por isso o campo Parcelas continua
+// obrigatório para o C6 (ver BANCOS_TABELA_NOME_COM_PARCELAS acima).
+const C6_TABELAS = [
+  { valor: 'TOP PLAN 13 C/SEGURO', label: 'TOP PLAN 13 C/SEGURO (48x=1,35 · 24x=1,20)' },
+  { valor: 'TOP PLAN 10, 9, 8, 6 E 4 - TODAS C/SEGURO', label: 'TOP PLAN 10,9,8,6 e 4 C/SEGURO (48x=1,20)' },
+  { valor: 'TOP PLAN 13, 10, 9, 8 E 6 - TODAS C/SEGURO', label: 'TOP PLAN 13,10,9,8 e 6 C/SEGURO (36x=1,20)' },
+  { valor: 'TOP PLAN 3, 2 E 1 - PLAN 13, 10, 9, 8, 6 E 4 - TODAS C/SEGURO', label: 'TOP PLAN 3,2,1 (+13,10,9,8,6,4) C/SEGURO (48x=1,00)' },
+  { valor: 'TOP PLAN 4, 3, 2 E 1 - PLAN 13, 10, 9, E 6 - TODAS C/SEGURO', label: 'TOP PLAN 4,3,2,1 (+13,10,9,6) C/SEGURO (36x=1,00)' },
+  { valor: 'TOP PLAN 10, 9, 8, 6, 4 E 3 - PLAN 13 - TODAS C/SEGURO', label: 'TOP PLAN 10,9,8,6,4,3 (+13) C/SEGURO (24x=1,00 · 14x=0,80)' },
+  { valor: 'TOP PLAN 13, 10, 9, 8, 6 E 4 - TODAS C/SEGURO', label: 'TOP PLAN 13,10,9,8,6,4 C/SEGURO (18x=1,00)' },
+  { valor: 'TOP PLAN13 C/SEGURO', label: 'TOP PLAN 13 C/SEGURO — nome curto (14x=1,00)' },
+  { valor: 'PLAN 3, 2 E 1 - TODAS C/SEGURO', label: 'PLAN 3,2,1 C/SEGURO (48x=0,80 · 24x=0,70)' },
+  { valor: 'NOVO - SEM SEGURO', label: 'NOVO - SEM SEGURO (48x=0,80 · 36x=0,70 · 24x=0,60)' },
+  { valor: 'PLAN 4, 3, 2 E 1 - TODAS C/ SEGURO', label: 'PLAN 4,3,2,1 C/SEGURO (36x=0,80)' },
+  { valor: 'TOP PLAN 2 E 1 - PLAN 10, 9, 8, 6, 4 E 3 - TODAS C/SEGURO', label: 'TOP PLAN 2,1 (+10,9,8,6,4,3) C/SEGURO (24x=0,80)' },
+  { valor: 'TOP PLAN 3, 2 E 1 - PLAN 13, 10, 9, 8, 6 E 4 - TODAS C/SEGURO', label: 'TOP PLAN 3,2,1 (+13,10,9,8,6,4) C/SEGURO (18x=0,80)' },
+  { valor: 'PLAN 2 E 1 - TODAS C/SEGURO', label: 'PLAN 2,1 C/SEGURO (24x=0,70)' },
+  { valor: 'PLAN 3 E 2 - TODAS C/SEGURO', label: 'PLAN 3,2 C/SEGURO (18x=0,70)' },
+  { valor: 'TOP PLAN 2 E 1 - PLAN 10 E 9 - TODAS C/SEGURO', label: 'TOP PLAN 2,1 (+10,9) C/SEGURO (14x=0,70)' },
+  { valor: 'PLAN 1 C/SEGURO E NOVO SEM SEGURO', label: 'PLAN 1 C/SEGURO e NOVO SEM SEGURO (18x=0,60)' },
+  { valor: 'PLAN 8, 6, 4 E 3 - TODAS C/SEGURO', label: 'PLAN 8,6,4,3 C/SEGURO (14x=0,60)' },
+  { valor: 'PLAN 2 E 1 C/SEGURO E NOVO SEM SEGURO', label: 'PLAN 2,1 C/SEGURO e NOVO SEM SEGURO (14x=0,50)' },
+  { valor: 'ESP PLAN 6 C/ SEGURO', label: 'ESP PLAN 6 C/SEGURO (18x=0,35)' },
+  { valor: 'ESP PLAN 4 C/ SEGURO', label: 'ESP PLAN 4 C/SEGURO (18x=0,30 · 14x=0,30)' },
+]
+
 // Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
-const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE']
+const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE', 'C6']
 
 const FACTA_CODIGOS = [
   { codigo: '69205', label: '69205 — Novo Gold, 60x (1,45)' },
@@ -1924,10 +1959,11 @@ const FACTA_CODIGOS = [
   { codigo: '69132', label: '69132 — Novo Gold, 24x (1,10)' },
   { codigo: '692213', label: '692213 — Novo Smart, 24-60x (1,10)' },
   { codigo: '69221', label: '69221 — Novo Smart, 24-60x (1,10)' },
-  { codigo: '69230', label: '69230 — Novo Smart, 24-60x (1,10)' },
   { codigo: '69078', label: '69078 — Novo Gold, 36/48x (0,90)' },
   { codigo: '69086', label: '69086 — Novo Gold, 36/48x (0,90)' },
-  { codigo: '69213', label: '69213 — Novo Smart, 24x (0,90)' },
+  { codigo: '69213', label: '69213 — Novo Smart: 24x (0,90) · 36/48/60x (1,10) — a partir de 01/09/2026' },
+  { codigo: '69230', label: '69230 — Novo Smart: 24x (0,70) · 36/48x (1,10) — a partir de 01/09/2026' },
+  { codigo: '69248', label: '69248 — Novo Smart, 24/36/48x (0,60 a partir de 01/09/2026)' },
   { codigo: '69116', label: '69116 — Novo Smart, 24-48x (0,90)' },
   { codigo: '69019', label: '69019 — Novo Gold, 24x (0,80)' },
   { codigo: '69094', label: '69094 — Novo Gold, 24x (0,80)' },
@@ -1961,6 +1997,147 @@ const FACTA_CODIGOS = [
   { codigo: '64785', label: '64785 — Refin da Port CLT, 36/48x (0,30)' },
 ]
 
+// Modal de "Adicionar adesão", compartilhado entre o portal restrito da
+// vendedora (vendedorFixo definido) e a visão geral de vendedoras (sem
+// vendedorFixo — nesse caso exige selecionar a vendedora num dropdown).
+// Envia sempre banco/tabela/parcelas/seguro pro backend, que calcula o
+// peso via calc_peso_vendas (tabela_pontos + fallback), então os pesos
+// batem automaticamente com a tabela vigente sem precisar hardcode aqui.
+function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }) {
+  const [addForm, setAddForm] = useState({
+    vendedorSel: vendedorFixo || '',
+    adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '',
+  })
+  const [addMsg, setAddMsg] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    const vendedorAlvo = vendedorFixo || addForm.vendedorSel
+    if (!vendedorAlvo) {
+      setAddMsg('Selecione a vendedora.')
+      return
+    }
+    setAdding(true)
+    setAddMsg('')
+    try {
+      const ehPorCodigo = BANCOS_POR_CODIGO.includes(addForm.banco)
+      const ehPorTabelaNome = BANCOS_POR_TABELA_NOME.includes(addForm.banco)
+      const precisaParcelasComTabelaNome = BANCOS_TABELA_NOME_COM_PARCELAS.includes(addForm.banco)
+      const result = await postApi('vendedoras_add_venda', {
+        vendedor: vendedorAlvo,
+        adesao: addForm.adesao,
+        cpf: addForm.cpf,
+        nome: addForm.nome,
+        valor: addForm.valor.replace(',', '.'),
+        banco: addForm.banco,
+        tabela: ehPorCodigo ? addForm.codigo : (ehPorTabelaNome ? addForm.tabelaNome : ''),
+        data_pagamento: addForm.dataPagamento,
+        parcelas: (ehPorTabelaNome && !precisaParcelasComTabelaNome) ? '' : addForm.parcelas,
+        seguro: ehPorTabelaNome ? '' : addForm.seguro,
+      })
+      const r = result?.[0]
+      if (r?.ok) {
+        setAddMsg('Venda adicionada. Sincronizando...')
+        setAddForm({ vendedorSel: vendedorFixo || '', adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
+        if (onAdded) await onAdded()
+        setAddMsg('Concluído!')
+        setTimeout(() => { onClose(); setAddMsg('') }, 1500)
+      } else {
+        setAddMsg(r?.mensagem || 'Não foi possível adicionar.')
+      }
+    } catch (e2) {
+      setAddMsg('Erro: ' + (e2.message || ''))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const tabelaOpcoes = addForm.banco === 'FGTSV8' ? FGTSV8_TABELAS
+    : addForm.banco === 'C6' ? C6_TABELAS
+    : NOVO_SAQUE_TABELAS
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+        <div className="funil-header">
+          <div><h2>Adicionar ades&atilde;o</h2></div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+        <form className="add-venda-form" onSubmit={handleAdd}>
+          {!vendedorFixo && (
+            <label>Vendedora
+              <select required value={addForm.vendedorSel} onChange={(e) => setAddForm({ ...addForm, vendedorSel: e.target.value })}>
+                <option value="">selecione a vendedora</option>
+                {(vendedoresDisponiveis || []).map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+          )}
+          <label>Ades&atilde;o<input required value={addForm.adesao} onChange={(e) => setAddForm({ ...addForm, adesao: e.target.value })} /></label>
+          <label>CPF<input required value={addForm.cpf} onChange={(e) => setAddForm({ ...addForm, cpf: e.target.value })} /></label>
+          <label>Nome<input required value={addForm.nome} onChange={(e) => setAddForm({ ...addForm, nome: e.target.value })} /></label>
+          <label>Valor<input required value={addForm.valor} onChange={(e) => setAddForm({ ...addForm, valor: e.target.value })} placeholder="0,00" /></label>
+          <label>Banco
+            <select required value={addForm.banco} onChange={(e) => setAddForm({ ...addForm, banco: e.target.value, codigo: '', tabelaNome: '', parcelas: '', seguro: '' })}>
+              <option value="">selecione o banco</option>
+              {BANCOS_VENDA.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </label>
+
+          {addForm.banco && BANCOS_POR_CODIGO.includes(addForm.banco) && (
+            <label>C&oacute;digo da tabela
+              <select required value={addForm.codigo} onChange={(e) => setAddForm({ ...addForm, codigo: e.target.value })}>
+                <option value="">selecione o c&oacute;digo</option>
+                {FACTA_CODIGOS.map((c) => <option key={c.codigo} value={c.codigo}>{c.label}</option>)}
+              </select>
+            </label>
+          )}
+          {addForm.banco && BANCOS_POR_CODIGO.includes(addForm.banco) && (
+            <label>Parcelas <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(s&oacute; necess&aacute;rio pra alguns c&oacute;digos)</span>
+              <input value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 36" />
+            </label>
+          )}
+
+          {addForm.banco && BANCOS_POR_TABELA_NOME.includes(addForm.banco) && (
+            <label>Tabela
+              <select required value={addForm.tabelaNome} onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })}>
+                <option value="">selecione a tabela</option>
+                {tabelaOpcoes.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+              </select>
+            </label>
+          )}
+          {addForm.banco && BANCOS_TABELA_NOME_COM_PARCELAS.includes(addForm.banco) && (
+            <label>Parcelas
+              <input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 48" />
+            </label>
+          )}
+
+          {addForm.banco && !BANCOS_POR_CODIGO.includes(addForm.banco) && !BANCOS_POR_TABELA_NOME.includes(addForm.banco) && (
+            <>
+              <label>Parcelas
+                <input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 24" />
+              </label>
+              <label>Seguro
+                <select value={addForm.seguro} onChange={(e) => setAddForm({ ...addForm, seguro: e.target.value })}>
+                  <option value="">n&atilde;o informado</option>
+                  <option value="sim">Com seguro</option>
+                  <option value="nao">Sem seguro</option>
+                </select>
+              </label>
+            </>
+          )}
+
+          <label>Data de pagamento <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(vazio = hoje)</span>
+            <input type="date" value={addForm.dataPagamento} onChange={(e) => setAddForm({ ...addForm, dataPagamento: e.target.value })} />
+          </label>
+
+          {addMsg && <p className="state-msg" style={{ margin: '4px 0' }}>{addMsg}</p>}
+          <button type="submit" className="refresh-btn" disabled={adding}>{adding ? 'Enviando...' : 'Adicionar'}</button>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 // URL do site de playbooks (projeto separado, "hotline-playbook").
 const PLAYBOOK_BASE_URL = 'https://hotline-playbook.vercel.app'
@@ -2560,10 +2737,6 @@ function VendedoraPortal({ vendedor, onLogout }) {
     url.searchParams.delete('onboarding')
     window.history.replaceState({}, '', url.toString())
   }
-  const [addForm, setAddForm] = useState({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
-  const [addMsg, setAddMsg] = useState('')
-  const [adding, setAdding] = useState(false)
-
   const { limit, offset } = useMemo(() => {
     if (page === 0) return { limit: 10, offset: 0 }
     if (page === 1) return { limit: 40, offset: 0 }
@@ -2650,43 +2823,6 @@ function VendedoraPortal({ vendedor, onLogout }) {
       if (s.semana <= ultima.semana) soma += Number(s[campo]) || 0
     }
     return soma
-  }
-
-  const handleAdd = async (e) => {
-    e.preventDefault()
-    setAdding(true)
-    setAddMsg('')
-    try {
-      const ehPorCodigo = BANCOS_POR_CODIGO.includes(addForm.banco)
-      const ehPorTabelaNome = BANCOS_POR_TABELA_NOME.includes(addForm.banco)
-      const result = await postApi('vendedoras_add_venda', {
-        vendedor,
-        adesao: addForm.adesao,
-        cpf: addForm.cpf,
-        nome: addForm.nome,
-        valor: addForm.valor.replace(',', '.'),
-        banco: addForm.banco,
-        tabela: ehPorCodigo ? addForm.codigo : (ehPorTabelaNome ? addForm.tabelaNome : ''),
-        data_pagamento: addForm.dataPagamento,
-        parcelas: ehPorTabelaNome ? '' : addForm.parcelas,
-        seguro: ehPorTabelaNome ? '' : addForm.seguro,
-      })
-      const r = result?.[0]
-      if (r?.ok) {
-        setAddMsg('Venda adicionada. Sincronizando...')
-        setAddForm({ adesao: '', cpf: '', nome: '', valor: '', banco: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
-        await callApi('vendedoras_sync', {})
-        await load()
-        setAddMsg('Concluído!')
-        setTimeout(() => { setShowAdd(false); setAddMsg('') }, 1500)
-      } else {
-        setAddMsg(r?.mensagem || 'Não foi possível adicionar.')
-      }
-    } catch (e2) {
-      setAddMsg('Erro: ' + (e2.message || ''))
-    } finally {
-      setAdding(false)
-    }
   }
 
   const semanasBatidas = semanas.filter((s) => Number(s.valor_semana) >= META_SEMANA && s.passada)
@@ -2796,14 +2932,14 @@ function VendedoraPortal({ vendedor, onLogout }) {
       <div className="panel table-panel">
         <p className="section-label">Minhas vendas ({fmtInt(tabela.total)})</p>
         <div className="template-row head" style={{ gridTemplateColumns: '1fr 1fr 1fr 0.8fr' }}>
-          <span>Valor</span><span>CPF</span><span>Banco</span><span>Data</span>
+          <span>{modo === 'ponto' ? 'Pontos' : 'Valor'}</span><span>CPF</span><span>Banco</span><span>Data</span>
         </div>
         {tabela.rows.length === 0 && !loading && (
           <div className="state-msg">Nenhuma venda encontrada para os filtros selecionados.</div>
         )}
         {tabela.rows.map((r, i) => (
           <div className="template-row" key={i} style={{ gridTemplateColumns: '1fr 1fr 1fr 0.8fr' }}>
-            <span>{fmtMoeda(r.valor)}</span>
+            <span>{fmtV(modo === 'ponto' ? r.ponto : r.valor)}</span>
             <span>{r.cpf}</span>
             <span>{r.banco || '-'}</span>
             <span>{fmtDataBR(r.dia)}</span>
@@ -2828,71 +2964,11 @@ function VendedoraPortal({ vendedor, onLogout }) {
       </div>
 
       {showAdd && (
-        <div className="funil-overlay" onClick={() => setShowAdd(false)}>
-          <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
-            <div className="funil-header">
-              <div><h2>Adicionar ades&atilde;o</h2></div>
-              <button className="funil-close" onClick={() => setShowAdd(false)}>&times;</button>
-            </div>
-            <form className="add-venda-form" onSubmit={handleAdd}>
-              <label>Ades&atilde;o<input required value={addForm.adesao} onChange={(e) => setAddForm({ ...addForm, adesao: e.target.value })} /></label>
-              <label>CPF<input required value={addForm.cpf} onChange={(e) => setAddForm({ ...addForm, cpf: e.target.value })} /></label>
-              <label>Nome<input required value={addForm.nome} onChange={(e) => setAddForm({ ...addForm, nome: e.target.value })} /></label>
-              <label>Valor<input required value={addForm.valor} onChange={(e) => setAddForm({ ...addForm, valor: e.target.value })} placeholder="0,00" /></label>
-              <label>Banco
-                <select required value={addForm.banco} onChange={(e) => setAddForm({ ...addForm, banco: e.target.value, codigo: '', tabelaNome: '', parcelas: '', seguro: '' })}>
-                  <option value="">selecione o banco</option>
-                  {BANCOS_VENDA.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-              </label>
-
-              {addForm.banco && BANCOS_POR_CODIGO.includes(addForm.banco) && (
-                <label>C&oacute;digo da tabela
-                  <select required value={addForm.codigo} onChange={(e) => setAddForm({ ...addForm, codigo: e.target.value })}>
-                    <option value="">selecione o c&oacute;digo</option>
-                    {FACTA_CODIGOS.map((c) => <option key={c.codigo} value={c.codigo}>{c.label}</option>)}
-                  </select>
-                </label>
-              )}
-              {addForm.banco && BANCOS_POR_CODIGO.includes(addForm.banco) && (
-                <label>Parcelas <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(s&oacute; necess&aacute;rio pra alguns c&oacute;digos)</span>
-                  <input value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 36" />
-                </label>
-              )}
-
-              {addForm.banco && BANCOS_POR_TABELA_NOME.includes(addForm.banco) && (
-                <label>Tabela
-                  <select required value={addForm.tabelaNome} onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })}>
-                    <option value="">selecione a tabela</option>
-                    {(addForm.banco === 'FGTSV8' ? FGTSV8_TABELAS : NOVO_SAQUE_TABELAS).map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
-                  </select>
-                </label>
-              )}
-
-              {addForm.banco && !BANCOS_POR_CODIGO.includes(addForm.banco) && !BANCOS_POR_TABELA_NOME.includes(addForm.banco) && (
-                <>
-                  <label>Parcelas
-                    <input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 24" />
-                  </label>
-                  <label>Seguro
-                    <select value={addForm.seguro} onChange={(e) => setAddForm({ ...addForm, seguro: e.target.value })}>
-                      <option value="">n&atilde;o informado</option>
-                      <option value="sim">Com seguro</option>
-                      <option value="nao">Sem seguro</option>
-                    </select>
-                  </label>
-                </>
-              )}
-
-              <label>Data de pagamento <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(vazio = hoje)</span>
-                <input type="date" value={addForm.dataPagamento} onChange={(e) => setAddForm({ ...addForm, dataPagamento: e.target.value })} />
-              </label>
-
-              {addMsg && <p className="state-msg" style={{ margin: '4px 0' }}>{addMsg}</p>}
-              <button type="submit" className="refresh-btn" disabled={adding}>{adding ? 'Enviando...' : 'Adicionar'}</button>
-            </form>
-          </div>
-        </div>
+        <AddVendaModal
+          vendedorFixo={vendedor}
+          onClose={() => setShowAdd(false)}
+          onAdded={async () => { await callApi('vendedoras_sync', {}); await load() }}
+        />
       )}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
 
@@ -2941,6 +3017,7 @@ function VendedorasView() {
   const [syncMsg, setSyncMsg] = useState('')
   const [showRanking, setShowRanking] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
@@ -3133,6 +3210,9 @@ function VendedorasView() {
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
             &#8595; Baixar
+          </button>
+          <button className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão para qualquer vendedora">
+            + Adicionar adesão
           </button>
           <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
@@ -3362,6 +3442,13 @@ function VendedorasView() {
 
       {showRanking && <RankingOverlay onClose={() => setShowRanking(false)} />}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
+      {showAdd && (
+        <AddVendaModal
+          vendedoresDisponiveis={vendedores}
+          onClose={() => setShowAdd(false)}
+          onAdded={async () => { await callApi('vendedoras_sync', {}); await load() }}
+        />
+      )}
 
       {showMetaConfig && metaForm && (
         <div className="funil-overlay" onClick={() => setShowMetaConfig(false)}>
