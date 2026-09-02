@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
 import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
+import RefinButton from './RefinLeads'
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 // altura de uma linha do breakdown (padding 7+7, conteúdo ~18, borda 1)
@@ -2699,6 +2700,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <img src="/tiger-icon.png" alt="" className="app-logo" />
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <RefinButton vendedor={vendedor} modo="vendedora" />
           <ArquivosButton dono={vendedor} />
           <PlaybookMenuButton />
           <span ref={tourAiRef} style={{ display: 'inline-flex' }}><AIChatButton vendedor={vendedor} /></span>
@@ -4187,6 +4189,7 @@ function Dashboard() {
         <ViewSwitcher view={view} setView={changeView} />
         {view === 'vendedoras' && (
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <RefinButton vendedor={null} modo="gestao" />
             <ArquivosButton dono={null} />
             <PlaybookMenuButton />
             <AIChatButton vendedor={undefined} />
