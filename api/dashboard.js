@@ -401,6 +401,51 @@ export default async function handler(req, res) {
     }
   }
 
+  if (type === 'consultas_bancos_export') {
+    try {
+      const p_banco = req.query.banco || null;
+      const client = getPool();
+      const result = await client.query(
+        `select criado_em, banco, adesao, cpf, origem, sucesso, encontrado,
+                valor_informado, valor_banco, tabela_informada, tabela_banco,
+                parcelas_banco, status_banco, divergente, mensagem
+         from dashboard_consultas_bancos_export($1::date, $2::date, $3::text)`,
+        [p_date_from, p_date_to, p_banco]
+      );
+      const cols = ['criado_em', 'banco', 'adesao', 'cpf', 'origem', 'sucesso', 'encontrado',
+        'valor_informado', 'valor_banco', 'tabela_informada', 'tabela_banco',
+        'parcelas_banco', 'status_banco', 'divergente', 'mensagem'];
+      return sendCsv(res, cols, result.rows, `consultas_bancos_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (type === 'propostas_bancos_export') {
+    try {
+      const p_banco = req.query.banco || null;
+      const client = getPool();
+      const result = await client.query(
+        `select criado_em, atualizado_em, banco, proposal_id, proposal_number, cpf, nome,
+                produto, tabela_nome, status, status_anterior, valor, parcelas,
+                pago, cancelado, data_pagamento, lancado_em_vendas, campanha, origem
+         from propostas_bancos
+         where ($1::date is null or criado_em::date >= $1::date)
+           and ($2::date is null or criado_em::date <= $2::date)
+           and ($3::text is null or $3::text = '' or banco = any(string_to_array($3::text, ',')))
+         order by criado_em desc
+         limit 20000`,
+        [p_date_from, p_date_to, p_banco]
+      );
+      const cols = ['criado_em', 'atualizado_em', 'banco', 'proposal_id', 'proposal_number', 'cpf', 'nome',
+        'produto', 'tabela_nome', 'status', 'status_anterior', 'valor', 'parcelas',
+        'pago', 'cancelado', 'data_pagamento', 'lancado_em_vendas', 'campanha', 'origem'];
+      return sendCsv(res, cols, result.rows, `propostas_bancos_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (type === 'disparos_export') {
     try {
       const client = getPool();

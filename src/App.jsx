@@ -3551,6 +3551,7 @@ function VendasView() {
   const [syncMsg, setSyncMsg] = useState('')
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
+  const [showEngrenagem, setShowEngrenagem] = useState(false)
   const fileInputRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -3690,6 +3691,16 @@ function VendasView() {
     window.open(`/api/dashboard?${qs.toString()}`, '_blank')
   }
 
+  // Downloads do que foi coletado das APIs dos bancos (log de consultas e
+  // propostas com proposal_id). Ficam atrás da engrenagem pra não poluir a
+  // barra principal — são dados de auditoria, não o relatório do dia a dia.
+  const handleDownloadBancos = (tipo) => {
+    const qs = new URLSearchParams({ type: tipo, date_from: dataInicio, date_to: dataFim })
+    if (bancoSel.length) qs.set('banco', bancoSel.join(','))
+    window.open(`/api/dashboard?${qs.toString()}`, '_blank')
+    setShowEngrenagem(false)
+  }
+
   return (
     <>
       <div className="topbar">
@@ -3708,6 +3719,54 @@ function VendasView() {
           <button className="refresh-btn" onClick={handleDownload} title="Baixar tabela filtrada em CSV">
             &#8595; Baixar
           </button>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              className="refresh-btn"
+              onClick={() => setShowEngrenagem((v) => !v)}
+              title="Dados coletados das APIs dos bancos"
+            >
+              &#9881;
+            </button>
+            {showEngrenagem && (
+              <>
+                <div
+                  onClick={() => setShowEngrenagem(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                />
+                <div
+                  style={{
+                    position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41,
+                    background: 'var(--panel, #14181c)', border: '1px solid var(--border, #2a3038)',
+                    borderRadius: 8, padding: 6, minWidth: 250,
+                    boxShadow: '0 8px 24px rgba(0,0,0,.45)',
+                  }}
+                >
+                  <p style={{ margin: '4px 8px 8px', fontSize: 11, color: 'var(--muted, #7d8894)', letterSpacing: '.04em' }}>
+                    DADOS DOS BANCOS
+                  </p>
+                  <button
+                    className="refresh-btn"
+                    style={{ width: '100%', textAlign: 'left', marginBottom: 4 }}
+                    onClick={() => handleDownloadBancos('consultas_bancos_export')}
+                    title="Cada consulta feita às APIs dos bancos, com valor informado x valor do banco"
+                  >
+                    &#8595; Consultas às APIs
+                  </button>
+                  <button
+                    className="refresh-btn"
+                    style={{ width: '100%', textAlign: 'left' }}
+                    onClick={() => handleDownloadBancos('propostas_bancos_export')}
+                    title="Propostas com proposal_id (Novo Saque e outros), com status de pagamento"
+                  >
+                    &#8595; Propostas / proposal_id
+                  </button>
+                  <p style={{ margin: '8px 8px 4px', fontSize: 11, color: 'var(--muted, #7d8894)' }}>
+                    Respeita o período e o filtro de banco.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
           <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
             {syncing ? 'Sincronizando...' : '↻ Sincronizar'}
           </button>
