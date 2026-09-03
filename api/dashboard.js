@@ -250,6 +250,53 @@ export default async function handler(req, res) {
       }
     }
 
+    if (type === 'consulta_adesao_banco') {
+      try {
+        const { banco, adesao, cpf, valor } = req.body || {};
+        if (!banco || !adesao) return res.status(400).json({ error: 'Informe banco e adesão.' });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        let resp;
+        try {
+          resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/consulta-adesao-banco', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ banco, adesao, cpf: cpf || null, valor: valor || null }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+        const texto = await resp.text();
+        let dados;
+        try { dados = JSON.parse(texto); } catch { dados = { sucesso: false, mensagem: texto?.slice(0, 300) }; }
+        return res.status(200).json(dados);
+      } catch (e) {
+        const timeoutMsg = e.name === 'AbortError' ? 'A consulta demorou demais. Tente novamente.' : e.message;
+        return res.status(500).json({ error: timeoutMsg });
+      }
+    }
+
+    if (type === 'novo_saque_status') {
+      try {
+        const cpf = String(req.body?.cpf || '').replace(/\D/g, '');
+        if (cpf.length !== 11) return res.status(400).json({ error: 'CPF inválido.' });
+        const client = getPool();
+        const result = await client.query(
+          `select proposal_id, status, tabela_nome, valor, parcelas, pago, cancelado,
+                  data_pagamento, lancado_em_vendas, criado_em, atualizado_em
+           from propostas_bancos
+           where banco = 'NOVO SAQUE' and cpf = $1
+           order by criado_em desc
+           limit 1`,
+          [cpf]
+        );
+        return res.status(200).json({ existe: result.rows.length > 0, proposta: result.rows[0] || null });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type === 'novo_saque_saldo') {
       try {
         const { cpf, product, vendedor, apenas_consultar, dados_pagamento, customer_data_manual } = req.body || {};
