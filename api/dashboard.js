@@ -250,6 +250,24 @@ export default async function handler(req, res) {
       }
     }
 
+    if (type === 'novo_saque_saldo') {
+      try {
+        const { cpf, product, vendedor } = req.body || {};
+        if (!cpf) return res.status(400).json({ error: 'Informe o CPF.' });
+        const resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/novo-saque-saldo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cpf, product: product || 'FGTS', vendedor: vendedor || null }),
+        });
+        const texto = await resp.text();
+        let dados;
+        try { dados = JSON.parse(texto); } catch { dados = { ok: false, erro: texto?.slice(0, 300) }; }
+        return res.status(200).json(dados);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type === 'vendedoras_import' || type === 'vendas_import') {
       try {
         const rows = req.body?.rows;

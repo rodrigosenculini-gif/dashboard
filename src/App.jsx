@@ -2139,6 +2139,102 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
   )
 }
 
+// Consulta de saldo do Novo Saque. A mesma chamada que checa o saldo tambem
+// cria o transaction_id (= proposal_id) e ja registra a proposta na base —
+// e assim que garantimos que toda proposta nasce com proposal_id, que e o
+// unico jeito de acompanhar o pagamento dela pela API depois.
+function NovoSaqueSaldoModal({ vendedorFixo, onClose }) {
+  const [cpf, setCpf] = useState('')
+  const [produto, setProduto] = useState('FGTS')
+  const [carregando, setCarregando] = useState(false)
+  const [res, setRes] = useState(null)
+  const [erro, setErro] = useState('')
+
+  const consultar = async (e) => {
+    e.preventDefault()
+    const doc = String(cpf).replace(/\D/g, '')
+    if (doc.length !== 11) { setErro('CPF precisa ter 11 dígitos.'); return }
+    setCarregando(true); setErro(''); setRes(null)
+    try {
+      const d = await postApi('novo_saque_saldo', { cpf: doc, product: produto, vendedor: vendedorFixo || null })
+      if (d?.error) { setErro(d.error); }
+      else setRes(d)
+    } catch (e2) {
+      setErro('Erro na consulta: ' + (e2.message || ''))
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="funil-header">
+          <div><h2>Novo Saque &mdash; consulta de saldo</h2></div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <form className="add-venda-form" onSubmit={consultar}>
+          <label>CPF do cliente
+            <input required value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="somente números" />
+          </label>
+          <label>Produto
+            <select value={produto} onChange={(e) => setProduto(e.target.value)}>
+              <option value="FGTS">FGTS</option>
+              <option value="CLT">CLT</option>
+            </select>
+          </label>
+          <button type="submit" className="refresh-btn" disabled={carregando}>
+            {carregando ? 'Consultando...' : 'Consultar saldo'}
+          </button>
+          <p className="kpi-sub" style={{ margin: '2px 0 0' }}>
+            A consulta cria a proposta no Novo Saque e j&aacute; registra o identificador dela na base.
+          </p>
+        </form>
+
+        {erro && <p className="state-msg error" style={{ marginTop: 10 }}>{erro}</p>}
+
+        {res && (
+          <div style={{ marginTop: 12 }}>
+            {res.saldo != null ? (
+              <>
+                <p className="kpi-label">Saldo dispon&iacute;vel</p>
+                <p className="kpi-value" style={{ color: 'var(--green, #7ddc9a)' }}>{fmtMoeda(res.saldo)}</p>
+              </>
+            ) : (
+              <p className="state-msg" style={{ margin: '0 0 8px' }}>
+                Sem saldo dispon&iacute;vel{res.contrato_bruto?.status_description ? ` — ${res.contrato_bruto.status_description}` : ''}
+              </p>
+            )}
+            {res.cliente && <p className="kpi-sub">{res.cliente}</p>}
+            {res.summary_status && <p className="kpi-sub">status: {res.summary_status}</p>}
+            {res.transaction_id && (
+              <p className="kpi-sub" style={{ wordBreak: 'break-all' }}>proposta: {res.transaction_id}</p>
+            )}
+
+            {res.ofertas?.length > 0 && (
+              <div className="panel table-panel" style={{ marginTop: 10 }}>
+                <p className="section-label">Ofertas</p>
+                <div className="template-row head" style={{ gridTemplateColumns: '1.6fr 0.7fr 1fr 1fr' }}>
+                  <span>Tabela</span><span>Parc.</span><span>Liberado</span><span>Parcela</span>
+                </div>
+                {res.ofertas.map((o, i) => (
+                  <div className="template-row" key={i} style={{ gridTemplateColumns: '1.6fr 0.7fr 1fr 1fr' }}>
+                    <span>{o.tabela || '-'}</span>
+                    <span>{o.parcelas ?? '-'}</span>
+                    <span>{fmtMoeda(o.valor_liberado)}</span>
+                    <span>{fmtMoeda(o.valor_parcela)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // URL do site de playbooks (projeto separado, "hotline-playbook").
 const PLAYBOOK_BASE_URL = 'https://hotline-playbook.vercel.app'
 
@@ -2714,6 +2810,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const fmtV = modo === 'ponto' ? ((v) => `${fmtInt(Math.round(v ?? 0))} pts`) : fmtMoeda
 
   const [showAdd, setShowAdd] = useState(false)
+  const [showSaldoNS, setShowSaldoNS] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(() => (
     new URLSearchParams(window.location.search).get('onboarding') === '1' ? 0 : -1
@@ -2859,6 +2956,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <button ref={tourAddRef} className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão">
             + Adicionar adesão
           </button>
+          <button className="refresh-btn" onClick={() => setShowSaldoNS(true)} title="Consultar saldo do Novo Saque e criar a proposta">
+            Saldo Novo Saque
+          </button>
           <button ref={tourFactaRef} className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
           </button>
@@ -2970,6 +3070,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
           onAdded={async () => { await callApi('vendedoras_sync', {}); await load() }}
         />
       )}
+      {showSaldoNS && <NovoSaqueSaldoModal vendedorFixo={vendedor} onClose={() => setShowSaldoNS(false)} />}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
 
       {onboardingStep >= 0 && onboardingStep < 5 && (
@@ -3018,6 +3119,7 @@ function VendedorasView() {
   const [showRanking, setShowRanking] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
+  const [showSaldoNS, setShowSaldoNS] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
@@ -3216,6 +3318,9 @@ function VendedorasView() {
           </button>
           <button className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão para qualquer vendedora">
             + Adicionar adesão
+          </button>
+          <button className="refresh-btn" onClick={() => setShowSaldoNS(true)} title="Consultar saldo do Novo Saque e criar a proposta">
+            Saldo Novo Saque
           </button>
           <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
@@ -3452,6 +3557,7 @@ function VendedorasView() {
           onAdded={async () => { await callApi('vendedoras_sync', {}); await load() }}
         />
       )}
+      {showSaldoNS && <NovoSaqueSaldoModal onClose={() => setShowSaldoNS(false)} />}
 
       {showMetaConfig && metaForm && (
         <div className="funil-overlay" onClick={() => setShowMetaConfig(false)}>
