@@ -2143,6 +2143,10 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
 // cria o transaction_id (= proposal_id) e ja registra a proposta na base —
 // e assim que garantimos que toda proposta nasce com proposal_id, que e o
 // unico jeito de acompanhar o pagamento dela pela API depois.
+// Consulta de saldo do Novo Saque — SEMPRE manda apenas_consultar:true, então
+// nunca chega a formalizar/criar proposta de verdade. A mesma chamada já cria
+// o transaction_id (= proposal_id) e registra em propostas_bancos, então dá
+// pra acompanhar o pagamento dela depois mesmo sem ter formalizado ainda.
 function NovoSaqueSaldoModal({ vendedorFixo, onClose }) {
   const [cpf, setCpf] = useState('')
   const [produto, setProduto] = useState('FGTS')
@@ -2156,8 +2160,8 @@ function NovoSaqueSaldoModal({ vendedorFixo, onClose }) {
     if (doc.length !== 11) { setErro('CPF precisa ter 11 dígitos.'); return }
     setCarregando(true); setErro(''); setRes(null)
     try {
-      const d = await postApi('novo_saque_saldo', { cpf: doc, product: produto, vendedor: vendedorFixo || null })
-      if (d?.error) { setErro(d.error); }
+      const d = await postApi('novo_saque_saldo', { cpf: doc, product: produto, vendedor: vendedorFixo || null, apenas_consultar: true })
+      if (d?.error) setErro(d.error)
       else setRes(d)
     } catch (e2) {
       setErro('Erro na consulta: ' + (e2.message || ''))
@@ -2188,48 +2192,236 @@ function NovoSaqueSaldoModal({ vendedorFixo, onClose }) {
             {carregando ? 'Consultando...' : 'Consultar saldo'}
           </button>
           <p className="kpi-sub" style={{ margin: '2px 0 0' }}>
-            A consulta cria a proposta no Novo Saque e j&aacute; registra o identificador dela na base.
+            S&oacute; consulta &mdash; n&atilde;o cria proposta. Pra formalizar, use "Cadastrar proposta".
           </p>
         </form>
 
         {erro && <p className="state-msg error" style={{ marginTop: 10 }}>{erro}</p>}
 
-        {res && (
+        {res?.precisa_manual && (
+          <p className="state-msg" style={{ marginTop: 10 }}>{res.mensagem}</p>
+        )}
+
+        {res && !res.precisa_manual && (
           <div style={{ marginTop: 12 }}>
-            {res.saldo != null ? (
+            {res.oferta ? (
               <>
-                <p className="kpi-label">Saldo dispon&iacute;vel</p>
-                <p className="kpi-value" style={{ color: 'var(--green, #7ddc9a)' }}>{fmtMoeda(res.saldo)}</p>
+                <p className="kpi-label">Melhor oferta dispon&iacute;vel</p>
+                <p className="kpi-value" style={{ color: 'var(--green, #7ddc9a)' }}>{fmtMoeda(res.oferta.liberado)}</p>
+                <p className="kpi-sub">{res.oferta.tabela} &middot; {res.oferta.parcelas}x de {fmtMoeda(res.oferta.parcela)}</p>
               </>
             ) : (
               <p className="state-msg" style={{ margin: '0 0 8px' }}>
-                Sem saldo dispon&iacute;vel{res.contrato_bruto?.status_description ? ` — ${res.contrato_bruto.status_description}` : ''}
+                {res.mensagem || 'Sem oferta disponível no momento.'}
+                {res.contrato_bruto?.status_description ? ` — ${res.contrato_bruto.status_description}` : ''}
               </p>
             )}
             {res.cliente && <p className="kpi-sub">{res.cliente}</p>}
-            {res.summary_status && <p className="kpi-sub">status: {res.summary_status}</p>}
             {res.transaction_id && (
               <p className="kpi-sub" style={{ wordBreak: 'break-all' }}>proposta: {res.transaction_id}</p>
             )}
-
-            {res.ofertas?.length > 0 && (
+            {res.todas_ofertas?.length > 0 && (
               <div className="panel table-panel" style={{ marginTop: 10 }}>
-                <p className="section-label">Ofertas</p>
+                <p className="section-label">Todas as ofertas</p>
                 <div className="template-row head" style={{ gridTemplateColumns: '1.6fr 0.7fr 1fr 1fr' }}>
                   <span>Tabela</span><span>Parc.</span><span>Liberado</span><span>Parcela</span>
                 </div>
-                {res.ofertas.map((o, i) => (
+                {res.todas_ofertas.map((o, i) => (
                   <div className="template-row" key={i} style={{ gridTemplateColumns: '1.6fr 0.7fr 1fr 1fr' }}>
                     <span>{o.tabela || '-'}</span>
                     <span>{o.parcelas ?? '-'}</span>
-                    <span>{fmtMoeda(o.valor_liberado)}</span>
-                    <span>{fmtMoeda(o.valor_parcela)}</span>
+                    <span>{fmtMoeda(o.liberado)}</span>
+                    <span>{fmtMoeda(o.parcela)}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Cadastro de proposta do Novo Saque — fluxo em 2 passos:
+//  1) consulta (apenas_consultar:true) mostra a melhor oferta pro CPF
+//  2) a vendedora confirma os dados de pagamento (pix ou conta) e envia
+//     de vez (apenas_consultar:false), que formaliza a proposta de verdade.
+// Se o Lemit não encontrar o CPF, abre o formulário manual dos dados do
+// cliente antes de deixar seguir.
+function NovoSaqueCadastroModal({ vendedorFixo, onClose, onCadastrado }) {
+  const [etapa, setEtapa] = useState('cpf') // cpf | manual | oferta | enviando | feito
+  const [cpf, setCpf] = useState('')
+  const [produto, setProduto] = useState('FGTS')
+  const [oferta, setOferta] = useState(null)
+  const [erro, setErro] = useState('')
+  const [carregando, setCarregando] = useState(false)
+
+  const [manual, setManual] = useState({ name: '', birth_date: '', email: '', gender: 'M', street: '', number: '', neighborhood: '', city: '', state: '', zip_code: '' })
+  const [usouManual, setUsouManual] = useState(false)
+  const [pagamento, setPagamento] = useState({ tipo: 'pix', pix_key: '', pix_key_type: 'cpf', bank_code: '', bank_account: '', bank_account_digit: '', bank_branch: '', bank_account_type: 'CAC' })
+
+  const doc = String(cpf).replace(/\D/g, '')
+
+  const montaCustomerDataManual = () => ({
+    name: manual.name, birth_date: manual.birth_date, email: manual.email, gender: manual.gender,
+    address: { street: manual.street, number: manual.number, neighborhood: manual.neighborhood, city: manual.city, state: manual.state, zip_code: manual.zip_code },
+  })
+
+  const montaDadosPagamento = () => pagamento.tipo === 'pix'
+    ? { pix_key: pagamento.pix_key, pix_key_type: pagamento.pix_key_type }
+    : { bank_code: pagamento.bank_code, bank_account: pagamento.bank_account, bank_account_digit: pagamento.bank_account_digit, bank_branch: pagamento.bank_branch, bank_account_type: pagamento.bank_account_type }
+
+  const consultarOferta = async (e) => {
+    e?.preventDefault()
+    if (doc.length !== 11) { setErro('CPF precisa ter 11 dígitos.'); return }
+    setCarregando(true); setErro('')
+    try {
+      const body = { cpf: doc, product: produto, vendedor: vendedorFixo || null, apenas_consultar: true }
+      if (etapa === 'manual') body.customer_data_manual = montaCustomerDataManual()
+      const d = await postApi('novo_saque_saldo', body)
+      if (d?.error) { setErro(d.error); return }
+      if (d?.precisa_manual) { setEtapa('manual'); return }
+      if (!d?.oferta) { setErro(d?.mensagem || 'Nenhuma oferta disponível para esse CPF.'); return }
+      setUsouManual(etapa === 'manual')
+      setOferta(d)
+      setEtapa('oferta')
+    } catch (e2) {
+      setErro('Erro na consulta: ' + (e2.message || ''))
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  const confirmarProposta = async (e) => {
+    e.preventDefault()
+    const pg = montaDadosPagamento()
+    if (pagamento.tipo === 'pix' && !pg.pix_key) { setErro('Informe a chave PIX.'); return }
+    if (pagamento.tipo === 'conta' && (!pg.bank_code || !pg.bank_account)) { setErro('Informe banco e conta.'); return }
+    setCarregando(true); setErro('')
+    try {
+      const body = { cpf: doc, product: produto, vendedor: vendedorFixo || null, apenas_consultar: false, dados_pagamento: pg }
+      if (usouManual) body.customer_data_manual = montaCustomerDataManual()
+      const d = await postApi('novo_saque_saldo', body)
+      if (d?.error) { setErro(d.error); return }
+      setOferta(d)
+      setEtapa('feito')
+      if (onCadastrado) onCadastrado()
+    } catch (e2) {
+      setErro('Erro ao enviar proposta: ' + (e2.message || ''))
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+        <div className="funil-header">
+          <div><h2>Novo Saque &mdash; cadastrar proposta</h2></div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        {(etapa === 'cpf' || etapa === 'manual') && (
+          <form className="add-venda-form" onSubmit={consultarOferta}>
+            <label>CPF do cliente
+              <input required value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="somente números" disabled={etapa === 'manual'} />
+            </label>
+            <label>Produto
+              <select value={produto} onChange={(e) => setProduto(e.target.value)} disabled={etapa === 'manual'}>
+                <option value="FGTS">FGTS</option>
+                <option value="CLT">CLT</option>
+              </select>
+            </label>
+
+            {etapa === 'manual' && (
+              <>
+                <p className="state-msg" style={{ margin: '4px 0' }}>
+                  CPF n&atilde;o encontrado no Lemit. Preencha os dados do cliente.
+                </p>
+                <label>Nome completo<input required value={manual.name} onChange={(e) => setManual({ ...manual, name: e.target.value })} /></label>
+                <label>Data de nascimento<input required type="date" value={manual.birth_date} onChange={(e) => setManual({ ...manual, birth_date: e.target.value })} /></label>
+                <label>E-mail<input type="email" value={manual.email} onChange={(e) => setManual({ ...manual, email: e.target.value })} /></label>
+                <label>Sexo
+                  <select value={manual.gender} onChange={(e) => setManual({ ...manual, gender: e.target.value })}>
+                    <option value="M">Masculino</option>
+                    <option value="F">Feminino</option>
+                  </select>
+                </label>
+                <label>CEP<input value={manual.zip_code} onChange={(e) => setManual({ ...manual, zip_code: e.target.value })} /></label>
+                <label>Rua<input value={manual.street} onChange={(e) => setManual({ ...manual, street: e.target.value })} /></label>
+                <label>N&uacute;mero<input value={manual.number} onChange={(e) => setManual({ ...manual, number: e.target.value })} /></label>
+                <label>Bairro<input value={manual.neighborhood} onChange={(e) => setManual({ ...manual, neighborhood: e.target.value })} /></label>
+                <label>Cidade<input value={manual.city} onChange={(e) => setManual({ ...manual, city: e.target.value })} /></label>
+                <label>Estado (UF)<input maxLength={2} value={manual.state} onChange={(e) => setManual({ ...manual, state: e.target.value.toUpperCase() })} /></label>
+              </>
+            )}
+
+            <button type="submit" className="refresh-btn" disabled={carregando}>
+              {carregando ? 'Consultando...' : 'Consultar oferta'}
+            </button>
+          </form>
+        )}
+
+        {etapa === 'oferta' && oferta && (
+          <form className="add-venda-form" onSubmit={confirmarProposta}>
+            <p className="kpi-label">Melhor oferta dispon&iacute;vel</p>
+            <p className="kpi-value" style={{ color: 'var(--green, #7ddc9a)' }}>{fmtMoeda(oferta.oferta.liberado)}</p>
+            <p className="kpi-sub" style={{ marginBottom: 10 }}>{oferta.oferta.tabela} &middot; {oferta.oferta.parcelas}x de {fmtMoeda(oferta.oferta.parcela)}</p>
+
+            <label>Forma de pagamento
+              <select value={pagamento.tipo} onChange={(e) => setPagamento({ ...pagamento, tipo: e.target.value })}>
+                <option value="pix">PIX</option>
+                <option value="conta">Conta banc&aacute;ria</option>
+              </select>
+            </label>
+
+            {pagamento.tipo === 'pix' ? (
+              <>
+                <label>Tipo de chave
+                  <select value={pagamento.pix_key_type} onChange={(e) => setPagamento({ ...pagamento, pix_key_type: e.target.value })}>
+                    <option value="cpf">CPF</option>
+                    <option value="email">E-mail</option>
+                    <option value="phone_number">Telefone</option>
+                    <option value="aleatory_key">Chave aleat&oacute;ria</option>
+                  </select>
+                </label>
+                <label>Chave PIX<input required value={pagamento.pix_key} onChange={(e) => setPagamento({ ...pagamento, pix_key: e.target.value })} /></label>
+              </>
+            ) : (
+              <>
+                <label>C&oacute;digo do banco<input required value={pagamento.bank_code} onChange={(e) => setPagamento({ ...pagamento, bank_code: e.target.value })} /></label>
+                <label>Ag&ecirc;ncia<input value={pagamento.bank_branch} onChange={(e) => setPagamento({ ...pagamento, bank_branch: e.target.value })} /></label>
+                <label>Conta<input required value={pagamento.bank_account} onChange={(e) => setPagamento({ ...pagamento, bank_account: e.target.value })} /></label>
+                <label>D&iacute;gito<input value={pagamento.bank_account_digit} onChange={(e) => setPagamento({ ...pagamento, bank_account_digit: e.target.value })} /></label>
+                <label>Tipo de conta
+                  <select value={pagamento.bank_account_type} onChange={(e) => setPagamento({ ...pagamento, bank_account_type: e.target.value })}>
+                    <option value="CAC">Corrente</option>
+                    <option value="TRAN">Pagamento</option>
+                    <option value="SLRY">Sal&aacute;rio</option>
+                    <option value="SVG">Poupan&ccedil;a</option>
+                  </select>
+                </label>
+              </>
+            )}
+
+            <button type="submit" className="refresh-btn" disabled={carregando}>
+              {carregando ? 'Enviando...' : 'Confirmar e enviar proposta'}
+            </button>
+          </form>
+        )}
+
+        {etapa === 'feito' && oferta && (
+          <div>
+            <p className="state-msg" style={{ margin: '4px 0 10px' }}>
+              {oferta.ok ? 'Proposta enviada para formalização.' : 'Não foi possível formalizar a proposta.'}
+            </p>
+            {oferta.transaction_id && <p className="kpi-sub" style={{ wordBreak: 'break-all' }}>proposta: {oferta.transaction_id}</p>}
+            <button className="refresh-btn" onClick={onClose}>Fechar</button>
+          </div>
+        )}
+
+        {erro && <p className="state-msg error" style={{ marginTop: 10 }}>{erro}</p>}
       </div>
     </div>
   )
@@ -2811,6 +3003,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
 
   const [showAdd, setShowAdd] = useState(false)
   const [showSaldoNS, setShowSaldoNS] = useState(false)
+  const [showCadastroNS, setShowCadastroNS] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(() => (
     new URLSearchParams(window.location.search).get('onboarding') === '1' ? 0 : -1
@@ -2959,6 +3152,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <button className="refresh-btn" onClick={() => setShowSaldoNS(true)} title="Consultar saldo do Novo Saque e criar a proposta">
             Saldo Novo Saque
           </button>
+          <button className="refresh-btn" onClick={() => setShowCadastroNS(true)} title="Cadastrar proposta do Novo Saque">
+            Cadastrar Proposta NS
+          </button>
           <button ref={tourFactaRef} className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
           </button>
@@ -3071,6 +3267,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         />
       )}
       {showSaldoNS && <NovoSaqueSaldoModal vendedorFixo={vendedor} onClose={() => setShowSaldoNS(false)} />}
+      {showCadastroNS && <NovoSaqueCadastroModal vendedorFixo={vendedor} onClose={() => setShowCadastroNS(false)} />}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
 
       {onboardingStep >= 0 && onboardingStep < 5 && (
@@ -3120,6 +3317,7 @@ function VendedorasView() {
   const [showFacta, setShowFacta] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [showSaldoNS, setShowSaldoNS] = useState(false)
+  const [showCadastroNS, setShowCadastroNS] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
@@ -3321,6 +3519,9 @@ function VendedorasView() {
           </button>
           <button className="refresh-btn" onClick={() => setShowSaldoNS(true)} title="Consultar saldo do Novo Saque e criar a proposta">
             Saldo Novo Saque
+          </button>
+          <button className="refresh-btn" onClick={() => setShowCadastroNS(true)} title="Cadastrar proposta do Novo Saque">
+            Cadastrar Proposta NS
           </button>
           <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
@@ -3558,6 +3759,7 @@ function VendedorasView() {
         />
       )}
       {showSaldoNS && <NovoSaqueSaldoModal onClose={() => setShowSaldoNS(false)} />}
+      {showCadastroNS && <NovoSaqueCadastroModal onClose={() => setShowCadastroNS(false)} />}
 
       {showMetaConfig && metaForm && (
         <div className="funil-overlay" onClick={() => setShowMetaConfig(false)}>
