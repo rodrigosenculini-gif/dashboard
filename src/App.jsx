@@ -2035,6 +2035,7 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   const [msg, setMsg] = useState('')
   const [carregando, setCarregando] = useState(false)
   const [copiado, setCopiado] = useState(false)
+  const [simForm, setSimForm] = useState({ bancarizadora: '', tipoCalculo: 'VALOR_LIQUIDO', valor: '', parcelas: '', comSeguro: true })
 
   const chamar = async (payload) => {
     setCarregando(true); setMsg('')
@@ -2064,9 +2065,32 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
     if (d) setJornada((j) => ({ ...j, ...d }))
   }
 
+  const simular = async () => {
+    const id = jornada?.jornadaId || jornada?.jorId
+    if (!id) return
+    if (!simForm.bancarizadora) { setMsg('Escolha a bancarizadora.'); return }
+    if (!simForm.valor) { setMsg('Informe o valor.'); return }
+    const d = await chamar({
+      acao: 'simular',
+      jornadaId: id,
+      bancarizadora: simForm.bancarizadora,
+      tipoCalculo: simForm.tipoCalculo,
+      valor: Number(String(simForm.valor).replace(',', '.')),
+      parcelas: simForm.parcelas ? Number(simForm.parcelas) : undefined,
+      comSeguro: simForm.comSeguro,
+    })
+    // A simulação nova aparece na jornada; recarrega pra listar todas.
+    if (d) await atualizar()
+  }
+
   const link = jornada?.linkAceite || jornada?.jorLinkAceite || null
   const statusId = jornada?.jorStatusId ?? jornada?.statusId ?? null
   const jornadaId = jornada?.jornadaId || jornada?.jorId || null
+  const acoes = jornada?.acoes || []
+  const bancas = [].concat(jornada?.bancaElegivel || []).filter(Boolean)
+  const simulacoes = jornada?.simulacoes || []
+  const podeSimular = acoes.includes('SIMULAR')
+  const podeGerarProposta = acoes.includes('GERAR_PROPOSTA')
 
   return (
     <div className="funil-overlay" onClick={onClose}>
@@ -2110,6 +2134,73 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                     onClick={() => { navigator.clipboard?.writeText(link); setCopiado(true) }}>
                     {copiado ? 'Link copiado' : 'Copiar link'}
                   </button>
+                </div>
+              )}
+
+              {jornada?.margemDisponivel != null && (
+                <p className="kpi-sub" style={{ margin: '2px 0' }}>
+                  Margem dispon&iacute;vel: <strong>{fmtMoeda(jornada.margemDisponivel)}</strong>
+                  {jornada?.margemValidaAte ? <> &middot; v&aacute;lida at&eacute; {String(jornada.margemValidaAte).slice(0, 10)}</> : null}
+                </p>
+              )}
+
+              {/* A API diz em "acoes" o que dá pra fazer agora; a tela segue isso
+                  em vez de adivinhar pelo status. Antes do aceite do cliente,
+                  SIMULAR não vem e o bloco nem aparece. */}
+              {podeSimular && (
+                <div style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 10, margin: '6px 0' }}>
+                  <p className="kpi-sub" style={{ margin: '0 0 6px' }}><strong>Simular</strong></p>
+                  <label>Bancarizadora
+                    <select value={simForm.bancarizadora} onChange={(e) => setSimForm({ ...simForm, bancarizadora: e.target.value })}>
+                      <option value="">selecione</option>
+                      {(bancas.length ? bancas : ['UY3', 'CELCOIN', '321BANK']).map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>Tipo de c&aacute;lculo
+                    <select value={simForm.tipoCalculo} onChange={(e) => setSimForm({ ...simForm, tipoCalculo: e.target.value })}>
+                      <option value="VALOR_LIQUIDO">Valor liberado ao cliente</option>
+                      <option value="VALOR_PARCELA">Valor da parcela</option>
+                      <option value="VALOR_BRUTO">Valor bruto</option>
+                    </select>
+                  </label>
+                  <label>Valor
+                    <input value={simForm.valor} onChange={(e) => setSimForm({ ...simForm, valor: e.target.value })} placeholder="0,00" />
+                  </label>
+                  <label>Parcelas <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(opcional)</span>
+                    <input value={simForm.parcelas} onChange={(e) => setSimForm({ ...simForm, parcelas: e.target.value })} placeholder="ex: 24" />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="checkbox" checked={simForm.comSeguro} onChange={(e) => setSimForm({ ...simForm, comSeguro: e.target.checked })} />
+                    Com seguro
+                  </label>
+                  <button type="button" className="refresh-btn" onClick={simular} disabled={carregando}>
+                    {carregando ? 'Simulando...' : 'Simular'}
+                  </button>
+                </div>
+              )}
+
+              {simulacoes.length > 0 && (
+                <div style={{ margin: '6px 0' }}>
+                  <p className="kpi-sub" style={{ margin: '0 0 4px' }}><strong>Simula&ccedil;&otilde;es</strong></p>
+                  {simulacoes.map((sm) => (
+                    <div key={sm.simId} style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 8, marginBottom: 6 }}>
+                      <div style={{ fontSize: 13 }}>
+                        <strong>{sm.simBancarizadora}</strong> &middot; l&iacute;quido {fmtMoeda(sm.simValorLiquido)}
+                        {sm.simParcelas ? <> &middot; {sm.simParcelas}x</> : null}
+                        {sm.simValorParcela ? <> de {fmtMoeda(sm.simValorParcela)}</> : null}
+                      </div>
+                      {sm.simTaxaMensal != null && (
+                        <div className="kpi-sub">Taxa {sm.simTaxaMensal}% a.m.</div>
+                      )}
+                    </div>
+                  ))}
+                  {!podeGerarProposta && (
+                    <p className="kpi-sub" style={{ margin: '2px 0' }}>
+                      Para gerar a proposta ainda falta cadastrar os dados banc&aacute;rios do cliente.
+                    </p>
+                  )}
                 </div>
               )}
 
