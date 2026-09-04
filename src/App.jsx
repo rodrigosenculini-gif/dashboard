@@ -2349,11 +2349,19 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                     <div key={sm?.simId || i} style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 8, marginBottom: 6 }}>
                       <div style={{ fontSize: 13 }}>
                         <strong>{sm.simBancarizadora}</strong> &middot; l&iacute;quido {fmtMoeda(sm.simValorLiquido)}
-                        {sm.simParcelas ? <> &middot; {sm.simParcelas}x</> : null}
+                        {sm.simPrazo ? <> &middot; {sm.simPrazo}x</> : null}
                         {sm.simValorParcela ? <> de {fmtMoeda(sm.simValorParcela)}</> : null}
                       </div>
-                      {sm.simTaxaMensal != null && (
-                        <div className="kpi-sub">Taxa {sm.simTaxaMensal}% a.m.</div>
+                      {sm.simRegraComissaoNome && (
+                        <div className="kpi-sub">{sm.simRegraComissaoNome}</div>
+                      )}
+                      <div className="kpi-sub">
+                        {sm.simTaxaMensal != null ? <>Taxa {sm.simTaxaMensal}% a.m.</> : null}
+                        {sm.simCetMensal != null ? <> &middot; CET {sm.simCetMensal}%</> : null}
+                        {sm.simComSeguroAplicado ? <> &middot; com seguro</> : null}
+                      </div>
+                      {sm.simValorDivida != null && (
+                        <div className="kpi-sub">Total a pagar {fmtMoeda(sm.simValorDivida)}</div>
                       )}
                     </div>
                   ))}
