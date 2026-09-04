@@ -2336,9 +2336,20 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                     <input type="checkbox" checked={simForm.comSeguro} onChange={(e) => setSimForm({ ...simForm, comSeguro: e.target.checked })} />
                     Com seguro
                   </label>
-                  <button type="button" className="refresh-btn" onClick={simular} disabled={carregando}>
-                    {carregando ? 'Simulando...' : 'Simular'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" className="refresh-btn" onClick={simular} disabled={carregando}>
+                      {carregando ? 'Simulando...' : 'Simular com estes valores'}
+                    </button>
+                    <button type="button" className="refresh-btn" disabled={carregando || !margem}
+                      title="Volta pro maximo da margem e simula de novo"
+                      onClick={() => {
+                        const banca = simForm.bancarizadora || bancas[0]
+                        setSimForm({ bancarizadora: banca, tipoCalculo: 'VALOR_PARCELA', valor: String(margem), parcelas: '', comSeguro: true })
+                        jaSimulouRef.current = null   // libera a simulacao automatica de novo
+                      }}>
+                      Refazer pelo m&aacute;ximo
+                    </button>
+                  </div>
                 </div>
               )}
 
