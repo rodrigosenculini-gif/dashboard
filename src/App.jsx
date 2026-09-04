@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
 import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
@@ -2029,6 +2029,31 @@ const SOMA_JORNADA_STATUS = {
   9: 'Proposta cancelada',
 }
 
+class ErroNaTela extends React.Component {
+  constructor(props) { super(props); this.state = { erro: null } }
+  static getDerivedStateFromError(erro) { return { erro } }
+  componentDidCatch(erro, info) { console.error('Erro no modal:', erro, info) }
+  render() {
+    if (this.state.erro) {
+      return (
+        <div className="funil-overlay" onClick={this.props.onClose}>
+          <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="funil-header">
+              <div><h2>Algo quebrou nesta tela</h2></div>
+              <button className="funil-close" onClick={this.props.onClose}>&times;</button>
+            </div>
+            <div className="add-venda-form">
+              <p className="kpi-sub" style={{ color: '#e5484d' }}>{String(this.state.erro?.message || this.state.erro)}</p>
+              <p className="kpi-sub">Feche e tente de novo. Se repetir, me mande esta mensagem.</p>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function SomaJornadaModal({ vendedorFixo, onClose }) {
   const [form, setForm] = useState({ cpf: '', nome: '', celular: '', dataNascimento: '' })
   const [jornada, setJornada] = useState(null)
@@ -2043,8 +2068,14 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   // A Soma so devolve a margem no momento em que a jornada fica elegivel; nas
   // consultas seguintes ela volta vazia. Guardamos aqui pra nao sumir da tela.
   const [margemSalva, setMargemSalva] = useState(null)
+  // Refs em vez de state: nao se perdem em re-render e nao entram como
+  // dependencia de efeito (era o que fazia simular em loop).
+  const jaSimulouRef = useRef(null)     // guarda o jornadaId ja simulado
+  const carregandoRef = useRef(false)
+  const tentativasRef = useRef(0)
 
   const chamar = async (payload) => {
+    carregandoRef.current = true
     setCarregando(true); setMsg('')
     try {
       const d = await postApi('soma_jornada', payload)
@@ -2055,6 +2086,7 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
       setMsg('Erro: ' + (e.message || ''))
       return null
     } finally {
+      carregandoRef.current = false
       setCarregando(false)
     }
   }
@@ -2161,39 +2193,39 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
     if (!jornadaId) return
     const finais = [3, 4, 5, 8, 9]   // gerou proposta, paga, nao elegivel, expirada, cancelada
     if (finais.includes(Number(statusId))) return
+    tentativasRef.current = 0
     const t = setInterval(() => {
-      // nao empilha chamada em cima de outra em andamento
-      if (!carregando) atualizar()
+      // para depois de 10 min pra nao ficar batendo pra sempre
+      if (tentativasRef.current >= 120) { clearInterval(t); return }
+      tentativasRef.current += 1
+      if (!carregandoRef.current) atualizar()
     }, 5000)
     return () => clearInterval(t)
-  }, [jornadaId, statusId, carregando])
+  }, [jornadaId, statusId])
 
   // Assim que a jornada fica elegivel, simula sozinho pela margem de parcela
   // (e pela banca que a Soma marcou como elegivel). A vendedora nao digita nada;
   // se quiser outro valor, ajusta e clica em Simular de novo.
   useEffect(() => {
-    if (!jornadaId || !podeSimular || simulouAuto) return
-    if (simulacoes.length > 0) { setSimulouAuto(true); return }
+    if (!jornadaId || !podeSimular) return
+    if (jaSimulouRef.current === jornadaId) return   // ja simulou ESTA jornada
+    if (simulacoes.length > 0) { jaSimulouRef.current = jornadaId; return }
     const banca = bancas[0]
     if (!margem || !banca) return
-    setSimulouAuto(true)
+    jaSimulouRef.current = jornadaId                  // trava antes de disparar
     setSimForm((f) => ({ ...f, bancarizadora: banca, tipoCalculo: 'VALOR_PARCELA', valor: String(margem) }))
     ;(async () => {
       try {
         const d = await chamar({
-          acao: 'simular',
-          jornadaId,
-          bancarizadora: banca,
-          tipoCalculo: 'VALOR_PARCELA',
-          valor: Number(margem),
-          comSeguro: true,
+          acao: 'simular', jornadaId, bancarizadora: banca,
+          tipoCalculo: 'VALOR_PARCELA', valor: Number(margem), comSeguro: true,
         })
         if (d) await atualizar()
       } catch (e) {
         setMsg('Não consegui simular automaticamente: ' + (e?.message || 'erro'))
       }
     })()
-  }, [jornadaId, podeSimular, simulacoes.length, jornada?.margemDisponivel])
+  }, [jornadaId, podeSimular, simulacoes.length, margem])
 
   return (
     <div className="funil-overlay" onClick={onClose}>
@@ -2242,6 +2274,25 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                     onClick={() => { navigator.clipboard?.writeText(link); setCopiado(true) }}>
                     {copiado ? 'Link copiado' : 'Copiar link'}
                   </button>
+                </div>
+              )}
+
+              {(Number(statusId) === 5 || Number(statusId) === 8 || Number(statusId) === 9) && (
+                <div style={{ border: '2px solid #e5484d', background: 'rgba(229,72,77,0.12)', borderRadius: 8, padding: 10, margin: '6px 0' }}>
+                  <p style={{ margin: 0, fontWeight: 700, color: '#e5484d' }}>
+                    {Number(statusId) === 5 ? 'Recusado' : Number(statusId) === 8 ? 'Expirou' : 'Cancelado'}
+                  </p>
+                  <p className="kpi-sub" style={{ margin: '4px 0 0' }}>
+                    {SOMA_JORNADA_STATUS[statusId] || ''}
+                  </p>
+                  {(Array.isArray(jornada?.etapas) ? jornada.etapas : []).map((et, i) => (
+                    <p key={i} className="kpi-sub" style={{ margin: '2px 0' }}>
+                      <strong>{et?.banca}</strong>: {et?.status}
+                      {et?.mensagem ? ' — ' + et.mensagem : ''}
+                      {Array.isArray(et?.motivosMapeados) && et.motivosMapeados.length
+                        ? ' — ' + et.motivosMapeados.join('; ') : ''}
+                    </p>
+                  ))}
                 </div>
               )}
 
@@ -2320,6 +2371,7 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
               <button type="button" className="reset-btn" style={{ fontSize: 12, padding: '4px 8px' }}
                 onClick={() => {
                   setJornada(null); setMsg(''); setSimulouAuto(false); setMargemSalva(null); setCopiado(false)
+                  jaSimulouRef.current = null; tentativasRef.current = 0
                   setForm({ cpf: '', nome: '', celular: '', dataNascimento: '' })
                   setSimForm({ bancarizadora: '', tipoCalculo: 'VALOR_PARCELA', valor: '', parcelas: '', comSeguro: true })
                 }}>
@@ -2328,7 +2380,13 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
             </>
           )}
 
-          {msg && <p className="kpi-sub" style={{ margin: '6px 0' }}>{msg}</p>}
+          {msg && (
+            <p className="kpi-sub" style={{
+              margin: '6px 0', padding: '6px 8px', borderRadius: 6,
+              border: '1px solid var(--border, #333)',
+              background: /erro|não|nao |recus|inv|falh/i.test(msg) ? 'rgba(229,72,77,0.12)' : 'transparent',
+            }}>{msg}</p>
+          )}
         </div>
       </div>
     </div>
@@ -3666,7 +3724,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         />
       )}
       {showNovoSaque && <NovoSaqueModal vendedorFixo={vendedor} onClose={() => setShowNovoSaque(false)} />}
-      {showSomaJornada && <SomaJornadaModal vendedorFixo={vendedor} onClose={() => setShowSomaJornada(false)} />}
+      {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal vendedorFixo={vendedor} onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
 
       {onboardingStep >= 0 && onboardingStep < 5 && (
@@ -4154,7 +4212,7 @@ function VendedorasView() {
         />
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
-      {showSomaJornada && <SomaJornadaModal onClose={() => setShowSomaJornada(false)} />}
+      {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
 
       {showMetaConfig && metaForm && (
         <div className="funil-overlay" onClick={() => setShowMetaConfig(false)}>
