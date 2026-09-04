@@ -2009,6 +2009,126 @@ const FACTA_CODIGOS = [
 // Envia sempre banco/tabela/parcelas/seguro pro backend, que calcula o
 // peso via calc_peso_vendas (tabela_pontos + fallback), então os pesos
 // batem automaticamente com a tabela vigente sem precisar hardcode aqui.
+// Jornada Soma (Consulta Unificada) — a plataforma percorre a cascata de
+// bancarizadoras sozinha e para na primeira que aprovar margem.
+//
+// O aceite é do CLIENTE, não da vendedora: quando a jornada volta com
+// linkAceite, ela fica travada em "Aguardando Aceite" e nenhuma bancarizadora
+// roda até o cliente assinar (o termo expira em 24h). Por isso o link aqui é
+// só copiado/enviado pro cliente — não abrimos nem assinamos por ele.
+const SOMA_JORNADA_STATUS = {
+  1: 'Em andamento — consultando bancarizadoras',
+  2: 'Elegível — pode simular',
+  3: 'Gerou proposta',
+  4: 'Proposta paga',
+  5: 'Não elegível — nenhuma bancarizadora aprovou',
+  6: 'Erro — a plataforma vai tentar de novo',
+  7: 'Aguardando o cliente assinar o termo',
+  8: 'Expirada — o cliente não assinou em 24h',
+  9: 'Proposta cancelada',
+}
+
+function SomaJornadaModal({ vendedorFixo, onClose }) {
+  const [form, setForm] = useState({ cpf: '', nome: '', celular: '', dataNascimento: '' })
+  const [jornada, setJornada] = useState(null)
+  const [msg, setMsg] = useState('')
+  const [carregando, setCarregando] = useState(false)
+  const [copiado, setCopiado] = useState(false)
+
+  const chamar = async (payload) => {
+    setCarregando(true); setMsg('')
+    try {
+      const d = await postApi('soma_jornada', payload)
+      if (d?.error) { setMsg(d.error); return null }
+      if (d?.message && !d?.jornadaId && !d?.jorId) { setMsg(d.message); return null }
+      return d
+    } catch (e) {
+      setMsg('Erro: ' + (e.message || ''))
+      return null
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  const iniciar = async () => {
+    if (!form.cpf || !form.nome || !form.celular) { setMsg('Preencha CPF, nome e celular.'); return }
+    const d = await chamar({ acao: 'iniciar', ...form })
+    if (d) { setJornada(d); setCopiado(false) }
+  }
+
+  const atualizar = async () => {
+    const id = jornada?.jornadaId || jornada?.jorId
+    if (!id) return
+    const d = await chamar({ acao: 'status', jornadaId: id })
+    if (d) setJornada((j) => ({ ...j, ...d }))
+  }
+
+  const link = jornada?.linkAceite || jornada?.jorLinkAceite || null
+  const statusId = jornada?.jorStatusId ?? jornada?.statusId ?? null
+  const jornadaId = jornada?.jornadaId || jornada?.jorId || null
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="funil-header">
+          <div><h2>Soma &mdash; nova consulta</h2></div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <div className="add-venda-form">
+          {!jornada && (
+            <>
+              <label>CPF<input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="somente n&uacute;meros" /></label>
+              <label>Nome completo<input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></label>
+              <label>Celular<input value={form.celular} onChange={(e) => setForm({ ...form, celular: e.target.value })} placeholder="DDD + n&uacute;mero" /></label>
+              <label>Data de nascimento <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(algumas bancarizadoras exigem)</span>
+                <input type="date" value={form.dataNascimento} onChange={(e) => setForm({ ...form, dataNascimento: e.target.value })} />
+              </label>
+              <button type="button" className="refresh-btn" onClick={iniciar} disabled={carregando}>
+                {carregando ? 'Consultando...' : 'Consultar margem'}
+              </button>
+            </>
+          )}
+
+          {jornada && (
+            <>
+              <p className="kpi-sub" style={{ margin: '4px 0' }}>
+                Jornada <strong>{jornadaId || '-'}</strong>
+                {statusId != null && <> &middot; {SOMA_JORNADA_STATUS[statusId] || ('status ' + statusId)}</>}
+              </p>
+
+              {link && (
+                <div style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 10, margin: '6px 0' }}>
+                  <p className="kpi-sub" style={{ margin: '0 0 6px' }}>
+                    <strong>Envie este link para o cliente assinar.</strong> Nenhuma bancarizadora consulta a margem
+                    antes do aceite dele, e o termo expira em 24h. O aceite &eacute; do cliente &mdash; n&atilde;o
+                    assine no lugar dele.
+                  </p>
+                  <input readOnly value={link} onClick={(e) => e.target.select()} style={{ width: '100%' }} />
+                  <button type="button" className="refresh-btn" style={{ marginTop: 6, fontSize: 12, padding: '4px 8px' }}
+                    onClick={() => { navigator.clipboard?.writeText(link); setCopiado(true) }}>
+                    {copiado ? 'Link copiado' : 'Copiar link'}
+                  </button>
+                </div>
+              )}
+
+              <button type="button" className="refresh-btn" onClick={atualizar} disabled={carregando}>
+                {carregando ? 'Atualizando...' : 'Atualizar status'}
+              </button>
+              <button type="button" className="reset-btn" style={{ fontSize: 12, padding: '4px 8px' }}
+                onClick={() => { setJornada(null); setMsg('') }}>
+                &larr; Nova consulta
+              </button>
+            </>
+          )}
+
+          {msg && <p className="kpi-sub" style={{ margin: '6px 0' }}>{msg}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }) {
   const [addForm, setAddForm] = useState({
     vendedorSel: vendedorFixo || '',
@@ -3076,6 +3196,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
 
   const [showAdd, setShowAdd] = useState(false)
   const [showNovoSaque, setShowNovoSaque] = useState(false)
+  const [showSomaJornada, setShowSomaJornada] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(() => (
     new URLSearchParams(window.location.search).get('onboarding') === '1' ? 0 : -1
@@ -3224,6 +3345,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <button className="refresh-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: consulta status, saldo/ofertas e cadastro de proposta">
             Novo Saque
           </button>
+          <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simula&ccedil;&atilde;o e cadastro de proposta">
+            Soma
+          </button>
           <button ref={tourFactaRef} className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
           </button>
@@ -3336,6 +3460,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         />
       )}
       {showNovoSaque && <NovoSaqueModal vendedorFixo={vendedor} onClose={() => setShowNovoSaque(false)} />}
+      {showSomaJornada && <SomaJornadaModal vendedorFixo={vendedor} onClose={() => setShowSomaJornada(false)} />}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
 
       {onboardingStep >= 0 && onboardingStep < 5 && (
@@ -3385,6 +3510,7 @@ function VendedorasView() {
   const [showFacta, setShowFacta] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [showNovoSaque, setShowNovoSaque] = useState(false)
+  const [showSomaJornada, setShowSomaJornada] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
@@ -3583,6 +3709,9 @@ function VendedorasView() {
           </button>
           <button className="refresh-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: consulta status, saldo/ofertas e cadastro de proposta">
             Novo Saque
+          </button>
+          <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simula&ccedil;&atilde;o e cadastro de proposta">
+            Soma
           </button>
           <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
@@ -3819,6 +3948,7 @@ function VendedorasView() {
         />
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
+      {showSomaJornada && <SomaJornadaModal onClose={() => setShowSomaJornada(false)} />}
 
       {showMetaConfig && metaForm && (
         <div className="funil-overlay" onClick={() => setShowMetaConfig(false)}>
