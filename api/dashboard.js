@@ -314,6 +314,20 @@ export default async function handler(req, res) {
       }
     }
 
+    // Busca nome/celular/nascimento nas nossas bases pelo CPF, pra vendedora
+    // não redigitar na consulta da Soma. Se não achar, o front cai no Lemit.
+    if (type === 'busca_cliente_cpf') {
+      try {
+        const cpf = String(req.body?.cpf || '').replace(/\D/g, '');
+        if (cpf.length !== 11) return res.status(400).json({ error: 'CPF inválido.' });
+        const client = getPool();
+        const result = await client.query('select * from busca_dados_cliente_por_cpf($1)', [cpf]);
+        return res.status(200).json(result.rows[0] || { encontrado: false });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type === 'novo_saque_status') {
       try {
         const cpf = String(req.body?.cpf || '').replace(/\D/g, '');

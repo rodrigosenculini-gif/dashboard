@@ -2035,7 +2035,11 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   const [msg, setMsg] = useState('')
   const [carregando, setCarregando] = useState(false)
   const [copiado, setCopiado] = useState(false)
-  const [simForm, setSimForm] = useState({ bancarizadora: '', tipoCalculo: 'VALOR_LIQUIDO', valor: '', parcelas: '', comSeguro: true })
+  // VALOR_PARCELA + margemDisponivel: a margem que a Soma devolve é de PARCELA,
+  // não de valor liberado. Simular pela parcela é o que acha o máximo do cliente.
+  const [simForm, setSimForm] = useState({ bancarizadora: '', tipoCalculo: 'VALOR_PARCELA', valor: '', parcelas: '', comSeguro: true })
+  const [buscandoCpf, setBuscandoCpf] = useState(false)
+  const [simulouAuto, setSimulouAuto] = useState(false)
 
   const chamar = async (payload) => {
     setCarregando(true); setMsg('')
@@ -2049,6 +2053,32 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
       return null
     } finally {
       setCarregando(false)
+    }
+  }
+
+  // Ao sair do campo CPF, tenta preencher nome/celular/nascimento pelas nossas
+  // bases (disparochat, leads_chatwoot, vendedoras_analise).
+  const buscarPorCpf = async () => {
+    const cpf = String(form.cpf || '').replace(/\D/g, '')
+    if (cpf.length !== 11) return
+    setBuscandoCpf(true)
+    try {
+      const d = await postApi('busca_cliente_cpf', { cpf })
+      if (d?.encontrado) {
+        setForm((f) => ({
+          ...f,
+          nome: f.nome || d.nome || '',
+          celular: f.celular || d.celular || '',
+          dataNascimento: f.dataNascimento || (d.nascimento ? String(d.nascimento).slice(0, 10) : ''),
+        }))
+        setMsg('Dados preenchidos a partir de ' + (d.origem || 'nossas bases') + '.')
+      } else {
+        setMsg('CPF não encontrado nas nossas bases — preencha à mão.')
+      }
+    } catch (e) {
+      // silencioso: é uma conveniência, não pode travar a consulta
+    } finally {
+      setBuscandoCpf(false)
     }
   }
 
@@ -2068,12 +2098,12 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   const simular = async () => {
     const id = jornada?.jornadaId || jornada?.jorId
     if (!id) return
-    if (!simForm.bancarizadora) { setMsg('Escolha a bancarizadora.'); return }
+    if (!simForm.bancarizadora && !bancas[0]) { setMsg('Escolha a bancarizadora.'); return }
     if (!simForm.valor) { setMsg('Informe o valor.'); return }
     const d = await chamar({
       acao: 'simular',
       jornadaId: id,
-      bancarizadora: simForm.bancarizadora,
+      bancarizadora: simForm.bancarizadora || bancas[0],
       tipoCalculo: simForm.tipoCalculo,
       valor: Number(String(simForm.valor).replace(',', '.')),
       parcelas: simForm.parcelas ? Number(simForm.parcelas) : undefined,
@@ -2092,6 +2122,30 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   const podeSimular = acoes.includes('SIMULAR')
   const podeGerarProposta = acoes.includes('GERAR_PROPOSTA')
 
+  // Assim que a jornada fica elegivel, simula sozinho pela margem de parcela
+  // (e pela banca que a Soma marcou como elegivel). A vendedora nao digita nada;
+  // se quiser outro valor, ajusta e clica em Simular de novo.
+  useEffect(() => {
+    if (!jornadaId || !podeSimular || simulouAuto) return
+    if (simulacoes.length > 0) { setSimulouAuto(true); return }
+    const margem = jornada?.margemDisponivel
+    const banca = bancas[0]
+    if (!margem || !banca) return
+    setSimulouAuto(true)
+    setSimForm((f) => ({ ...f, bancarizadora: banca, tipoCalculo: 'VALOR_PARCELA', valor: String(margem) }))
+    ;(async () => {
+      const d = await chamar({
+        acao: 'simular',
+        jornadaId,
+        bancarizadora: banca,
+        tipoCalculo: 'VALOR_PARCELA',
+        valor: Number(margem),
+        comSeguro: true,
+      })
+      if (d) await atualizar()
+    })()
+  }, [jornadaId, podeSimular, simulacoes.length, jornada?.margemDisponivel])
+
   return (
     <div className="funil-overlay" onClick={onClose}>
       <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
@@ -2103,7 +2157,12 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
         <div className="add-venda-form">
           {!jornada && (
             <>
-              <label>CPF<input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="somente n&uacute;meros" /></label>
+              <label>CPF <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{buscandoCpf ? '(buscando...)' : '(preenche o resto sozinho)'}</span>
+                <input value={form.cpf}
+                  onChange={(e) => setForm({ ...form, cpf: e.target.value })}
+                  onBlur={buscarPorCpf}
+                  placeholder="somente n&uacute;meros" />
+              </label>
               <label>Nome completo<input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></label>
               <label>Celular<input value={form.celular} onChange={(e) => setForm({ ...form, celular: e.target.value })} placeholder="DDD + n&uacute;mero" /></label>
               <label>Data de nascimento <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(algumas bancarizadoras exigem)</span>
@@ -2149,9 +2208,11 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                   SIMULAR não vem e o bloco nem aparece. */}
               {podeSimular && (
                 <div style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 10, margin: '6px 0' }}>
-                  <p className="kpi-sub" style={{ margin: '0 0 6px' }}><strong>Simular</strong></p>
+                  <p className="kpi-sub" style={{ margin: '0 0 6px' }}>
+                    <strong>Simular</strong> &mdash; j&aacute; simulado automaticamente pela margem; ajuste s&oacute; se precisar de outro valor
+                  </p>
                   <label>Bancarizadora
-                    <select value={simForm.bancarizadora} onChange={(e) => setSimForm({ ...simForm, bancarizadora: e.target.value })}>
+                    <select value={simForm.bancarizadora || bancas[0] || ''} onChange={(e) => setSimForm({ ...simForm, bancarizadora: e.target.value })}>
                       <option value="">selecione</option>
                       {(bancas.length ? bancas : ['UY3', 'CELCOIN', '321BANK']).map((b) => (
                         <option key={b} value={b}>{b}</option>
@@ -2208,7 +2269,7 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                 {carregando ? 'Atualizando...' : 'Atualizar status'}
               </button>
               <button type="button" className="reset-btn" style={{ fontSize: 12, padding: '4px 8px' }}
-                onClick={() => { setJornada(null); setMsg('') }}>
+                onClick={() => { setJornada(null); setMsg(''); setSimulouAuto(false) }}>
                 &larr; Nova consulta
               </button>
             </>
