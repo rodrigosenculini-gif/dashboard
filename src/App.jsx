@@ -2040,6 +2040,9 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   const [simForm, setSimForm] = useState({ bancarizadora: '', tipoCalculo: 'VALOR_PARCELA', valor: '', parcelas: '', comSeguro: true })
   const [buscandoCpf, setBuscandoCpf] = useState(false)
   const [simulouAuto, setSimulouAuto] = useState(false)
+  // A Soma so devolve a margem no momento em que a jornada fica elegivel; nas
+  // consultas seguintes ela volta vazia. Guardamos aqui pra nao sumir da tela.
+  const [margemSalva, setMargemSalva] = useState(null)
 
   const chamar = async (payload) => {
     setCarregando(true); setMsg('')
@@ -2065,13 +2068,26 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
     try {
       const d = await postApi('busca_cliente_cpf', { cpf })
       if (d?.encontrado) {
-        setForm((f) => ({
-          ...f,
-          nome: f.nome || d.nome || '',
-          celular: f.celular || d.celular || '',
-          dataNascimento: f.dataNascimento || (d.nascimento ? String(d.nascimento).slice(0, 10) : ''),
-        }))
-        setMsg('Dados preenchidos a partir de ' + (d.origem || 'nossas bases') + '.')
+        // A Soma espera o celular sem DDI: 12982988998, nao 5512982988998.
+        const soDigitos = String(d.celular || '').replace(/\D/g, '')
+        const celularLimpo = soDigitos.length > 11 && soDigitos.startsWith('55')
+          ? soDigitos.slice(2)
+          : soDigitos
+        const preenchido = {
+          cpf,
+          nome: d.nome || '',
+          celular: celularLimpo,
+          dataNascimento: d.nascimento ? String(d.nascimento).slice(0, 10) : '',
+        }
+        setForm(preenchido)
+        // Achou tudo que a Soma exige: ja dispara a consulta, sem segundo clique.
+        if (preenchido.nome && preenchido.celular) {
+          setMsg('Dados de ' + (d.origem || 'nossas bases') + '. Consultando...')
+          const j = await chamar({ acao: 'iniciar', ...preenchido })
+          if (j) { setJornada(j); setCopiado(false) }
+          return
+        }
+        setMsg('Dados de ' + (d.origem || 'nossas bases') + ' — complete o que faltou.')
       } else {
         setMsg('CPF não encontrado nas nossas bases — preencha à mão.')
       }
@@ -2092,7 +2108,15 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
     const id = jornada?.jornadaId || jornada?.jorId
     if (!id) return
     const d = await chamar({ acao: 'status', jornadaId: id })
-    if (d) setJornada((j) => ({ ...j, ...d }))
+    if (!d) return
+    // merge que preserva o que a Soma deixa de mandar nas consultas seguintes
+    setJornada((j) => {
+      const merged = { ...j, ...d }
+      if (d.margemDisponivel == null && j?.margemDisponivel != null) merged.margemDisponivel = j.margemDisponivel
+      if ((!d.simulacoes || !d.simulacoes.length) && j?.simulacoes?.length) merged.simulacoes = j.simulacoes
+      if (!d.bancaElegivel && j?.bancaElegivel) merged.bancaElegivel = j.bancaElegivel
+      return merged
+    })
   }
 
   const simular = async () => {
@@ -2116,11 +2140,33 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   const link = jornada?.linkAceite || jornada?.jorLinkAceite || null
   const statusId = jornada?.jorStatusId ?? jornada?.statusId ?? null
   const jornadaId = jornada?.jornadaId || jornada?.jorId || null
-  const acoes = jornada?.acoes || []
+  // Guarda a margem assim que ela aparece (a Soma nao repete nas consultas seguintes)
+  useEffect(() => {
+    const m = jornada?.margemDisponivel
+    if (m != null && m !== '') setMargemSalva(m)
+  }, [jornada?.margemDisponivel])
+
+  const margem = jornada?.margemDisponivel ?? margemSalva
+  // Blindagem: se a API devolver esses campos como objeto/string em vez de array,
+  // um .map direto quebra a tela inteira (foi o que deixou a tela preta).
+  const acoes = Array.isArray(jornada?.acoes) ? jornada.acoes : []
   const bancas = [].concat(jornada?.bancaElegivel || []).filter(Boolean)
-  const simulacoes = jornada?.simulacoes || []
+  const simulacoes = Array.isArray(jornada?.simulacoes) ? jornada.simulacoes : []
   const podeSimular = acoes.includes('SIMULAR')
   const podeGerarProposta = acoes.includes('GERAR_PROPOSTA')
+
+  // Enquanto a jornada nao chega num estado final, consulta sozinha a cada 5s.
+  // Assim a vendedora ve o cliente assinar sem ficar clicando em "Atualizar".
+  useEffect(() => {
+    if (!jornadaId) return
+    const finais = [3, 4, 5, 8, 9]   // gerou proposta, paga, nao elegivel, expirada, cancelada
+    if (finais.includes(Number(statusId))) return
+    const t = setInterval(() => {
+      // nao empilha chamada em cima de outra em andamento
+      if (!carregando) atualizar()
+    }, 5000)
+    return () => clearInterval(t)
+  }, [jornadaId, statusId, carregando])
 
   // Assim que a jornada fica elegivel, simula sozinho pela margem de parcela
   // (e pela banca que a Soma marcou como elegivel). A vendedora nao digita nada;
@@ -2128,21 +2174,24 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   useEffect(() => {
     if (!jornadaId || !podeSimular || simulouAuto) return
     if (simulacoes.length > 0) { setSimulouAuto(true); return }
-    const margem = jornada?.margemDisponivel
     const banca = bancas[0]
     if (!margem || !banca) return
     setSimulouAuto(true)
     setSimForm((f) => ({ ...f, bancarizadora: banca, tipoCalculo: 'VALOR_PARCELA', valor: String(margem) }))
     ;(async () => {
-      const d = await chamar({
-        acao: 'simular',
-        jornadaId,
-        bancarizadora: banca,
-        tipoCalculo: 'VALOR_PARCELA',
-        valor: Number(margem),
-        comSeguro: true,
-      })
-      if (d) await atualizar()
+      try {
+        const d = await chamar({
+          acao: 'simular',
+          jornadaId,
+          bancarizadora: banca,
+          tipoCalculo: 'VALOR_PARCELA',
+          valor: Number(margem),
+          comSeguro: true,
+        })
+        if (d) await atualizar()
+      } catch (e) {
+        setMsg('Não consegui simular automaticamente: ' + (e?.message || 'erro'))
+      }
     })()
   }, [jornadaId, podeSimular, simulacoes.length, jornada?.margemDisponivel])
 
@@ -2196,9 +2245,9 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                 </div>
               )}
 
-              {jornada?.margemDisponivel != null && (
+              {margem != null && (
                 <p className="kpi-sub" style={{ margin: '2px 0' }}>
-                  Margem dispon&iacute;vel: <strong>{fmtMoeda(jornada.margemDisponivel)}</strong>
+                  Margem dispon&iacute;vel: <strong>{fmtMoeda(margem)}</strong>
                   {jornada?.margemValidaAte ? <> &middot; v&aacute;lida at&eacute; {String(jornada.margemValidaAte).slice(0, 10)}</> : null}
                 </p>
               )}
@@ -2245,8 +2294,8 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
               {simulacoes.length > 0 && (
                 <div style={{ margin: '6px 0' }}>
                   <p className="kpi-sub" style={{ margin: '0 0 4px' }}><strong>Simula&ccedil;&otilde;es</strong></p>
-                  {simulacoes.map((sm) => (
-                    <div key={sm.simId} style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 8, marginBottom: 6 }}>
+                  {simulacoes.map((sm, i) => (
+                    <div key={sm?.simId || i} style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 8, marginBottom: 6 }}>
                       <div style={{ fontSize: 13 }}>
                         <strong>{sm.simBancarizadora}</strong> &middot; l&iacute;quido {fmtMoeda(sm.simValorLiquido)}
                         {sm.simParcelas ? <> &middot; {sm.simParcelas}x</> : null}
@@ -2269,7 +2318,11 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                 {carregando ? 'Atualizando...' : 'Atualizar status'}
               </button>
               <button type="button" className="reset-btn" style={{ fontSize: 12, padding: '4px 8px' }}
-                onClick={() => { setJornada(null); setMsg(''); setSimulouAuto(false) }}>
+                onClick={() => {
+                  setJornada(null); setMsg(''); setSimulouAuto(false); setMargemSalva(null); setCopiado(false)
+                  setForm({ cpf: '', nome: '', celular: '', dataNascimento: '' })
+                  setSimForm({ bancarizadora: '', tipoCalculo: 'VALOR_PARCELA', valor: '', parcelas: '', comSeguro: true })
+                }}>
                 &larr; Nova consulta
               </button>
             </>
