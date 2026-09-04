@@ -2009,6 +2009,7 @@ const FACTA_CODIGOS = [
 // Envia sempre banco/tabela/parcelas/seguro pro backend, que calcula o
 // peso via calc_peso_vendas (tabela_pontos + fallback), então os pesos
 // batem automaticamente com a tabela vigente sem precisar hardcode aqui.
+// Jornada Soma (Consulta Unificada) — botao 'Soma' na toolbar
 // Jornada Soma (Consulta Unificada) — a plataforma percorre a cascata de
 // bancarizadoras sozinha e para na primeira que aprovar margem.
 //
