@@ -2022,6 +2022,10 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
 
   const ehBancoComApi = BANCOS_COM_API.includes(addForm.banco) && !manualApesarDeApi
 
+  // Bancos cuja API nunca traz uma tabela comercial confiável — mesmo quando
+  // acha a proposta, a vendedora precisa escolher a tabela na mão.
+  const BANCOS_TABELA_SEMPRE_MANUAL = ['C6']
+
   const buscarNaApi = async () => {
     if (!addForm.adesao) { setAddMsg('Informe a adesão pra buscar.'); return }
     setBuscando(true); setAddMsg(''); setBuscaResultado(null)
@@ -2032,10 +2036,19 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
       if (d.encontrado) {
         setAddForm((f) => ({
           ...f,
+          cpf: d.cpf_banco || f.cpf,
+          nome: d.nome_banco || f.nome,
           valor: d.valor_banco != null ? String(d.valor_banco) : f.valor,
           tabelaNome: d.tabela_banco || f.tabelaNome,
           parcelas: d.parcelas_banco != null ? String(d.parcelas_banco) : f.parcelas,
         }))
+        // Achou a proposta, mas esse banco não manda tabela confiável — ainda
+        // precisa abrir o campo pra vendedora escolher a tabela na mão.
+        if (BANCOS_TABELA_SEMPRE_MANUAL.includes(addForm.banco)) setManualApesarDeApi(true)
+      } else {
+        // Não achou: abre o formulário completo direto, sem precisar de um
+        // segundo clique da vendedora.
+        setManualApesarDeApi(true)
       }
     } catch (e2) {
       setAddMsg('Erro na busca: ' + (e2.message || ''))
@@ -2051,11 +2064,18 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
       setAddMsg('Selecione a vendedora.')
       return
     }
+    if (ehBancoComApi && (!addForm.cpf || !addForm.nome || !addForm.valor)) {
+      setAddMsg('Busque a adesão antes de adicionar.')
+      return
+    }
     setAdding(true)
     setAddMsg('')
     try {
       const ehPorCodigo = !ehBancoComApi && BANCOS_POR_CODIGO.includes(addForm.banco)
       const ehPorTabelaNome = !ehBancoComApi && BANCOS_POR_TABELA_NOME.includes(addForm.banco)
+      // Soma/Presença manuais: não têm dropdown de código nem de tabela fixa,
+      // usam o campo de texto livre — sem isso a tabela ia sempre vazia.
+      const ehTabelaLivreDeApiBanco = !ehBancoComApi && BANCOS_COM_API.includes(addForm.banco) && !ehPorCodigo && !ehPorTabelaNome
       const precisaParcelasComTabelaNome = BANCOS_TABELA_NOME_COM_PARCELAS.includes(addForm.banco)
       const result = await postApi('vendedoras_add_venda', {
         vendedor: vendedorAlvo,
@@ -2064,7 +2084,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         nome: addForm.nome,
         valor: addForm.valor.replace(',', '.'),
         banco: addForm.banco,
-        tabela: ehPorCodigo ? addForm.codigo : (ehPorTabelaNome || ehBancoComApi ? addForm.tabelaNome : ''),
+        tabela: ehPorCodigo ? addForm.codigo : (ehPorTabelaNome || ehBancoComApi || ehTabelaLivreDeApiBanco ? addForm.tabelaNome : ''),
         data_pagamento: addForm.dataPagamento,
         parcelas: (ehPorTabelaNome && !precisaParcelasComTabelaNome) ? '' : addForm.parcelas,
         seguro: (ehPorTabelaNome || ehBancoComApi) ? '' : addForm.seguro,
@@ -2111,7 +2131,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
           {/* Banco vem primeiro: define o resto do formulário */}
           <label>Banco
             <select required value={addForm.banco} onChange={(e) => {
-              setAddForm({ ...addForm, banco: e.target.value, codigo: '', tabelaNome: '', parcelas: '', seguro: '', adesao: '', valor: '' })
+              setAddForm({ ...addForm, banco: e.target.value, codigo: '', tabelaNome: '', parcelas: '', seguro: '', adesao: '', valor: '', cpf: '', nome: '' })
               setBuscaResultado(null)
               setManualApesarDeApi(false)
             }}>
@@ -2131,23 +2151,18 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
                 </div>
               </label>
 
-              {buscaResultado && (
-                <p className="kpi-sub" style={{ margin: '-4px 0 4px' }}>
-                  {buscaResultado.encontrado
-                    ? `Encontrado: ${fmtMoeda(buscaResultado.valor_banco)} · ${buscaResultado.tabela_banco || '-'} · ${buscaResultado.parcelas_banco ?? '-'}x${buscaResultado.status_banco ? ' · ' + buscaResultado.status_banco : ''}`
-                    : (buscaResultado.mensagem || 'Não encontrado na API pra essa adesão ainda.')}
-                </p>
+              {buscaResultado?.encontrado && (
+                <>
+                  <p className="kpi-sub" style={{ margin: '-4px 0 4px' }}>
+                    Encontrado: {buscaResultado.nome_banco || addForm.nome || '(nome não veio da API)'} · {fmtMoeda(buscaResultado.valor_banco)}
+                    {buscaResultado.parcelas_banco != null ? ` · ${buscaResultado.parcelas_banco}x` : ''}
+                    {buscaResultado.status_banco ? ` · ${buscaResultado.status_banco}` : ''}
+                  </p>
+                  <button type="button" className="refresh-btn" style={{ fontSize: 12, padding: '4px 8px' }} onClick={() => setManualApesarDeApi(true)}>
+                    N&atilde;o &eacute; essa proposta? Preencher manualmente
+                  </button>
+                </>
               )}
-
-              <label>CPF<input required value={addForm.cpf} onChange={(e) => setAddForm({ ...addForm, cpf: e.target.value })} /></label>
-              <label>Nome<input required value={addForm.nome} onChange={(e) => setAddForm({ ...addForm, nome: e.target.value })} /></label>
-              <label>Valor <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(preenchido pela busca, edit&aacute;vel)</span>
-                <input required value={addForm.valor} onChange={(e) => setAddForm({ ...addForm, valor: e.target.value })} placeholder="0,00" />
-              </label>
-
-              <button type="button" className="refresh-btn" style={{ fontSize: 12, padding: '4px 8px' }} onClick={() => setManualApesarDeApi(true)}>
-                A API n&atilde;o achou? Preencher tabela manualmente
-              </button>
             </>
           )}
 
@@ -2188,6 +2203,11 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
 
               {!BANCOS_POR_CODIGO.includes(addForm.banco) && !BANCOS_POR_TABELA_NOME.includes(addForm.banco) && (
                 <>
+                  {BANCOS_COM_API.includes(addForm.banco) && (
+                    <label>Tabela <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(copie o nome/c&oacute;digo da tabela do portal do banco)</span>
+                      <input required value={addForm.tabelaNome} onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })} />
+                    </label>
+                  )}
                   <label>Parcelas
                     <input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 24" />
                   </label>
