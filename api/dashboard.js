@@ -250,6 +250,43 @@ export default async function handler(req, res) {
       }
     }
 
+    // Jornada Soma (Consulta Unificada) usada pelo botão do dashboard da vendedora.
+    // Ações: iniciar (abre a jornada e devolve o linkAceite pro cliente assinar),
+    // status (acompanha) e simular. O aceite é do cliente — o link é enviado
+    // pra ele, nunca assinado por nós.
+    if (type === 'soma_jornada') {
+      try {
+        const { acao, cpf, nome, celular, dataNascimento, jornadaId, bancarizadora, tipoCalculo, valor, parcelas, comSeguro } = req.body || {};
+        if (!acao) return res.status(400).json({ error: 'Informe a ação.' });
+        if (acao === 'iniciar' && (!cpf || !nome || !celular)) {
+          return res.status(400).json({ error: 'Para iniciar, informe CPF, nome e celular.' });
+        }
+        if ((acao === 'status' || acao === 'simular') && !jornadaId) {
+          return res.status(400).json({ error: 'Informe a jornada.' });
+        }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
+        let resp;
+        try {
+          resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/soma-jornada', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ acao, cpf, nome, celular, dataNascimento, jornadaId, bancarizadora, tipoCalculo, valor, parcelas, comSeguro }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+        const texto = await resp.text();
+        let dados;
+        try { dados = JSON.parse(texto); } catch { dados = { error: texto?.slice(0, 300) }; }
+        return res.status(200).json(dados);
+      } catch (e) {
+        const timeoutMsg = e.name === 'AbortError' ? 'A consulta demorou demais. Tente novamente.' : e.message;
+        return res.status(500).json({ error: timeoutMsg });
+      }
+    }
+
     if (type === 'consulta_adesao_banco') {
       try {
         const { banco, adesao, cpf, valor } = req.body || {};
