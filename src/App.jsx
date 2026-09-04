@@ -2212,7 +2212,8 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
       },
     })
     if (!c) return
-    const idConta = c.contaBancariaId || c.conId || c.contaBancaria?.conId || null
+    const idConta = c.contaBancariaId || c.conId || c.contaBancaria?.conId
+      || c.dados?.contaBancariaId || c.dados?.conId || null
     if (!idConta) { setMsg('Cliente cadastrado, mas a Soma não devolveu a conta bancária: ' + JSON.stringify(c).slice(0, 200)); return }
     setContaId(idConta)
 
@@ -2442,14 +2443,16 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
 
                   {!podeGerarProposta && (
                     <p className="kpi-sub" style={{ margin: '2px 0' }}>
-                      Para gerar a proposta ainda falta cadastrar os dados banc&aacute;rios do cliente.
+                      A Soma ainda n&atilde;o liberou <strong>GERAR_PROPOSTA</strong> nesta jornada
+                      (a&ccedil;&otilde;es dispon&iacute;veis: {acoes.join(', ') || 'nenhuma'}). D&aacute; pra
+                      preencher o cadastro assim mesmo &mdash; se ela recusar, a mensagem aparece aqui.
                     </p>
                   )}
                 </div>
               )}
 
 
-              {podeGerarProposta && simEscolhida && !propostaFeita && (
+              {simEscolhida && !propostaFeita && (
                 <div style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 10, margin: '6px 0' }}>
                   <p className="kpi-sub" style={{ margin: '0 0 6px' }}>
                     <strong>Dados do cliente</strong> &mdash; a Soma exige tudo isso pra gerar a proposta
