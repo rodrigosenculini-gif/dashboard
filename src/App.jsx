@@ -2068,6 +2068,18 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
   // A Soma so devolve a margem no momento em que a jornada fica elegivel; nas
   // consultas seguintes ela volta vazia. Guardamos aqui pra nao sumir da tela.
   const [margemSalva, setMargemSalva] = useState(null)
+  const [simEscolhida, setSimEscolhida] = useState(null)
+  const [contaId, setContaId] = useState(null)
+  const [propostaFeita, setPropostaFeita] = useState(null)
+  // 26 campos que a Soma exige pra cadastrar o cliente antes de gerar a proposta.
+  const [cad, setCad] = useState({
+    cliNomeMae: '', cliProfissao: '', cliNacionalidade: 'BRASILEIRA', cliSexo: '',
+    cliEstadoCivil: '', cliPoliticamenteExposta: false, cliEmail: '',
+    endCep: '', endRua: '', endNumero: '', endBairro: '', endComplemento: '',
+    endCidadeId: '', endEstadoId: '',
+    conTipoConta: '', conBancoId: '', conAgencia: '', conDigitoAgencia: '',
+    conConta: '', conDigitoConta: '', conTipoPix: '', conChavePix: '',
+  })
   // Refs em vez de state: nao se perdem em re-render e nao entram como
   // dependencia de efeito (era o que fazia simular em loop).
   const jaSimulouRef = useRef(null)     // guarda o jornadaId ja simulado
@@ -2167,6 +2179,50 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
     })
     // A simulação nova aparece na jornada; recarrega pra listar todas.
     if (d) await atualizar()
+  }
+
+  const cadastrarECriarProposta = async () => {
+    if (!simEscolhida) { setMsg('Escolha a simulação.'); return }
+    const faltando = ['cliNomeMae','cliProfissao','cliSexo','cliEstadoCivil','cliEmail',
+      'endCep','endRua','endNumero','endBairro','endCidadeId','endEstadoId',
+      'conTipoConta','conBancoId','conAgencia','conDigitoAgencia','conConta','conDigitoConta',
+      'conTipoPix','conChavePix'].filter((c) => !String(cad[c] || '').trim())
+    if (faltando.length) { setMsg('Faltam ' + faltando.length + ' campos obrigatórios.'); return }
+
+    const c = await chamar({
+      acao: 'cadastrar_cliente',
+      cliente: {
+        cliCpf: form.cpf, cliNome: form.nome, cliNascimento: form.dataNascimento,
+        cliNomeMae: cad.cliNomeMae, cliProfissao: cad.cliProfissao,
+        cliNacionalidade: cad.cliNacionalidade, cliSexo: cad.cliSexo,
+        cliEstadoCivil: cad.cliEstadoCivil,
+        cliPoliticamenteExposta: !!cad.cliPoliticamenteExposta,
+        cliEmail: cad.cliEmail, cliCelular: form.celular,
+      },
+      endereco: {
+        endCep: cad.endCep, endRua: cad.endRua, endNumero: cad.endNumero,
+        endBairro: cad.endBairro, endComplemento: cad.endComplemento || '',
+        endCidadeId: cad.endCidadeId, endEstadoId: cad.endEstadoId,
+      },
+      contaBancaria: {
+        conTipoConta: cad.conTipoConta, conBancoId: cad.conBancoId,
+        conConta: cad.conConta, conDigitoConta: cad.conDigitoConta,
+        conAgencia: cad.conAgencia, conDigitoAgencia: cad.conDigitoAgencia,
+        conTipoPix: cad.conTipoPix, conChavePix: cad.conChavePix,
+      },
+    })
+    if (!c) return
+    const idConta = c.contaBancariaId || c.conId || c.contaBancaria?.conId || null
+    if (!idConta) { setMsg('Cliente cadastrado, mas a Soma não devolveu a conta bancária: ' + JSON.stringify(c).slice(0, 200)); return }
+    setContaId(idConta)
+
+    const pr = await chamar({
+      acao: 'gerar_proposta',
+      jornadaId,
+      simulacaoId: simEscolhida,
+      contaBancariaId: idConta,
+    })
+    if (pr) { setPropostaFeita(pr); setMsg('Proposta gerada.'); await atualizar() }
   }
 
   const link = jornada?.linkAceite || jornada?.jorLinkAceite || null
@@ -2376,11 +2432,100 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                       )}
                     </div>
                   ))}
+                  {simulacoes.map((sm, i) => (
+                    <label key={'esc'+(sm?.simId || i)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                      <input type="radio" name="simEscolhida" checked={simEscolhida === sm.simId}
+                        onChange={() => setSimEscolhida(sm.simId)} />
+                      Usar esta ({sm.simBancarizadora} &middot; {fmtMoeda(sm.simValorLiquido)})
+                    </label>
+                  ))}
+
                   {!podeGerarProposta && (
                     <p className="kpi-sub" style={{ margin: '2px 0' }}>
                       Para gerar a proposta ainda falta cadastrar os dados banc&aacute;rios do cliente.
                     </p>
                   )}
+                </div>
+              )}
+
+
+              {podeGerarProposta && simEscolhida && !propostaFeita && (
+                <div style={{ border: '1px solid var(--border, #333)', borderRadius: 8, padding: 10, margin: '6px 0' }}>
+                  <p className="kpi-sub" style={{ margin: '0 0 6px' }}>
+                    <strong>Dados do cliente</strong> &mdash; a Soma exige tudo isso pra gerar a proposta
+                  </p>
+                  <label>Nome da m&atilde;e<input value={cad.cliNomeMae} onChange={(e) => setCad({ ...cad, cliNomeMae: e.target.value })} /></label>
+                  <label>Profiss&atilde;o<input value={cad.cliProfissao} onChange={(e) => setCad({ ...cad, cliProfissao: e.target.value })} /></label>
+                  <label>Nacionalidade<input value={cad.cliNacionalidade} onChange={(e) => setCad({ ...cad, cliNacionalidade: e.target.value })} /></label>
+                  <label>Sexo
+                    <select value={cad.cliSexo} onChange={(e) => setCad({ ...cad, cliSexo: e.target.value })}>
+                      <option value="">selecione</option>
+                      <option value="M">Masculino</option>
+                      <option value="F">Feminino</option>
+                    </select>
+                  </label>
+                  <label>Estado civil
+                    <select value={cad.cliEstadoCivil} onChange={(e) => setCad({ ...cad, cliEstadoCivil: e.target.value })}>
+                      <option value="">selecione</option>
+                      <option value="SOLTEIRO">Solteiro(a)</option>
+                      <option value="CASADO">Casado(a)</option>
+                      <option value="DIVORCIADO">Divorciado(a)</option>
+                      <option value="VIUVO">Vi&uacute;vo(a)</option>
+                      <option value="SEPARADO">Separado(a)</option>
+                    </select>
+                  </label>
+                  <label>E-mail<input value={cad.cliEmail} onChange={(e) => setCad({ ...cad, cliEmail: e.target.value })} type="email" /></label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="checkbox" checked={cad.cliPoliticamenteExposta}
+                      onChange={(e) => setCad({ ...cad, cliPoliticamenteExposta: e.target.checked })} />
+                    Pessoa politicamente exposta
+                  </label>
+
+                  <p className="kpi-sub" style={{ margin: '8px 0 4px' }}><strong>Endere&ccedil;o</strong></p>
+                  <label>CEP<input value={cad.endCep} onChange={(e) => setCad({ ...cad, endCep: e.target.value })} /></label>
+                  <label>Rua<input value={cad.endRua} onChange={(e) => setCad({ ...cad, endRua: e.target.value })} /></label>
+                  <label>N&uacute;mero<input value={cad.endNumero} onChange={(e) => setCad({ ...cad, endNumero: e.target.value })} /></label>
+                  <label>Bairro<input value={cad.endBairro} onChange={(e) => setCad({ ...cad, endBairro: e.target.value })} /></label>
+                  <label>Complemento (opcional)<input value={cad.endComplemento} onChange={(e) => setCad({ ...cad, endComplemento: e.target.value })} /></label>
+                  <label>Cidade (ID Soma)<input value={cad.endCidadeId} onChange={(e) => setCad({ ...cad, endCidadeId: e.target.value })} /></label>
+                  <label>Estado (ID Soma)<input value={cad.endEstadoId} onChange={(e) => setCad({ ...cad, endEstadoId: e.target.value })} /></label>
+
+                  <p className="kpi-sub" style={{ margin: '8px 0 4px' }}><strong>Conta banc&aacute;ria</strong></p>
+                  <label>Tipo de conta
+                    <select value={cad.conTipoConta} onChange={(e) => setCad({ ...cad, conTipoConta: e.target.value })}>
+                      <option value="">selecione</option>
+                      <option value="CORRENTE">Corrente</option>
+                      <option value="POUPANCA">Poupan&ccedil;a</option>
+                    </select>
+                  </label>
+                  <label>Banco (ID Soma)<input value={cad.conBancoId} onChange={(e) => setCad({ ...cad, conBancoId: e.target.value })} /></label>
+                  <label>Ag&ecirc;ncia<input value={cad.conAgencia} onChange={(e) => setCad({ ...cad, conAgencia: e.target.value })} /></label>
+                  <label>D&iacute;gito da ag&ecirc;ncia<input value={cad.conDigitoAgencia} onChange={(e) => setCad({ ...cad, conDigitoAgencia: e.target.value })} /></label>
+                  <label>Conta<input value={cad.conConta} onChange={(e) => setCad({ ...cad, conConta: e.target.value })} /></label>
+                  <label>D&iacute;gito da conta<input value={cad.conDigitoConta} onChange={(e) => setCad({ ...cad, conDigitoConta: e.target.value })} /></label>
+                  <label>Tipo de PIX
+                    <select value={cad.conTipoPix} onChange={(e) => setCad({ ...cad, conTipoPix: e.target.value })}>
+                      <option value="">selecione</option>
+                      <option value="CPF">CPF</option>
+                      <option value="EMAIL">E-mail</option>
+                      <option value="CELULAR">Celular</option>
+                      <option value="ALEATORIA">Chave aleat&oacute;ria</option>
+                    </select>
+                  </label>
+                  <label>Chave PIX<input value={cad.conChavePix} onChange={(e) => setCad({ ...cad, conChavePix: e.target.value })} /></label>
+
+                  <button type="button" className="refresh-btn" onClick={cadastrarECriarProposta} disabled={carregando}>
+                    {carregando ? 'Enviando...' : 'Cadastrar cliente e gerar proposta'}
+                  </button>
+                </div>
+              )}
+
+              {propostaFeita && (
+                <div style={{ border: '2px solid #30a46c', background: 'rgba(48,164,108,0.12)', borderRadius: 8, padding: 10, margin: '6px 0' }}>
+                  <p style={{ margin: 0, fontWeight: 700, color: '#30a46c' }}>Proposta gerada</p>
+                  <p className="kpi-sub" style={{ margin: '4px 0 0' }}>
+                    {propostaFeita.proId || propostaFeita.propostaId || ''} {propostaFeita.proNumBancarizadora ? ' · nº ' + propostaFeita.proNumBancarizadora : ''}
+                  </p>
                 </div>
               )}
 
@@ -2391,6 +2536,7 @@ function SomaJornadaModal({ vendedorFixo, onClose }) {
                 onClick={() => {
                   setJornada(null); setMsg(''); setSimulouAuto(false); setMargemSalva(null); setCopiado(false)
                   jaSimulouRef.current = null; tentativasRef.current = 0
+                  setSimEscolhida(null); setContaId(null); setPropostaFeita(null)
                   setForm({ cpf: '', nome: '', celular: '', dataNascimento: '' })
                   setSimForm({ bancarizadora: '', tipoCalculo: 'VALOR_PARCELA', valor: '', parcelas: '', comSeguro: true })
                 }}>

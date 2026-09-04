@@ -256,10 +256,16 @@ export default async function handler(req, res) {
     // pra ele, nunca assinado por nós.
     if (type === 'soma_jornada') {
       try {
-        const { acao, cpf, nome, celular, dataNascimento, jornadaId, bancarizadora, tipoCalculo, valor, parcelas, comSeguro } = req.body || {};
+        const { acao, cpf, nome, celular, dataNascimento, jornadaId, bancarizadora, tipoCalculo, valor, parcelas, comSeguro, cliente, endereco, contaBancaria, simulacaoId, contaBancariaId } = req.body || {};
         if (!acao) return res.status(400).json({ error: 'Informe a ação.' });
         if (acao === 'iniciar' && (!cpf || !nome || !celular)) {
           return res.status(400).json({ error: 'Para iniciar, informe CPF, nome e celular.' });
+        }
+        if (acao === 'cadastrar_cliente' && !cliente) {
+          return res.status(400).json({ error: 'Faltam os dados do cliente.' });
+        }
+        if (acao === 'gerar_proposta' && (!jornadaId || !simulacaoId || !contaBancariaId)) {
+          return res.status(400).json({ error: 'Faltam jornada, simulação ou conta bancária.' });
         }
         if ((acao === 'status' || acao === 'simular') && !jornadaId) {
           return res.status(400).json({ error: 'Informe a jornada.' });
@@ -271,7 +277,7 @@ export default async function handler(req, res) {
           resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/soma-jornada', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ acao, cpf, nome, celular, dataNascimento, jornadaId, bancarizadora, tipoCalculo, valor, parcelas, comSeguro }),
+            body: JSON.stringify({ acao, cpf, nome, celular, dataNascimento, jornadaId, bancarizadora, tipoCalculo, valor, parcelas, comSeguro, cliente, endereco, contaBancaria, simulacaoId, contaBancariaId }),
             signal: controller.signal,
           });
         } finally {
