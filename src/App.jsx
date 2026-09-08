@@ -1947,7 +1947,7 @@ const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA'
 // Bancos com API instalada pra consulta de adesão (webhook n8n
 // consulta-adesao-banco): pra esses, o formulário não pede tabela/parcelas
 // — só a adesão, que é buscada e preenchida direto da API do banco.
-const BANCOS_COM_API = ['FACTA', 'SOMA', 'PRESENÇA', 'C6']
+const BANCOS_COM_API = ['FACTA', 'SOMA', 'PRESENÇA', 'C6', 'PAN']
 
 const FACTA_CODIGOS = [
   { codigo: '69205', label: '69205 — Novo Gold, 60x (1,45)' },
