@@ -2607,30 +2607,94 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
   // acha a proposta, a vendedora precisa escolher a tabela na mão.
   const BANCOS_TABELA_SEMPRE_MANUAL = ['C6']
 
+  // Status que significam "pago" nos bancos com API. Fora disso, a vendedora
+  // ve o status e decide se preenche a mao (nao gravamos venda nao paga).
+  const STATUS_PAGO_RE = /pag[oa]|integrad|liquidat|contrato pago|credit|desembols/i
+
+  const [c6Opcoes, setC6Opcoes] = useState([])
+
+  const gravarDireto = async (vendedorAlvo, dados) => {
+    const result = await postApi('vendedoras_add_venda', {
+      vendedor: vendedorAlvo,
+      adesao: dados.adesao,
+      cpf: dados.cpf,
+      nome: dados.nome,
+      valor: String(dados.valor).replace(',', '.'),
+      banco: dados.banco,
+      tabela: dados.tabela || '',
+      data_pagamento: dados.dataPagamento || null,
+      parcelas: dados.parcelas ? parseInt(dados.parcelas, 10) : null,
+      seguro: dados.seguro || null,
+    })
+    const r = Array.isArray(result) ? result[0] : result
+    if (r?.ok === false) throw new Error(r.mensagem || 'Nao foi possivel gravar.')
+    return r
+  }
+
   const buscarNaApi = async () => {
     if (!addForm.adesao) { setAddMsg('Informe a adesão pra buscar.'); return }
+    const vendedorAlvo = vendedorFixo || addForm.vendedorSel
+    if (!vendedorAlvo) { setAddMsg('Selecione a vendedora antes de buscar.'); return }
     setBuscando(true); setAddMsg(''); setBuscaResultado(null)
     try {
       const d = await postApi('consulta_adesao_banco', { banco: addForm.banco, adesao: addForm.adesao, cpf: addForm.cpf || null })
       if (d?.error) { setAddMsg(d.error); return }
       setBuscaResultado(d)
-      if (d.encontrado) {
-        setAddForm((f) => ({
-          ...f,
-          cpf: d.cpf_banco || f.cpf,
-          nome: d.nome_banco || f.nome,
-          valor: d.valor_banco != null ? String(d.valor_banco) : f.valor,
-          tabelaNome: d.tabela_banco || f.tabelaNome,
-          parcelas: d.parcelas_banco != null ? String(d.parcelas_banco) : f.parcelas,
-        }))
-        // Achou a proposta, mas esse banco não manda tabela confiável — ainda
-        // precisa abrir o campo pra vendedora escolher a tabela na mão.
-        if (BANCOS_TABELA_SEMPRE_MANUAL.includes(addForm.banco)) setManualApesarDeApi(true)
-      } else {
-        // Não achou: abre o formulário completo direto, sem precisar de um
-        // segundo clique da vendedora.
+
+      if (!d.encontrado) {
+        // Nao achou no banco: abre o formulario completo direto
         setManualApesarDeApi(true)
+        setAddMsg(d.mensagem || 'Proposta não encontrada na API do banco. Preencha os dados manualmente.')
+        return
       }
+
+      const preenchido = {
+        ...addForm,
+        cpf: d.cpf_banco || addForm.cpf,
+        nome: d.nome_banco || addForm.nome,
+        valor: d.valor_banco != null ? String(d.valor_banco) : addForm.valor,
+        tabelaNome: d.tabela_banco || addForm.tabelaNome,
+        parcelas: d.parcelas_banco != null ? String(d.parcelas_banco) : addForm.parcelas,
+      }
+      setAddForm(preenchido)
+
+      const pago = STATUS_PAGO_RE.test(String(d.status_banco || ''))
+      const completo = !!(preenchido.cpf && preenchido.nome && preenchido.valor)
+      const precisaTabelaManual = BANCOS_TABELA_SEMPRE_MANUAL.includes(addForm.banco)
+
+      if (precisaTabelaManual) {
+        // C6: a API nao devolve a tabela comercial. Carrega as opcoes validas
+        // para o prazo devolvido e deixa a vendedora escolher no select.
+        try {
+          const o = await postApi('c6_tabelas_opcoes', { parcelas: preenchido.parcelas || null })
+          setC6Opcoes(o?.opcoes || [])
+        } catch { setC6Opcoes([]) }
+        setManualApesarDeApi(true)
+        setAddMsg(pago
+          ? 'Proposta paga encontrada. Escolha a tabela e confirme.'
+          : `Proposta encontrada com status "${d.status_banco || '?'}" (ainda não paga). Escolha a tabela e confirme se quiser gravar.`)
+        return
+      }
+
+      if (pago && completo) {
+        // Caminho feliz: pago e com tudo -> grava sem perguntar mais nada
+        await gravarDireto(vendedorAlvo, {
+          adesao: preenchido.adesao, cpf: preenchido.cpf, nome: preenchido.nome, valor: preenchido.valor,
+          banco: addForm.banco, tabela: preenchido.tabelaNome, parcelas: preenchido.parcelas,
+          dataPagamento: preenchido.dataPagamento, seguro: preenchido.seguro,
+        })
+        setAddMsg(`Venda gravada: ${preenchido.nome} · ${fmtMoeda(Number(preenchido.valor))} · ${preenchido.parcelas || '?'}x · ${preenchido.tabelaNome || ''}`)
+        setAddForm((f) => ({ ...f, adesao: '', cpf: '', nome: '', valor: '', tabelaNome: '', parcelas: '', codigo: '' }))
+        setBuscaResultado(null)
+        if (typeof load === 'function') load()
+        return
+      }
+
+      // Achou mas nao esta paga, ou faltou algum dado: abre os campos
+      setManualApesarDeApi(true)
+      setAddMsg(!pago
+        ? `Proposta encontrada com status "${d.status_banco || '?'}" — ainda não consta como paga. Confira os dados e confirme se quiser gravar.`
+        : 'Proposta encontrada, mas faltou algum dado. Complete e confirme.')
     } catch (e2) {
       setAddMsg('Erro na busca: ' + (e2.message || ''))
     } finally {
@@ -2688,8 +2752,11 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
     }
   }
 
+  // C6: se a busca na API ja devolveu as parcelas, oferece so as tabelas
+  // validas para aquele prazo (vindas de c6_planos_da_tabela, no formato do
+  // portal). Sem busca, cai na lista estatica.
   const tabelaOpcoes = addForm.banco === 'FGTSV8' ? FGTSV8_TABELAS
-    : addForm.banco === 'C6' ? C6_TABELAS
+    : addForm.banco === 'C6' ? (c6Opcoes.length ? c6Opcoes.map((o) => ({ valor: o.nome, label: `${o.nome} (${o.parcelas}x · peso ${o.pontos})` })) : C6_TABELAS)
     : NOVO_SAQUE_TABELAS
 
   return (

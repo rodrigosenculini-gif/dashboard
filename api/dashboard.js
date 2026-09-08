@@ -512,6 +512,30 @@ export default async function handler(req, res) {
 
     // Ajuste de v8 e C6 pela planilha (VendeAI ou relatório do portal v8).
     // aplicar=false só simula e devolve linha a linha; aplicar=true grava.
+    // Opcoes de tabela do C6 para a vendedora escolher (a API do C6 nao devolve
+    // a tabela comercial). Nome no formato do portal, filtrado pelas parcelas.
+    if (type === 'c6_tabelas_opcoes') {
+      try {
+        const parcelas = parseInt(req.body?.parcelas, 10);
+        const client = getPool();
+        const result = await client.query(
+          `select tipo, plano, parcelas, pontos from c6_planos_da_tabela()
+            where ($1::int is null or parcelas = $1::int)
+            order by tipo, plano`,
+          [Number.isFinite(parcelas) ? parcelas : null]
+        );
+        const opcoes = result.rows.map((r) => {
+          const nome = r.tipo === 'TOP' ? `Trabalhador TOP Seg Plan ${r.plano}`
+                     : r.tipo === 'ESP' ? `Trabalhador ESP Seg Plan ${r.plano}`
+                     : `Trabalhador Seguro Plano ${r.plano}`;
+          return { nome, tipo: r.tipo, plano: r.plano, parcelas: r.parcelas, pontos: r.pontos };
+        });
+        return res.status(200).json({ opcoes });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type === 'vendas_import_v3') {
       try {
         const rows = req.body?.rows;
