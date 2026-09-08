@@ -354,6 +354,130 @@ export default async function handler(req, res) {
       }
     }
 
+    // ---------------------------------------------------------------
+    // PAN — propostas cadastradas pelas vendedoras no dashboard.
+    // A listagem lê direto do Postgres (rápido, sem passar pelo n8n);
+    // a consulta na API do banco vai pelo webhook do n8n.
+    // ---------------------------------------------------------------
+
+    // Tabelas do dash. vendedor null = visão geral (todas as vendedoras).
+    if (type === 'pan_listar') {
+      try {
+        const vendedor = req.body?.vendedor || null;
+        const client = getPool();
+        const result = await client.query('select * from pan_listar_propostas($1)', [vendedor]);
+        const linhas = result.rows || [];
+        // Já devolve separado, que é como o front mostra
+        return res.status(200).json({
+          total: linhas.length,
+          pagas: linhas.filter((l) => l.grupo === 'pago'),
+          autorizacao: linhas.filter((l) => l.grupo === 'autorizacao'),
+          aprovadas: linhas.filter((l) => l.grupo === 'aprovado'),
+          reprovadas: linhas.filter((l) => l.grupo === 'reprovado'),
+          todas: linhas,
+        });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Vendedora digita CPF ou adesão: procura o que já existe nas nossas bases
+    // antes de bater na API do banco.
+    if (type === 'pan_buscar') {
+      try {
+        const cpf = String(req.body?.cpf || '').replace(/\D/g, '');
+        const adesao = String(req.body?.adesao || '').replace(/\D/g, '');
+        if (!cpf && !adesao) return res.status(400).json({ error: 'Informe CPF ou adesão.' });
+        const client = getPool();
+
+        // 1) proposta PAN já registrada
+        const prop = await client.query(
+          `select * from pan_listar_propostas(null)
+            where ($1 <> '' and cpf = $1) or ($2 <> '' and adesao = $2)
+            order by criado_em desc limit 5`,
+          [cpf, adesao]
+        );
+
+        // 2) venda PAN já lançada (serve pro caso de adesão antiga)
+        const venda = await client.query(
+          `select id, adesao, cpf, nome, valor, parcelas, tabela, data, vendedor
+             from vendas_gerais
+            where banco ilike '%pan%'
+              and (($1 <> '' and cpf = $1) or ($2 <> '' and adesao::text = $2))
+            order by data desc nulls last limit 5`,
+          [cpf, adesao]
+        );
+
+        // 3) dados cadastrais nas nossas bases (pra pré-preencher)
+        let cliente = null;
+        if (cpf.length === 11) {
+          try {
+            const c = await client.query('select * from busca_dados_cliente_por_cpf($1)', [cpf]);
+            cliente = c.rows[0] || null;
+          } catch { cliente = null; }
+        }
+
+        return res.status(200).json({
+          tem_proposta: prop.rows.length > 0,
+          propostas: prop.rows,
+          vendas: venda.rows,
+          cliente,
+        });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Registra a proposta que a vendedora cadastrou pelo dash
+    if (type === 'pan_registrar') {
+      try {
+        const { adesao, cpf, nome, telefone, vendedor } = req.body || {};
+        if (!adesao) return res.status(400).json({ error: 'Informe a adesão.' });
+        const client = getPool();
+        const result = await client.query(
+          'select pan_registrar_proposta($1,$2,$3,$4,$5) as r',
+          [String(adesao).trim(), cpf || null, nome || null, telefone || null, vendedor || null]
+        );
+        return res.status(200).json(result.rows[0]?.r || { ok: false });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Atualiza status na API do PAN (botão manual e o refresh de 5 min).
+    // Só reconsulta o que não está pago nem cancelado — quem filtra é a
+    // RPC pan_propostas_pendentes, chamada dentro do workflow do n8n.
+    if (type === 'pan_atualizar') {
+      try {
+        const { adesao, cpf, vendedor, todas } = req.body || {};
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        let resp;
+        try {
+          resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/pan-consulta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adesao: adesao || null,
+              cpf: cpf || null,
+              vendedor: vendedor || null,
+              todas: todas === true,
+            }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+        const texto = await resp.text();
+        let dados;
+        try { dados = JSON.parse(texto); } catch { dados = { ok: false, erro: texto?.slice(0, 300) }; }
+        return res.status(200).json(dados);
+      } catch (e) {
+        const timeoutMsg = e.name === 'AbortError' ? 'A consulta ao PAN demorou demais. Tente novamente.' : e.message;
+        return res.status(500).json({ error: timeoutMsg });
+      }
+    }
+
     if (type === 'novo_saque_saldo') {
       try {
         const { cpf, product, vendedor, apenas_consultar, dados_pagamento, customer_data_manual } = req.body || {};
