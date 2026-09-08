@@ -466,6 +466,12 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Mantém os botões sempre encostados à direita, inclusive quando a
+     linha quebra por falta de espaço (senão eles caem para a esquerda). */
+  flex: 1 1 auto;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .dots-btn {

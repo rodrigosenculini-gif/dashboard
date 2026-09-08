@@ -2806,65 +2806,58 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
 // vendedorFixo preenchido = portal restrito (só as propostas dela);
 // null = visão geral (todas as vendedoras).
 // ---------------------------------------------------------------------
-const PAN_INTERVALO_MS = 5 * 60 * 1000 // atualiza sozinho a cada 5 min
-
 function PanBadge({ grupo }) {
   const mapa = {
-    autorizacao: { txt: 'Autorização', cor: '#b45309', fundo: '#fef3c7' },
-    aprovado: { txt: 'Aprovado', cor: '#065f46', fundo: '#d1fae5' },
-    reprovado: { txt: 'Reprovado', cor: '#991b1b', fundo: '#fee2e2' },
-    pago: { txt: 'Pago', cor: '#1e40af', fundo: '#dbeafe' },
+    autorizacao: { txt: 'Autorização', cor: '#e0a458' },
+    aprovado: { txt: 'Aprovado', cor: 'var(--green, #7ddc9a)' },
+    reprovado: { txt: 'Reprovado', cor: '#e08585' },
+    pago: { txt: 'Pago', cor: '#7aa7e0' },
   }
-  const m = mapa[grupo] || { txt: grupo || '—', cor: '#374151', fundo: '#f3f4f6' }
-  return (
-    <span style={{ background: m.fundo, color: m.cor, padding: '2px 8px', borderRadius: 10, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-      {m.txt}
-    </span>
-  )
+  const m = mapa[grupo] || { txt: grupo || '-', cor: 'var(--text)' }
+  return <span style={{ color: m.cor, fontWeight: 600, whiteSpace: 'nowrap' }}>{m.txt}</span>
 }
 
+// Colunas: adesao, cliente, cpf, [vendedora], valor, parc, status, acao
 function PanTabela({ titulo, linhas, mostrarVendedor, onSimular }) {
   if (!linhas?.length) return null
+  const cols = mostrarVendedor
+    ? '1fr 1.5fr 1.1fr 1.2fr 1fr 0.5fr 0.9fr 0.8fr'
+    : '1fr 1.6fr 1.1fr 1fr 0.5fr 0.9fr 0.8fr'
   return (
-    <div style={{ marginBottom: 18 }}>
-      <h4 style={{ margin: '0 0 6px', fontSize: 14 }}>{titulo} <span style={{ opacity: 0.6, fontWeight: 400 }}>({linhas.length})</span></h4>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="tabela" style={{ width: '100%', fontSize: 13 }}>
-          <thead>
-            <tr>
-              <th>Adesão</th><th>Cliente</th><th>CPF</th>
-              {mostrarVendedor && <th>Vendedora</th>}
-              <th>Valor</th><th>Parc.</th><th>Status</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {linhas.map((l) => (
-              <tr key={l.adesao}>
-                <td>{l.adesao}</td>
-                <td>{l.nome || '—'}</td>
-                <td>{l.cpf || '—'}</td>
-                {mostrarVendedor && <td>{l.vendedor || '—'}</td>}
-                <td>{l.valor != null ? Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</td>
-                <td>{l.parcelas ?? '—'}</td>
-                <td><PanBadge grupo={l.grupo} /></td>
-                <td>
-                  {l.grupo === 'aprovado' && onSimular && (
-                    <button className="refresh-btn" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => onSimular(l)}>
-                      Simular
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div style={{ marginBottom: 14 }}>
+      <p className="kpi-label" style={{ marginBottom: 6 }}>{titulo} ({linhas.length})</p>
+      <div className="panel table-panel">
+        <div className="template-row head" style={{ gridTemplateColumns: cols }}>
+          <div>Adesão</div><div>Cliente</div><div>CPF</div>
+          {mostrarVendedor && <div>Vendedora</div>}
+          <div>Valor</div><div>Parc.</div><div>Status</div><div></div>
+        </div>
+        {linhas.map((l) => (
+          <div className="template-row" key={l.adesao} style={{ gridTemplateColumns: cols, alignItems: 'center' }}>
+            <div>{l.adesao}</div>
+            <div>{l.nome || '-'}</div>
+            <div>{l.cpf || '-'}</div>
+            {mostrarVendedor && <div>{l.vendedor || '-'}</div>}
+            <div>{l.valor != null ? fmtMoeda(l.valor) : '-'}</div>
+            <div>{l.parcelas ?? '-'}</div>
+            <div><PanBadge grupo={l.grupo} /></div>
+            <div>
+              {l.grupo === 'aprovado' && onSimular && (
+                <button type="button" className="refresh-btn" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => onSimular(l)}>
+                  Simular
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
+const PAN_INTERVALO_MS = 5 * 60 * 1000 // atualiza sozinho a cada 5 min
+
 function PanModal({ vendedorFixo, onClose }) {
-  const [etapa, setEtapa] = useState('busca') // busca | resultado | simulacao
   const [busca, setBusca] = useState('')
   const [achado, setAchado] = useState(null)
   const [listas, setListas] = useState(null)
@@ -2875,16 +2868,17 @@ function PanModal({ vendedorFixo, onClose }) {
 
   const soDigitos = String(busca).replace(/\D/g, '')
   const ehCpf = soDigitos.length === 11
+  const mostrarVendedor = !vendedorFixo
 
   const carregarListas = async () => {
     try {
       const d = await postApi('pan_listar', { vendedor: vendedorFixo || null })
       if (!d?.error) { setListas(d); setUltimaAtualizacao(new Date()) }
-    } catch { /* silencioso: é atualização de fundo */ }
+    } catch { /* silencioso: atualizacao de fundo */ }
   }
 
-  // Atualização automática a cada 5 min enquanto o modal estiver aberto.
-  // Só as pendentes são reconsultadas na API — pagas e canceladas não.
+  // Atualiza sozinho a cada 5 min. Pagas e reprovadas nao sao reconsultadas
+  // (quem filtra e a RPC pan_propostas_pendentes, dentro do workflow do n8n).
   useEffect(() => {
     carregarListas()
     const id = setInterval(async () => {
@@ -2896,7 +2890,7 @@ function PanModal({ vendedorFixo, onClose }) {
   }, [vendedorFixo])
 
   const atualizarAgora = async () => {
-    setAtualizando(true)
+    setAtualizando(true); setErro('')
     try {
       await postApi('pan_atualizar', { vendedor: vendedorFixo || null, todas: true })
       await carregarListas()
@@ -2912,11 +2906,9 @@ function PanModal({ vendedorFixo, onClose }) {
     if (!soDigitos) { setErro('Informe o CPF ou a adesão.'); return }
     setCarregando(true); setErro(''); setAchado(null)
     try {
-      const body = ehCpf ? { cpf: soDigitos } : { adesao: soDigitos }
-      const d = await postApi('pan_buscar', body)
+      const d = await postApi('pan_buscar', ehCpf ? { cpf: soDigitos } : { adesao: soDigitos })
       if (d?.error) { setErro(d.error); return }
       setAchado(d)
-      setEtapa('resultado')
     } catch (e2) {
       setErro('Erro na busca: ' + (e2.message || ''))
     } finally {
@@ -2924,107 +2916,86 @@ function PanModal({ vendedorFixo, onClose }) {
     }
   }
 
-  const mostrarVendedor = !vendedorFixo
-
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 940 }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>PAN {vendedorFixo ? '' : '— todas as vendedoras'}</h3>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 940 }}>
+        <div className="funil-header">
+          <div><h2>PAN{vendedorFixo ? '' : ' \u2014 todas as vendedoras'}</h2></div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
         </div>
 
-        <div className="modal-body">
-          {erro && <div className="erro-box">{erro}</div>}
+        {erro && <p className="state-msg" style={{ color: '#e08585' }}>{erro}</p>}
 
-          {etapa === 'busca' || etapa === 'resultado' ? (
-            <form onSubmit={buscar} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 240px' }}>
-                <label>CPF ou adesão</label>
-                <input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="CPF (11 dígitos) ou número da adesão"
-                  autoFocus
-                />
-              </div>
-              <button className="refresh-btn" type="submit" disabled={carregando}>
-                {carregando ? 'Consultando…' : 'Consultar'}
-              </button>
-            </form>
-          ) : null}
+        <form className="add-venda-form" onSubmit={buscar}>
+          <label>CPF ou adesão</label>
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="CPF (11 dígitos) ou número da adesão" autoFocus />
+          <button type="submit" className="refresh-btn" disabled={carregando}>
+            {carregando ? 'Consultando...' : 'Consultar'}
+          </button>
+        </form>
 
-          {/* Resultado da busca pontual */}
-          {etapa === 'resultado' && achado && (
-            <div style={{ marginBottom: 18, padding: 12, background: '#f9fafb', borderRadius: 8 }}>
-              {achado.tem_proposta ? (
-                <>
-                  <strong>Proposta encontrada.</strong>
-                  <PanTabela titulo="" linhas={achado.propostas} mostrarVendedor={mostrarVendedor} />
-                  <p style={{ fontSize: 13, opacity: 0.8, margin: '4px 0 0' }}>
-                    Esta é a última proposta registrada — siga daqui para o cadastro.
+        {achado && (
+          <div style={{ marginBottom: 14 }}>
+            {achado.tem_proposta ? (
+              <>
+                <p className="kpi-label">Proposta encontrada &mdash; siga daqui para o cadastro</p>
+                <PanTabela titulo="Resultado" linhas={achado.propostas} mostrarVendedor={mostrarVendedor} />
+              </>
+            ) : achado.vendas?.length ? (
+              <>
+                <p className="kpi-label">Sem proposta em andamento, mas ha venda lancada</p>
+                {achado.vendas.map((v) => (
+                  <p className="kpi-sub" key={v.id}>
+                    Adesão {v.adesao} &middot; {v.nome || '-'} &middot; {fmtMoeda(v.valor || 0)} &middot; {v.parcelas}x
                   </p>
-                </>
-              ) : achado.vendas?.length ? (
-                <>
-                  <strong>Sem proposta em andamento, mas há venda já lançada:</strong>
-                  <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 13 }}>
-                    {achado.vendas.map((v) => (
-                      <li key={v.id}>
-                        Adesão {v.adesao} — {v.nome || '—'} — {Number(v.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} — {v.parcelas}x
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <>
-                  <strong>Nenhuma proposta para {ehCpf ? 'esse CPF' : 'essa adesão'}.</strong>
-                  <p style={{ fontSize: 13, margin: '4px 0 8px' }}>
-                    {achado.cliente?.encontrado
-                      ? <>Cliente localizado nas nossas bases: <b>{achado.cliente.nome}</b>. Pode seguir para a simulação.</>
-                      : 'Cliente não localizado nas nossas bases. A simulação vai pedir os dados.'}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Tabelas de acompanhamento */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h4 style={{ margin: 0, fontSize: 15 }}>Acompanhamento</h4>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {ultimaAtualizacao && (
-                <span style={{ fontSize: 12, opacity: 0.65 }}>
-                  atualizado {ultimaAtualizacao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-              <button className="refresh-btn" onClick={atualizarAgora} disabled={atualizando} style={{ fontSize: 12 }}>
-                {atualizando ? 'Atualizando…' : '\u21bb Atualizar agora'}
-              </button>
-            </div>
+                ))}
+              </>
+            ) : (
+              <>
+                <p className="kpi-label">Nenhuma proposta para {ehCpf ? 'esse CPF' : 'essa adesão'}</p>
+                <p className="kpi-sub">
+                  {achado.cliente?.encontrado
+                    ? `Cliente localizado nas nossas bases: ${achado.cliente.nome}. Pode seguir para a simulação.`
+                    : 'Cliente não localizado nas nossas bases. A simulação vai pedir os dados.'}
+                </p>
+              </>
+            )}
           </div>
+        )}
 
-          {!listas ? (
-            <p style={{ opacity: 0.7 }}>Carregando…</p>
-          ) : listas.total === 0 ? (
-            <p style={{ opacity: 0.7 }}>Nenhuma proposta do PAN registrada ainda.</p>
-          ) : (
-            <>
-              <PanTabela titulo="Aguardando autorização" linhas={listas.autorizacao} mostrarVendedor={mostrarVendedor} />
-              <PanTabela titulo="Aprovadas" linhas={listas.aprovadas} mostrarVendedor={mostrarVendedor} onSimular={() => setEtapa('simulacao')} />
-              <PanTabela titulo="Pagas" linhas={listas.pagas} mostrarVendedor={mostrarVendedor} />
-              <PanTabela titulo="Reprovadas" linhas={listas.reprovadas} mostrarVendedor={mostrarVendedor} />
-            </>
-          )}
-
-          <p style={{ fontSize: 12, opacity: 0.6, marginTop: 12 }}>
-            As listas se atualizam sozinhas a cada 5 minutos. Propostas pagas e reprovadas não são reconsultadas.
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 10, flexWrap: 'wrap' }}>
+          <p className="kpi-label" style={{ margin: 0 }}>Acompanhamento</p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {ultimaAtualizacao && (
+              <span className="kpi-sub" style={{ margin: 0 }}>
+                atualizado {ultimaAtualizacao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <button type="button" className="refresh-btn" onClick={atualizarAgora} disabled={atualizando} style={{ fontSize: 12 }}>
+              {atualizando ? 'Atualizando...' : '\u21bb Atualizar agora'}
+            </button>
+          </div>
         </div>
+
+        {!listas ? (
+          <p className="state-msg">Carregando...</p>
+        ) : listas.total === 0 ? (
+          <p className="state-msg">Nenhuma proposta do PAN registrada ainda.</p>
+        ) : (
+          <>
+            <PanTabela titulo="Aguardando autorização" linhas={listas.autorizacao} mostrarVendedor={mostrarVendedor} />
+            <PanTabela titulo="Aprovadas" linhas={listas.aprovadas} mostrarVendedor={mostrarVendedor} onSimular={() => {}} />
+            <PanTabela titulo="Pagas" linhas={listas.pagas} mostrarVendedor={mostrarVendedor} />
+            <PanTabela titulo="Reprovadas" linhas={listas.reprovadas} mostrarVendedor={mostrarVendedor} />
+          </>
+        )}
+
+        <p className="kpi-sub">As listas se atualizam sozinhas a cada 5 minutos. Propostas pagas e reprovadas não são reconsultadas.</p>
       </div>
     </div>
   )
 }
+
 
 function NovoSaqueModal({ vendedorFixo, onClose }) {
   const [etapa, setEtapa] = useState('cpf') // cpf | status | manual | ofertas | pagamento | feito
