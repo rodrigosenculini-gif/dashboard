@@ -447,34 +447,49 @@ export default async function handler(req, res) {
     // Atualiza status na API do PAN (botão manual e o refresh de 5 min).
     // Só reconsulta o que não está pago nem cancelado — quem filtra é a
     // RPC pan_propostas_pendentes, chamada dentro do workflow do n8n.
+    // Atualiza status das propostas PAN pendentes (botao manual do modal).
+    // Reusa o consulta-adesao-banco (que ja tem o ramo PAN testado) adesao por
+    // adesao e grava via conferir_e_lancar_proposta. O refresh de 5 min roda
+    // no n8n (workflow 'Conferencia APIs bancos'), nao aqui.
     if (type === 'pan_atualizar') {
       try {
-        const { adesao, cpf, vendedor, todas } = req.body || {};
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
-        let resp;
-        try {
-          resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/pan-consulta', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              adesao: adesao || null,
-              cpf: cpf || null,
-              vendedor: vendedor || null,
-              todas: todas === true,
-            }),
-            signal: controller.signal,
-          });
-        } finally {
-          clearTimeout(timeoutId);
+        const { adesao, vendedor } = req.body || {};
+        const client = getPool();
+        let alvos;
+        if (adesao) {
+          alvos = [{ banco: 'PAN', proposal_id: String(adesao).replace(/\D/g, ''), cpf: null }];
+        } else {
+          const q = await client.query(
+            `select banco, proposal_id, cpf from propostas_bancos
+              where banco = 'PAN' and not pago and not cancelado
+                and ($1::text is null or vendedor = $1)
+              order by criado_em desc limit 15`,
+            [vendedor || null]
+          );
+          alvos = q.rows;
         }
-        const texto = await resp.text();
-        let dados;
-        try { dados = JSON.parse(texto); } catch { dados = { ok: false, erro: texto?.slice(0, 300) }; }
-        return res.status(200).json(dados);
+        const resultados = [];
+        for (const a of alvos) {
+          const controller = new AbortController();
+          const t = setTimeout(() => controller.abort(), 40000);
+          try {
+            const resp = await fetch('https://hotn8n.querosacarfgts.com.br/webhook/consulta-adesao-banco', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ banco: 'PAN', adesao: a.proposal_id, cpf: a.cpf || null, valor: null }),
+              signal: controller.signal,
+            });
+            const norm = await resp.json().catch(() => ({ encontrado: false }));
+            const r = await client.query('select conferir_e_lancar_proposta($1,$2,$3::jsonb) as r', ['PAN', a.proposal_id, JSON.stringify(norm)]);
+            resultados.push({ adesao: a.proposal_id, ...(r.rows[0]?.r || {}) });
+          } catch (e) {
+            resultados.push({ adesao: a.proposal_id, ok: false, erro: e.name === 'AbortError' ? 'timeout' : e.message });
+          } finally {
+            clearTimeout(t);
+          }
+        }
+        return res.status(200).json({ ok: true, processadas: resultados.length, resultados });
       } catch (e) {
-        const timeoutMsg = e.name === 'AbortError' ? 'A consulta ao PAN demorou demais. Tente novamente.' : e.message;
-        return res.status(500).json({ error: timeoutMsg });
+        return res.status(500).json({ error: e.message });
       }
     }
 

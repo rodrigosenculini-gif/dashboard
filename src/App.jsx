@@ -2977,10 +2977,9 @@ function PanModal({ vendedorFixo, onClose }) {
   // (quem filtra e a RPC pan_propostas_pendentes, dentro do workflow do n8n).
   useEffect(() => {
     carregarListas()
-    const id = setInterval(async () => {
-      await postApi('pan_atualizar', { vendedor: vendedorFixo || null, todas: true }).catch(() => {})
-      await carregarListas()
-    }, PAN_INTERVALO_MS)
+    // O n8n consulta as APIs a cada 5 min (workflow 'Conferencia APIs bancos');
+    // aqui so recarregamos as listas do Postgres no mesmo ritmo.
+    const id = setInterval(carregarListas, PAN_INTERVALO_MS)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendedorFixo])
@@ -2988,7 +2987,7 @@ function PanModal({ vendedorFixo, onClose }) {
   const atualizarAgora = async () => {
     setAtualizando(true); setErro('')
     try {
-      await postApi('pan_atualizar', { vendedor: vendedorFixo || null, todas: true })
+      await postApi('pan_atualizar', { vendedor: vendedorFixo || null })
       await carregarListas()
     } catch (e) {
       setErro('Erro ao atualizar: ' + (e.message || ''))
