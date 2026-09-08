@@ -3,6 +3,35 @@ import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContaine
 import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
 import RefinButton from './RefinLeads'
+import * as XLSX from 'xlsx'
+
+// Lê CSV (; ou ,) ou XLSX e devolve as linhas CRUAS, com os nomes de coluna
+// exatamente como vieram no arquivo. Quem interpreta é a RPC no banco
+// (dashboard_vendas_import_v3), que reconhece o formato do VendeAI e o do
+// relatório do portal v8 pelos nomes das colunas.
+async function parseArquivoCru(file) {
+  const buf = await file.arrayBuffer()
+  const nome = (file.name || '').toLowerCase()
+  if (nome.endsWith('.xlsx') || nome.endsWith('.xls')) {
+    const wb = XLSX.read(buf, { type: 'array' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    return XLSX.utils.sheet_to_json(ws, { defval: null, raw: false })
+  }
+  // CSV: o relatório do portal v8 vem em latin-1 com ';'
+  let text
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf) }
+  catch { text = new TextDecoder('iso-8859-1').decode(buf) }
+  const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0)
+  if (lines.length < 2) return []
+  const delim = (lines[0].match(/;/g) || []).length >= (lines[0].match(/,/g) || []).length ? ';' : ','
+  const header = lines[0].split(delim).map((h) => h.trim())
+  return lines.slice(1).map((l) => {
+    const cols = l.split(delim)
+    const o = {}
+    header.forEach((h, i) => { o[h] = (cols[i] ?? '').trim() })
+    return o
+  })
+}
 
 const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 // altura de uma linha do breakdown (padding 7+7, conteúdo ~18, borda 1)
@@ -4795,6 +4824,47 @@ function VendasView() {
     }
   }
 
+  const ajusteInputRef = useRef(null)
+  const [ajuste, setAjuste] = useState(null)          // { rows, previa }
+  const [ajustando, setAjustando] = useState(false)
+
+  // Ajuste v8/C6: le o arquivo cru, simula na RPC v3 e mostra a previa.
+  // So grava quando a pessoa confirmar no modal.
+  const handleAjusteFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setAjustando(true); setImportMsg('')
+    try {
+      const rows = await parseArquivoCru(file)
+      if (!rows.length) { setImportMsg('Nenhuma linha encontrada no arquivo.'); return }
+      const previa = await postApi('vendas_import_v3', { rows, aplicar: false })
+      if (previa?.error) { setImportMsg(previa.error); return }
+      setAjuste({ rows, previa })
+    } catch (err) {
+      setImportMsg('Erro ao ler o arquivo: ' + (err.message || ''))
+    } finally {
+      setAjustando(false)
+    }
+  }
+
+  const aplicarAjuste = async () => {
+    if (!ajuste) return
+    setAjustando(true)
+    try {
+      const r = await postApi('vendas_import_v3', { rows: ajuste.rows, aplicar: true })
+      if (r?.error) { setImportMsg(r.error); return }
+      const rs = r.resumo || {}
+      setImportMsg(`Ajuste aplicado — ${fmtInt(rs.atualizar)} atualizadas, ${fmtInt(rs.inserir)} inseridas, ${fmtInt(rs.ja_correto)} já corretas, ${fmtInt(rs.rejeitado)} rejeitadas, ${fmtInt(rs.ignorado)} ignoradas (outros bancos).`)
+      setAjuste(null)
+      await handleSync()
+    } catch (err) {
+      setImportMsg('Erro ao aplicar: ' + (err.message || ''))
+    } finally {
+      setAjustando(false)
+    }
+  }
+
   const handleImportClick = () => fileInputRef.current?.click()
 
   const handleFileChange = async (e) => {
@@ -4851,6 +4921,10 @@ function VendasView() {
           <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
           <button className="refresh-btn" onClick={handleImportClick} disabled={importing} title="Importar vendas de um arquivo CSV">
             {importing ? 'Importando...' : '↑ Importar'}
+          </button>
+          <input type="file" accept=".csv,.xlsx,.xls" ref={ajusteInputRef} onChange={handleAjusteFile} style={{ display: 'none' }} />
+          <button className="refresh-btn" onClick={() => ajusteInputRef.current?.click()} disabled={ajustando} title="Ajustar tabela/parcelas/valor de v8 e C6 pela planilha do VendeAI ou pelo relatorio do portal v8 (simula antes de gravar)">
+            {ajustando ? 'Lendo...' : '⇆ Ajustar v8/C6'}
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar tabela filtrada em CSV">
             &#8595; Baixar
@@ -5049,6 +5123,46 @@ function VendasView() {
           ))}
         </div>
       </div>
+      {ajuste && (
+        <div className="funil-overlay" onClick={() => setAjuste(null)}>
+          <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 980 }}>
+            <div className="funil-header">
+              <div><h2>Ajuste v8/C6 &mdash; pr&eacute;via</h2></div>
+              <button className="funil-close" onClick={() => setAjuste(null)}>&times;</button>
+            </div>
+            <p className="kpi-sub" style={{ marginBottom: 10 }}>
+              {ajuste.previa.total} linhas lidas &middot;{' '}
+              <b style={{ color: 'var(--green, #7ddc9a)' }}>{fmtInt(ajuste.previa.resumo?.atualizar)} a atualizar</b> &middot;{' '}
+              {fmtInt(ajuste.previa.resumo?.inserir)} a inserir &middot;{' '}
+              {fmtInt(ajuste.previa.resumo?.ja_correto)} j&aacute; corretas &middot;{' '}
+              <span style={{ color: '#e08585' }}>{fmtInt(ajuste.previa.resumo?.rejeitado)} rejeitadas</span> &middot;{' '}
+              {fmtInt(ajuste.previa.resumo?.ignorado)} de outros bancos (ignoradas)
+            </p>
+            <div className="panel table-panel" style={{ maxHeight: 420, overflowY: 'auto' }}>
+              <div className="template-row head" style={{ gridTemplateColumns: '0.5fr 0.6fr 0.9fr 1.6fr 1.6fr 1.6fr' }}>
+                <div>#</div><div>Banco</div><div>A&ccedil;&atilde;o</div><div>Antes</div><div>Depois</div><div>Motivo</div>
+              </div>
+              {(ajuste.previa.linhas || []).filter((x) => x.acao !== 'ja_correto' && x.acao !== 'ignorado').map((x) => (
+                <div className="template-row" key={x.linha} style={{ gridTemplateColumns: '0.5fr 0.6fr 0.9fr 1.6fr 1.6fr 1.6fr', fontSize: 12 }}>
+                  <div>{x.linha}</div>
+                  <div>{String(x.banco || '').toUpperCase()}</div>
+                  <div style={{ color: x.acao === 'rejeitado' ? '#e08585' : x.acao === 'atualizar' ? 'var(--green, #7ddc9a)' : 'var(--text)' }}>{x.acao}</div>
+                  <div style={{ opacity: 0.75 }}>{x.antes || '-'}</div>
+                  <div>{x.depois || '-'}</div>
+                  <div style={{ opacity: 0.75 }}>{x.motivo}</div>
+                </div>
+              ))}
+            </div>
+            <p className="kpi-sub" style={{ marginTop: 8 }}>Linhas j&aacute; corretas e de outros bancos ficam ocultas na pr&eacute;via.</p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button className="refresh-btn" onClick={aplicarAjuste} disabled={ajustando || !((ajuste.previa.resumo?.atualizar || 0) + (ajuste.previa.resumo?.inserir || 0))}>
+                {ajustando ? 'Aplicando...' : `Aplicar ${fmtInt((ajuste.previa.resumo?.atualizar || 0) + (ajuste.previa.resumo?.inserir || 0))} alterações`}
+              </button>
+              <button className="reset-btn" onClick={() => setAjuste(null)} disabled={ajustando}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

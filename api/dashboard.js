@@ -510,6 +510,29 @@ export default async function handler(req, res) {
       }
     }
 
+    // Ajuste de v8 e C6 pela planilha (VendeAI ou relatório do portal v8).
+    // aplicar=false só simula e devolve linha a linha; aplicar=true grava.
+    if (type === 'vendas_import_v3') {
+      try {
+        const rows = req.body?.rows;
+        const aplicar = req.body?.aplicar === true;
+        if (!Array.isArray(rows) || rows.length === 0) {
+          return res.status(400).json({ error: 'Nenhuma linha para importar.' });
+        }
+        const client = getPool();
+        const result = await client.query(
+          'select * from dashboard_vendas_import_v3($1::jsonb, $2::boolean)',
+          [JSON.stringify(rows), aplicar]
+        );
+        const linhas = result.rows || [];
+        const resumo = {};
+        for (const l of linhas) resumo[l.acao] = (resumo[l.acao] || 0) + 1;
+        return res.status(200).json({ aplicado: aplicar, total: linhas.length, resumo, linhas });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type === 'vendedoras_import' || type === 'vendas_import') {
       try {
         const rows = req.body?.rows;
