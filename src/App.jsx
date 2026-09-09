@@ -1973,33 +1973,10 @@ const FGTSV8_TABELAS = [
   { valor: 'PIT STOP', label: 'PIT STOP (1,80)' },
 ]
 
-// C6 Consignado Privado — peso por nome da tabela + parcelas (tabela_pontos,
-// vigente a partir de 01/09/2026). Vários nomes se repetem em prazos
-// diferentes com pesos diferentes — por isso o campo Parcelas continua
-// obrigatório para o C6 (ver BANCOS_TABELA_NOME_COM_PARCELAS acima).
-const C6_TABELAS = [
-  { valor: 'TOP PLAN 13 C/SEGURO', label: 'TOP PLAN 13 C/SEGURO (48x=1,35 · 24x=1,20)' },
-  { valor: 'TOP PLAN 10, 9, 8, 6 E 4 - TODAS C/SEGURO', label: 'TOP PLAN 10,9,8,6 e 4 C/SEGURO (48x=1,20)' },
-  { valor: 'TOP PLAN 13, 10, 9, 8 E 6 - TODAS C/SEGURO', label: 'TOP PLAN 13,10,9,8 e 6 C/SEGURO (36x=1,20)' },
-  { valor: 'TOP PLAN 3, 2 E 1 - PLAN 13, 10, 9, 8, 6 E 4 - TODAS C/SEGURO', label: 'TOP PLAN 3,2,1 (+13,10,9,8,6,4) C/SEGURO (48x=1,00)' },
-  { valor: 'TOP PLAN 4, 3, 2 E 1 - PLAN 13, 10, 9, E 6 - TODAS C/SEGURO', label: 'TOP PLAN 4,3,2,1 (+13,10,9,6) C/SEGURO (36x=1,00)' },
-  { valor: 'TOP PLAN 10, 9, 8, 6, 4 E 3 - PLAN 13 - TODAS C/SEGURO', label: 'TOP PLAN 10,9,8,6,4,3 (+13) C/SEGURO (24x=1,00 · 14x=0,80)' },
-  { valor: 'TOP PLAN 13, 10, 9, 8, 6 E 4 - TODAS C/SEGURO', label: 'TOP PLAN 13,10,9,8,6,4 C/SEGURO (18x=1,00)' },
-  { valor: 'TOP PLAN13 C/SEGURO', label: 'TOP PLAN 13 C/SEGURO — nome curto (14x=1,00)' },
-  { valor: 'PLAN 3, 2 E 1 - TODAS C/SEGURO', label: 'PLAN 3,2,1 C/SEGURO (48x=0,80 · 24x=0,70)' },
-  { valor: 'NOVO - SEM SEGURO', label: 'NOVO - SEM SEGURO (48x=0,80 · 36x=0,70 · 24x=0,60)' },
-  { valor: 'PLAN 4, 3, 2 E 1 - TODAS C/ SEGURO', label: 'PLAN 4,3,2,1 C/SEGURO (36x=0,80)' },
-  { valor: 'TOP PLAN 2 E 1 - PLAN 10, 9, 8, 6, 4 E 3 - TODAS C/SEGURO', label: 'TOP PLAN 2,1 (+10,9,8,6,4,3) C/SEGURO (24x=0,80)' },
-  { valor: 'TOP PLAN 3, 2 E 1 - PLAN 13, 10, 9, 8, 6 E 4 - TODAS C/SEGURO', label: 'TOP PLAN 3,2,1 (+13,10,9,8,6,4) C/SEGURO (18x=0,80)' },
-  { valor: 'PLAN 2 E 1 - TODAS C/SEGURO', label: 'PLAN 2,1 C/SEGURO (24x=0,70)' },
-  { valor: 'PLAN 3 E 2 - TODAS C/SEGURO', label: 'PLAN 3,2 C/SEGURO (18x=0,70)' },
-  { valor: 'TOP PLAN 2 E 1 - PLAN 10 E 9 - TODAS C/SEGURO', label: 'TOP PLAN 2,1 (+10,9) C/SEGURO (14x=0,70)' },
-  { valor: 'PLAN 1 C/SEGURO E NOVO SEM SEGURO', label: 'PLAN 1 C/SEGURO e NOVO SEM SEGURO (18x=0,60)' },
-  { valor: 'PLAN 8, 6, 4 E 3 - TODAS C/SEGURO', label: 'PLAN 8,6,4,3 C/SEGURO (14x=0,60)' },
-  { valor: 'PLAN 2 E 1 C/SEGURO E NOVO SEM SEGURO', label: 'PLAN 2,1 C/SEGURO e NOVO SEM SEGURO (14x=0,50)' },
-  { valor: 'ESP PLAN 6 C/ SEGURO', label: 'ESP PLAN 6 C/SEGURO (18x=0,35)' },
-  { valor: 'ESP PLAN 4 C/ SEGURO', label: 'ESP PLAN 4 C/SEGURO (18x=0,30 · 14x=0,30)' },
-]
+// C6 Consignado Privado — as tabelas validas vem de c6_planos_da_tabela()
+// filtradas pelo prazo (endpoint c6_tabelas_opcoes). Nao existe mais lista
+// estatica: o nome da tabela do C6 e um agrupamento por prazo, e uma lista
+// sem filtro deixava gravar nome e prazo incompativeis (peso null = 0 ponto).
 
 // Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
 const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE', 'C6']
@@ -2644,6 +2621,26 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
 
   const [c6Opcoes, setC6Opcoes] = useState([])
 
+  // C6: o nome da tabela e um agrupamento POR PRAZO — o mesmo plano tem nomes
+  // diferentes em prazos diferentes, e o peso so resolve quando nome e prazo
+  // combinam. Antes as opcoes so eram filtradas depois da busca na API; no
+  // preenchimento manual caia na lista estatica, sem filtro, e dava pra gravar
+  // uma combinacao que nao existe (venda entra com peso null = zero ponto).
+  // Agora carrega direto de c6_planos_da_tabela sempre que o prazo muda.
+  useEffect(() => {
+    if (addForm.banco !== 'C6') { setC6Opcoes([]); return }
+    const p = parseInt(addForm.parcelas, 10)
+    if (!Number.isFinite(p) || p <= 0) { setC6Opcoes([]); return }
+    let cancelado = false
+    ;(async () => {
+      try {
+        const o = await postApi('c6_tabelas_opcoes', { parcelas: p })
+        if (!cancelado) setC6Opcoes(o?.opcoes || [])
+      } catch { if (!cancelado) setC6Opcoes([]) }
+    })()
+    return () => { cancelado = true }
+  }, [addForm.banco, addForm.parcelas])
+
   const gravarDireto = async (vendedorAlvo, dados) => {
     const result = await postApi('vendedoras_add_venda', {
       vendedor: vendedorAlvo,
@@ -2744,6 +2741,19 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
       setAddMsg('Busque a adesão antes de adicionar.')
       return
     }
+    // C6: trava a combinacao impossivel antes de gravar. Sem isso a venda entra
+    // com peso null e aparece valendo zero ponto pra vendedora.
+    if (addForm.banco === 'C6') {
+      const p = parseInt(addForm.parcelas, 10)
+      if (!Number.isFinite(p) || p <= 0) {
+        setAddMsg('Informe as parcelas antes de escolher a tabela do C6 — o peso depende do prazo.')
+        return
+      }
+      if (addForm.tabelaNome && c6Opcoes.length && !c6Opcoes.some((o) => o.nome === addForm.tabelaNome)) {
+        setAddMsg(`A tabela "${addForm.tabelaNome}" não existe para ${p}x. Escolha uma das tabelas da lista.`)
+        return
+      }
+    }
     setAdding(true)
     setAddMsg('')
     try {
@@ -2786,8 +2796,12 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
   // C6: se a busca na API ja devolveu as parcelas, oferece so as tabelas
   // validas para aquele prazo (vindas de c6_planos_da_tabela, no formato do
   // portal). Sem busca, cai na lista estatica.
+  // C6: as tabelas validas dependem do prazo, entao a lista so existe depois
+  // que as parcelas foram informadas. Sem parcelas o select fica vazio e o
+  // formulario pede o prazo primeiro — nao volta mais pra lista estatica sem
+  // filtro, que era o que deixava gravar nome e prazo incompativeis.
   const tabelaOpcoes = addForm.banco === 'FGTSV8' ? FGTSV8_TABELAS
-    : addForm.banco === 'C6' ? (c6Opcoes.length ? c6Opcoes.map((o) => ({ valor: o.nome, label: `${o.nome} (${o.parcelas}x · peso ${o.pontos})` })) : C6_TABELAS)
+    : addForm.banco === 'C6' ? c6Opcoes.map((o) => ({ valor: o.nome, label: `${o.nome} (${o.parcelas}x · peso ${o.pontos})` }))
     : NOVO_SAQUE_TABELAS
 
   return (
