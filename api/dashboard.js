@@ -727,6 +727,60 @@ export default async function handler(req, res) {
       }
     }
 
+    // PAN — esteira e formalizacao, pelo webhook pan-esteira do n8n:
+    //   aprovar   -> POST .../propostas/{id}/aprovar   (so Analise Promotora/Master; so view geral)
+    //   cancelar  -> POST .../propostas/{id}/cancelar
+    //   documentos-> GET  .../formalizador/{promotora}/{cpf}/{proposta}/documentos (lista)
+    //   link      -> GET  .../formalizador/{promotora}/{cpf}/{proposta}/links (assinatura digital)
+    // 'aprovar' exige geral=true: o portal restrito da vendedora nunca aprova.
+    if (type === 'pan_esteira') {
+      try {
+        const acao = String(req.body?.acao || '').toLowerCase();
+        const proposta = String(req.body?.proposta || '').replace(/\D/g, '');
+        const cpf = String(req.body?.cpf || '').replace(/\D/g, '');
+        const geral = req.body?.geral === true;
+        if (!['aprovar', 'cancelar', 'documentos', 'link'].includes(acao)) {
+          return res.status(400).json({ error: "acao deve ser 'aprovar', 'cancelar', 'documentos' ou 'link'." });
+        }
+        if (!proposta) return res.status(400).json({ error: 'Informe o número da proposta.' });
+        if (acao === 'aprovar' && !geral) {
+          return res.status(403).json({ error: 'Aprovar proposta só é permitido na view geral de Vendedoras.' });
+        }
+        if (['documentos', 'link'].includes(acao) && cpf.length !== 11) {
+          return res.status(400).json({ error: 'Para documentos e link é preciso o CPF do cliente.' });
+        }
+
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 60000);
+        let out;
+        try {
+          const resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/pan-esteira', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ acao, proposta, cpf: cpf || null, usuario: req.body?.usuario || null }),
+            signal: controller.signal,
+          });
+          const texto = await resp.text();
+          try { out = JSON.parse(texto); } catch { out = { ok: false, erro: texto?.slice(0, 300) }; }
+        } finally { clearTimeout(t); }
+
+        // registra o acionamento na proposta (best-effort)
+        try {
+          const client = getPool();
+          await client.query(
+            `update propostas_bancos set atualizado_em = now(),
+                    resposta_bruta = coalesce(resposta_bruta,'{}'::jsonb) || jsonb_build_object('esteira_' || $2::text, $3::jsonb)
+              where banco = 'PAN' and proposal_id = $1`,
+            [proposta, acao, JSON.stringify({ em: new Date().toISOString(), ok: out?.ok ?? null, http: out?.http_status ?? null })]
+          );
+        } catch { /* nao derruba a acao */ }
+
+        return res.status(200).json({ acao, proposta, ...out });
+      } catch (e) {
+        const msg = e.name === 'AbortError' ? 'O PAN demorou demais para responder. Tente novamente.' : e.message;
+        return res.status(500).json({ error: msg });
+      }
+    }
+
     if (type === 'vendas_import_v3') {
       try {
         const rows = req.body?.rows;

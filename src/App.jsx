@@ -3038,6 +3038,27 @@ function PanModal({ vendedorFixo, onClose }) {
   const ehCpf = soDigitos.length === 11
   const mostrarVendedor = !vendedorFixo
 
+  // Esteira/formalizacao do PAN sobre a proposta pesquisada. 'aprovar' so na
+  // view geral (backend tambem barra). Resposta fica em esteira[proposta].
+  const [esteira, setEsteira] = useState({})     // { [proposta]: { acao, ok, ... } }
+  const [esteiraBusy, setEsteiraBusy] = useState('')
+  const acaoEsteira = async (linha, acao) => {
+    if (acao === 'aprovar' && !window.confirm(`Aprovar a proposta ${linha.adesao} de ${linha.nome || 'cliente'} no PAN?`)) return
+    if (acao === 'cancelar' && !window.confirm(`CANCELAR a proposta ${linha.adesao} no PAN? Isso não tem volta.`)) return
+    setEsteiraBusy(`${linha.adesao}:${acao}`); setErro('')
+    try {
+      const d = await postApi('pan_esteira', { acao, proposta: linha.adesao, cpf: linha.cpf, geral: !vendedorFixo })
+      if (d?.error) { setErro(d.error); return }
+      setEsteira((e) => ({ ...e, [linha.adesao]: { ...d, acao } }))
+      if (['aprovar', 'cancelar'].includes(acao) && d.ok) await carregarListas()
+    } catch (e2) {
+      setErro('Erro: ' + (e2.message || ''))
+    } finally {
+      setEsteiraBusy('')
+    }
+  }
+  const PAN_STATUS_APROVAVEL = /an[aá]lise\s*(promotora|master)/i
+
   const carregarListas = async () => {
     try {
       const d = await postApi('pan_listar', { vendedor: vendedorFixo || null })
@@ -3107,6 +3128,68 @@ function PanModal({ vendedorFixo, onClose }) {
               <>
                 <p className="kpi-label">Proposta encontrada &mdash; siga daqui para o cadastro</p>
                 <PanTabela titulo="Resultado" linhas={achado.propostas} mostrarVendedor={mostrarVendedor} />
+                {achado.propostas.map((l) => {
+                  const r = esteira[l.adesao]
+                  const busy = (a) => esteiraBusy === `${l.adesao}:${a}`
+                  const podeAprovar = !vendedorFixo && l.grupo !== 'pago' && l.grupo !== 'reprovado'
+                  const podeCancelar = l.grupo !== 'pago' && l.grupo !== 'reprovado'
+                  return (
+                    <div key={`acoes-${l.adesao}`} className="panel" style={{ marginTop: 6, padding: 10 }}>
+                      <p className="kpi-sub" style={{ marginBottom: 6 }}>
+                        Ades&atilde;o {l.adesao} &middot; {l.status || l.grupo || '-'}
+                        {!vendedorFixo && !PAN_STATUS_APROVAVEL.test(l.status || '') && podeAprovar ? ' · aprovar só funciona em Análise Promotora/Master' : ''}
+                      </p>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {podeAprovar && (
+                          <button type="button" className="refresh-btn" disabled={!!esteiraBusy} onClick={() => acaoEsteira(l, 'aprovar')} style={{ fontSize: 12 }}>
+                            {busy('aprovar') ? 'Aprovando...' : '\u2714 Aprovar'}
+                          </button>
+                        )}
+                        {podeCancelar && (
+                          <button type="button" className="reset-btn" disabled={!!esteiraBusy} onClick={() => acaoEsteira(l, 'cancelar')} style={{ fontSize: 12 }}>
+                            {busy('cancelar') ? 'Cancelando...' : '\u2716 Cancelar'}
+                          </button>
+                        )}
+                        <button type="button" className="reset-btn" disabled={!!esteiraBusy || !l.cpf} onClick={() => acaoEsteira(l, 'documentos')} style={{ fontSize: 12 }}>
+                          {busy('documentos') ? 'Consultando...' : '\ud83d\udcc4 Documentos'}
+                        </button>
+                        <button type="button" className="reset-btn" disabled={!!esteiraBusy || !l.cpf} onClick={() => acaoEsteira(l, 'link')} style={{ fontSize: 12 }}>
+                          {busy('link') ? 'Buscando...' : '\ud83d\udd17 Link de assinatura'}
+                        </button>
+                      </div>
+                      {r && (
+                        <div style={{ marginTop: 8 }}>
+                          {r.acao === 'link' && r.ok && r.link && (
+                            <p className="kpi-sub" style={{ wordBreak: 'break-all' }}>
+                              <a href={r.link} target="_blank" rel="noreferrer">{r.link}</a>{' '}
+                              <button type="button" className="reset-btn" onClick={() => navigator.clipboard?.writeText(r.link)}>copiar</button>
+                            </p>
+                          )}
+                          {r.acao === 'documentos' && r.ok && (
+                            <div>
+                              {(r.documentos || []).length === 0
+                                ? <p className="kpi-sub">Nenhum documento pendente.</p>
+                                : (r.documentos || []).map((d, i) => (
+                                    <p className="kpi-sub" key={i}>{d.tipo || d.descricao || JSON.stringify(d)}{d.status ? ` · ${d.status}` : ''}{d.obrigatorio ? ' · obrigatório' : ''}</p>
+                                  ))}
+                            </div>
+                          )}
+                          {['aprovar', 'cancelar'].includes(r.acao) && (
+                            <p className="kpi-sub" style={{ color: r.ok ? 'var(--green, #7ddc9a)' : 'var(--red, #e88)' }}>
+                              {r.ok ? `${r.acao === 'aprovar' ? 'Aprovada' : 'Cancelada'} no PAN.` : 'O PAN recusou.'}
+                              {r.mensagem ? ` ${r.mensagem}` : ''}
+                            </p>
+                          )}
+                          {!r.ok && (
+                            <details><summary className="kpi-sub">resposta do PAN</summary>
+                              <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap' }}>{JSON.stringify(r.erro || r.bruto || r, null, 2).slice(0, 1500)}</pre>
+                            </details>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </>
             ) : achado.vendas?.length ? (
               <>
