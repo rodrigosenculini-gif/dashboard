@@ -43,11 +43,15 @@ function Spark({ data, cor, id }) {
   )
 }
 
-function Metrica({ label, valor, tom }) {
+function Metrica({ label, valor, sub, tom, largo }) {
+  // valores longos (R$ 13.692.698) encolhem em vez de estourar o cartao
+  const comp = String(valor).length
+  const escala = comp > 15 ? 'muito-longo' : comp > 11 ? 'longo' : ''
   return (
-    <div className="home-metrica">
+    <div className={`home-metrica ${largo ? 'largo' : ''}`}>
       <span className="home-metrica-label">{label}</span>
-      <span className={`home-metrica-valor ${tom || ''}`}>{valor}</span>
+      <span className={`home-metrica-valor ${escala} ${tom || ''}`}>{valor}</span>
+      {sub && <span className="home-metrica-sub">{sub}</span>}
     </div>
   )
 }
@@ -171,19 +175,19 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
                 serie={disp.serie} onAbrir={() => onIrPara('disparos')}>
           <Metrica label="Total leads" valor={fInt(disp.total_leads)} />
           <Metrica label="Interação" valor={fPct(disp.interacao_pct)} />
-          <Metrica label="Pagas" valor={fInt(disp.pagas)} />
-          <Metrica label="Valor pago" valor={fMoney(disp.valor_pago)} />
           <Metrica label="Conversão" valor={fPct(disp.conversao_pct)} tom="destaque" />
+          <Metrica label="Pagas" valor={fInt(disp.pagas)} />
+          <Metrica label="Valor pago" valor={fMoney(disp.valor_pago)} largo />
         </Painel>
 
         <Painel titulo="Entrada de leads" cor="var(--gold)" sparkId="sparkEntradas"
                 serie={ent.serie} onAbrir={() => onIrPara('produtos')}>
-          <Metrica label="Total" valor={fInt(ent.total)} />
+          <Metrica label="Entradas" valor={fInt(ent.total)} />
           <Metrica label="Interação" valor={fPct(ent.interacao_pct)} />
-          <Metrica label="Aprovados" valor={fPct(ent.aprovados_pct)} />
+          <Metrica label="Aprovados" valor={fPct(ent.aprovados_pct)} sub="de quem interagiu" />
           <Metrica label="Pagas" valor={fInt(ent.pagas_qtd)} />
-          <Metrica label="Valor" valor={fMoney(ent.valor)} />
           <Metrica label="Conv. aprovados" valor={fPct(ent.conversao_aprovados_pct)} tom="destaque" />
+          <Metrica label="Valor" valor={fMoney(ent.valor)} largo />
         </Painel>
 
         <Painel titulo="Vendedoras" cor="var(--lime)" sparkId="sparkVendedoras"
@@ -209,26 +213,27 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
               )
             })}
           </div>
+          <Metrica label="Total do dia" valor={emPontos ? fPts(vdd.pontos_total) : fMoney(vdd.valor_total)}
+                   sub={`${fInt(vdd.qtd_total)} vendas`} />
           <Metrica label="Fatia das vendas"
                    valor={fPct(emPontos ? vdd.pct_do_total_ponto : vdd.pct_do_total_valor)} tom="destaque" />
-          <Metrica label="Total do dia" valor={emPontos ? fPts(vdd.pontos_total) : fMoney(vdd.valor_total)} />
-          <Metrica label="Projeção do mês"
-                   valor={emPontos ? fPts(vdd.pontos_projecao_mes) : fMoney(vdd.projecao_mes)} />
           <Metrica label="Projeção diária"
                    valor={emPontos ? fPts(vdd.pontos_projecao_diaria) : fMoney(vdd.projecao_diaria)} />
           <Metrica label="Projeção semanal"
-                   valor={emPontos ? fPts(vdd.pontos_projecao_semanal) : fMoney(vdd.projecao_semanal)} />
+                   valor={emPontos ? fPts(vdd.pontos_projecao_semanal) : fMoney(vdd.projecao_semanal)} largo />
+          <Metrica label="Projeção do mês"
+                   valor={emPontos ? fPts(vdd.pontos_projecao_mes) : fMoney(vdd.projecao_mes)} largo />
         </Painel>
 
         <Painel titulo="Vendas" cor="var(--gold)" sparkId="sparkVendas"
                 serie={vnd.serie} onAbrir={() => onIrPara('vendas')}>
           <Metrica label="Pontos" valor={fPts(vnd.pontos_total)} tom="destaque" />
           <Metrica label="Qtd total" valor={fInt(vnd.qtd_total)} />
-          <Metrica label="Projeção do mês" valor={fPts(vnd.pontos_projecao_mes)} />
           <Metrica label="Projeção diária" valor={fPts(vnd.projecao_diaria_pontos)} />
-          <Metrica label="Proj. diária (valor)" valor={fMoney(vnd.projecao_diaria_valor)} />
-          <Metrica label="CLT" valor={fPts(vnd.clt_pontos)} />
-          <Metrica label="FGTS" valor={fPts(vnd.fgts_pontos)} />
+          <Metrica label="Projeção do mês" valor={fPts(vnd.pontos_projecao_mes)} largo />
+          <Metrica label="Proj. diária em valor" valor={fMoney(vnd.projecao_diaria_valor)} largo />
+          <Metrica label="CLT" valor={fPts(vnd.clt_pontos)} sub={`${fInt(vnd.clt_qtd)} vendas`} largo />
+          <Metrica label="FGTS" valor={fPts(vnd.fgts_pontos)} sub={`${fInt(vnd.fgts_qtd)} vendas`} largo />
         </Painel>
       </div>
     </>

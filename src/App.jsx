@@ -4408,7 +4408,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
       </div>
 
       <div ref={tourKpiRef} className="kpi-grid kpi-grid-3">
-        <div className="kpi"><p className="kpi-label">Maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'venda'}</p><p className="kpi-value">{fmtV(modo === 'ponto' ? kpis?.maior_pontuacao : kpis?.maior_venda)}</p></div>
+        <div className="kpi"><p className="kpi-label">Maior {modo === 'ponto' ? 'pontuação' : 'venda'}</p><p className="kpi-value">{fmtV(modo === 'ponto' ? kpis?.maior_pontuacao : kpis?.maior_venda)}</p></div>
         <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.dia_mais_vendas ? fmtDataBR(kpis.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpis?.dia_mais_vendas_qtd)} vendas</p></div>
         <div className="kpi">
           <p className="kpi-label">{modo === 'ponto' ? 'Pontos totais' : 'Valor total vendido'}</p>
@@ -4678,7 +4678,7 @@ function VendedorasView() {
     setSyncing(true)
     setSyncMsg('')
     try {
-      const r = await callApi('vendedoras_sync', {}, opts)
+      const r = await callApi('vendedoras_sync', {}, { forcar: true })
       const s = r?.[0]
       setSyncMsg(
         s
@@ -4826,14 +4826,24 @@ function VendedorasView() {
             <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} tickFormatter={fmtDataBR} />
             <Tooltip
               contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}
-              labelStyle={{ color: '#8a978f', marginBottom: 4 }}
-              labelFormatter={fmtDataBR}
+              labelStyle={{ color: '#8a978f', marginBottom: 6 }}
+              itemSorter={(it) => -Number(it.value ?? 0)}
               formatter={(value, name, item) => {
                 const vendas = item?.payload?.[`${name}__vendas`]
                 const outro = modo === 'ponto' ? item?.payload?.[`${name}__valor`] : item?.payload?.[`${name}__pontos`]
                 const outroLabel = modo === 'ponto' ? fmtMoeda(outro) : `${fmtInt(Math.round(outro ?? 0))} pts`
                 const valorFmt = modo === 'ponto' ? `${fmtInt(value)} pts` : fmtMoeda(value)
                 return [`${valorFmt}${vendas != null ? ` · ${fmtInt(vendas)} vendas` : ''}${outro != null ? ` · ${outroLabel}` : ''}`, name]
+              }}
+              wrapperStyle={{ outline: 'none' }}
+              // o cabecalho do tooltip mostra o TOTAL do dia somando as barras
+              labelFormatter={(dia, payload) => {
+                if (!payload?.length) return fmtDataBR(dia)
+                const soma = (suf) => payload.reduce((t, x) => t + Number(x?.payload?.[`${x.name}${suf}`] ?? 0), 0)
+                const total = modo === 'ponto'
+                  ? `${fmtInt(Math.round(soma('__pontos')))} pts`
+                  : fmtMoeda(soma('__valor'))
+                return `${fmtDataBR(dia)} — total do dia: ${total} · ${fmtInt(soma('__vendas'))} vendas`
               }}
             />
             <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
@@ -4847,9 +4857,9 @@ function VendedorasView() {
       {!vendedor && (
         <div className="kpi-grid">
           <div className="kpi"><p className="kpi-label">Vendedora com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_qtd_vendedor || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.top_qtd_valor)} vendas</p></div>
-          <div className="kpi"><p className="kpi-label">Vendedora com maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'valor'}</p><p className="kpi-value" style={{ fontSize: 16 }}>{(modo === 'ponto' ? kpisGeral?.top_ponto_vendedor : kpisGeral?.top_valor_vendedor) || '-'}</p><p className="kpi-sub">{fmtV(modo === 'ponto' ? kpisGeral?.top_ponto_valor : kpisGeral?.top_valor_valor)}</p></div>
+          <div className="kpi"><p className="kpi-label">Vendedora com maior {modo === 'ponto' ? 'pontuação' : 'valor'}</p><p className="kpi-value" style={{ fontSize: 16 }}>{(modo === 'ponto' ? kpisGeral?.top_ponto_vendedor : kpisGeral?.top_valor_vendedor) || '-'}</p><p className="kpi-sub">{fmtV(modo === 'ponto' ? kpisGeral?.top_ponto_valor : kpisGeral?.top_valor_valor)}</p></div>
           <div className="kpi"><p className="kpi-label">Banco mais utilizado</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.banco_top_qtd)} vendas</p></div>
-          <div className="kpi"><p className="kpi-label">Dia com maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'valor'}</p><p className="kpi-value" style={{ fontSize: 16 }}>{(modo === 'ponto' ? kpisGeral?.dia_maior_ponto : kpisGeral?.dia_maior_valor) ? fmtDataBR(modo === 'ponto' ? kpisGeral.dia_maior_ponto : kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtV(modo === 'ponto' ? kpisGeral?.dia_maior_ponto_total : kpisGeral?.dia_maior_valor_total)}</p></div>
+          <div className="kpi"><p className="kpi-label">Dia com maior {modo === 'ponto' ? 'pontuação' : 'valor'}</p><p className="kpi-value" style={{ fontSize: 16 }}>{(modo === 'ponto' ? kpisGeral?.dia_maior_ponto : kpisGeral?.dia_maior_valor) ? fmtDataBR(modo === 'ponto' ? kpisGeral.dia_maior_ponto : kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtV(modo === 'ponto' ? kpisGeral?.dia_maior_ponto_total : kpisGeral?.dia_maior_valor_total)}</p></div>
         </div>
       )}
       {!vendedor && mediasGeral && (
@@ -4887,7 +4897,7 @@ function VendedorasView() {
       )}
       {vendedor && (
         <div className="kpi-grid">
-          <div className="kpi"><p className="kpi-label">Maior {modo === 'ponto' ? 'pontua&ccedil;&atilde;o' : 'venda'}</p><p className="kpi-value">{fmtV(modo === 'ponto' ? kpisVendedor?.maior_pontuacao : kpisVendedor?.maior_venda)}</p></div>
+          <div className="kpi"><p className="kpi-label">Maior {modo === 'ponto' ? 'pontuação' : 'venda'}</p><p className="kpi-value">{fmtV(modo === 'ponto' ? kpisVendedor?.maior_pontuacao : kpisVendedor?.maior_venda)}</p></div>
           <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisVendedor?.dia_mais_vendas ? fmtDataBR(kpisVendedor.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpisVendedor?.dia_mais_vendas_qtd)} vendas</p></div>
           <div className="kpi">
             <p className="kpi-label">{modo === 'ponto' ? 'Pontos' : 'Valor'} total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
@@ -4987,7 +4997,7 @@ function VendedorasView() {
         <AddVendaModal
           vendedoresDisponiveis={vendedores}
           onClose={() => setShowAdd(false)}
-          onAdded={async () => { await callApi('vendedoras_sync', {}, opts); await load() }}
+          onAdded={async () => { await callApi('vendedoras_sync', {}, { forcar: true }); await load() }}
         />
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
@@ -5187,7 +5197,7 @@ function VendasView() {
     setSyncing(true)
     setSyncMsg('')
     try {
-      const r = await callApi('vendas_sync', {}, opts)
+      const r = await callApi('vendas_sync', {}, { forcar: true })
       const s = r?.[0]
       setSyncMsg(
         s
@@ -5412,7 +5422,7 @@ function VendasView() {
         </div>
       </div>
 
-      <div className="kpi-grid">
+      <div className="kpi-grid kpi-grid-produtos">
         {porProduto.map((p, i) => (
           <div
             className="kpi"
@@ -5917,15 +5927,12 @@ function VisaoGeral() {
 
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Total Leads</p><p className="kpi-value">{fmtInt(kpis?.total_leads)}</p></div>
-        <div className="kpi"><p className="kpi-label">Gastado</p><p className="kpi-value">{fmtMoney(kpis?.gastado)}</p></div>
         <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o %</p><p className="kpi-value">{fmtPct(kpis?.interacao_pct)}</p></div>
         <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o (qtd)</p><p className="kpi-value">{fmtInt(kpis?.interacao_qtd)}</p></div>
       </div>
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Pagas</p><p className="kpi-value">{fmtInt(kpis?.pagas)}</p></div>
         <div className="kpi"><p className="kpi-label">Valor Pago</p><p className="kpi-value">{fmtMoney(kpis?.valor_pago)}</p></div>
-        <div className="kpi"><p className="kpi-label">Faturado</p><p className="kpi-value">{fmtMoney(kpis?.faturado)}</p></div>
-        <div className="kpi"><p className="kpi-label">ROI</p><p className="kpi-value accent">{(kpis?.roi ?? 0).toString().replace('.', ',')}</p></div>
       </div>
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Convers&atilde;o</p><p className="kpi-value">{fmtPct(kpis?.conversao_pct)}</p></div>

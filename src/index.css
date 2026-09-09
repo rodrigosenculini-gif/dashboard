@@ -2077,14 +2077,27 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .home-spark{ height:54px; margin:0 -6px; }
 .home-spark-vazio{ height:0; }
 
-.home-metricas{ display:flex; flex-wrap:wrap; gap:7px; }
+.home-metricas{ display:grid; grid-template-columns:repeat(6, 1fr); gap:7px; }
 .home-metrica{
-  flex:1 1 88px; min-width:88px; background:var(--surface-2); border:1px solid var(--border);
-  border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:3px;
+  grid-column:span 2; min-width:0; background:var(--surface-2); border:1px solid var(--border);
+  border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:2px;
 }
-.home-metrica-label{ font-size:10.5px; color:var(--muted); letter-spacing:.02em; }
-.home-metrica-valor{ font-size:16px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
+.home-metrica.largo{ grid-column:span 3; }
+.home-metrica-label{
+  font-size:10.5px; color:var(--muted); letter-spacing:.02em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.home-metrica-valor{
+  font-size:16px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* numero grande encolhe em vez de estourar o cartao */
+.home-metrica-valor.longo{ font-size:14px; }
+.home-metrica-valor.muito-longo{ font-size:12.5px; }
 .home-metrica-valor.destaque{ color:var(--lime); }
+.home-metrica-sub{
+  font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
 
 .home-toggle{ display:inline-flex; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
 .home-toggle button{
@@ -2281,21 +2294,28 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
   border:1px solid var(--border); border-radius:18px;
   box-shadow:0 24px 60px rgba(0,0,0,.6);
   transform-origin:top right;
-  animation:askiaGota .34s cubic-bezier(.22,.9,.28,1);
+  will-change:transform, opacity;
+  animation:askiaGota .42s cubic-bezier(.16,.84,.24,1) both;
 }
-/* a "gota": comeca do tamanho do botao, no canto, e escorre abrindo */
+/* A gota escorre do botao. So transform+opacity: animar border-radius
+   obriga o navegador a repintar a cada quadro e travava. */
 @keyframes askiaGota{
-  0%{   opacity:0; transform:translate(14px,-26px) scale(.12); border-radius:50%; }
-  45%{  opacity:1; transform:translate(4px,-6px) scale(.6);   border-radius:34px; }
-  100%{ opacity:1; transform:translate(0,0) scale(1);          border-radius:18px; }
+  0%{   opacity:0; transform:translate3d(10px,-18px,0) scale(.34); }
+  60%{  opacity:1; transform:translate3d(0,2px,0) scale(1.012); }
+  100%{ opacity:1; transform:translate3d(0,0,0) scale(1); }
 }
+/* o conteudo entra logo atras da casca, pra nao parecer esticado */
+.askia-painel > *:not(.askia-brilho){ animation:askiaConteudo .3s ease-out .1s both; }
+@keyframes askiaConteudo{ from{ opacity:0; } to{ opacity:1; } }
 /* bico ligando o painel ao botao */
 .askia-painel::before{
   content:''; position:absolute; top:-6px; right:26px; width:12px; height:12px;
   background:rgba(20,28,23,.96); border-left:1px solid var(--border); border-top:1px solid var(--border);
   transform:rotate(45deg); border-radius:2px;
 }
-@media (prefers-reduced-motion:reduce){ .askia-painel{ animation:none; } }
+@media (prefers-reduced-motion:reduce){
+  .askia-painel, .askia-painel > *{ animation:none; }
+}
 @media (max-width:640px){
   .askia-painel{ right:12px; left:12px; width:auto; height:calc(100vh - 100px); }
   .askia-painel::before{ right:18px; }
@@ -2444,7 +2464,7 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
   border:1px solid var(--border); border-radius:20px; color:var(--text);
   font-family:inherit; font-size:12.5px; cursor:pointer;
   box-shadow:0 14px 32px rgba(0,0,0,.5);
-  transform-origin:top right; animation:askiaGota .26s cubic-bezier(.22,.9,.28,1);
+  transform-origin:top right; animation:askiaGota .3s cubic-bezier(.16,.84,.24,1) both;
 }
 .askia-pilula:hover{ border-color:var(--gold); }
 .askia-pilula svg{ color:var(--gold); }
@@ -2484,3 +2504,16 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
   background:linear-gradient(120deg, var(--gold), var(--lime)); color:#12160f; font-weight:700; border:none;
 }
 .tela-erro-botoes button:hover{ border-color:var(--gold); }
+
+/* Cards de produto (Vendas): quantidade varia (CLT, FGTS, ENERGIA, REFIN),
+   entao eles se estendem pra preencher a linha em vez de deixar buraco. */
+.kpi-grid-produtos{ grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); }
+
+/* Numeros longos: o valor encolhe em vez de vazar do card ou quebrar linha */
+.kpi-value{ overflow-wrap:anywhere; }
+.kpi-label{ min-height:1.2em; }
+.kpi-split{ display:flex; align-items:baseline; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+@media (max-width:1280px){
+  .kpi-value{ font-size:22px; }
+  .kpi-split{ font-size:19px; }
+}
