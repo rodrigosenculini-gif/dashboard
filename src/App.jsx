@@ -3193,7 +3193,8 @@ function C6Modal({ vendedorFixo, onClose }) {
     setJorBusy(acao); setJorMsg('')
     try {
       const d = await postApi('c6_jornada', {
-        acao, cpf: doc, nome: jor.nome, data_nascimento: jor.nascimento, telefone: jor.telefone,
+        acao, cpf: doc, vendedor: vendedorFixo || null,
+        nome: jor.nome, data_nascimento: jor.nascimento, telefone: jor.telefone,
         parcelas: jor.parcelas, valor: jor.valor, renda: jor.renda, matricula: jor.matricula, covenant_code: jor.codigo,
       })
       if (d?.error) { setJorMsg(d.error); return }
@@ -3202,7 +3203,7 @@ function C6Modal({ vendedorFixo, onClose }) {
         if (d.ok) { setJorLink({ link: d.link, data_expiracao: d.data_expiracao }); setJorStatus(null); setJorMsg('Link gerado. Envie ao cliente para ele autorizar.') }
         else setJorMsg('C6 recusou a geração: ' + txt(d.erro || d.bruto))
       } else if (acao === 'status') {
-        setJorStatus({ status_autorizacao: d.status_autorizacao, observacao: d.observacao, expirado: d.expirado })
+        setJorStatus({ status_autorizacao: d.status_autorizacao, observacao: d.observacao, expirado: d.expirado, autorizado: d.autorizado })
         if (d.expirado) setJorMsg('A autorização anterior expirou. Gere um novo link.')
         else if (!d.ok) setJorMsg('Status: ' + txt(d.erro))
       } else {
@@ -3213,9 +3214,22 @@ function C6Modal({ vendedorFixo, onClose }) {
       setJorMsg('Erro: ' + (e2.message || ''))
     } finally {
       setJorBusy('')
+      carregarJornadas()
     }
   }
-  const autorizado = jorStatus?.status_autorizacao === 'AUTORIZADO'
+  const autorizado = !!jorStatus?.autorizado
+
+  // acompanhamento: o que a vendedora ja fez (link, status, simulacao, proposta)
+  const [jornadas, setJornadas] = useState([])
+  const carregarJornadas = async () => {
+    try { const d = await postApi('c6_jornada', { acao: 'listar', vendedor: vendedorFixo || null }); setJornadas(d?.jornadas || []) } catch {}
+  }
+  useEffect(() => { if (modo === 'jornada') carregarJornadas() }, [modo])
+  const rotuloStatus = (s, expirado) => expirado ? 'EXPIRADA'
+    : /^(AUTHORIZED|AUTORIZADO)$/i.test(s || '') ? 'AUTORIZADO'
+    : /WAITING|AGUARDANDO/i.test(s || '') ? 'AGUARDANDO'
+    : /NOT_AUTHORIZED|NAO_AUTORIZADO/i.test(s || '') ? 'NÃO AUTORIZADO'
+    : (s || '—')
 
   const consultar = async (e) => {
     e?.preventDefault()
@@ -3321,7 +3335,7 @@ function C6Modal({ vendedorFixo, onClose }) {
             )}
             {jorStatus && (
               <p className="kpi-value" style={{ color: autorizado ? 'var(--green, #7ddc9a)' : jorStatus.expirado ? 'var(--red, #e88)' : 'var(--text)' }}>
-                {jorStatus.expirado ? 'EXPIRADA' : (jorStatus.status_autorizacao || 'sem status')}
+                {rotuloStatus(jorStatus.status_autorizacao, jorStatus.expirado)}
                 {jorStatus.observacao ? <span className="kpi-sub"> &middot; {jorStatus.observacao}</span> : null}
               </p>
             )}
@@ -3363,6 +3377,28 @@ function C6Modal({ vendedorFixo, onClose }) {
               </details>
             )}
             {jorMsg && <p className="state-msg" style={{ marginTop: 8 }}>{jorMsg}</p>}
+
+            {jornadas.length > 0 && (
+              <div className="panel table-panel" style={{ marginTop: 14 }}>
+                <p className="section-label">Acompanhamento {vendedorFixo ? '' : '(todas as vendedoras)'} &middot; {jornadas.length}</p>
+                <div className="template-row head" style={{ gridTemplateColumns: '0.9fr 1.2fr 0.9fr 0.9fr 0.8fr 0.7fr' }}>
+                  <span>CPF</span><span>Cliente</span><span>Autoriza&ccedil;&atilde;o</span><span>Simula&ccedil;&atilde;o</span><span>Proposta</span><span>Link</span>
+                </div>
+                {jornadas.map((j) => (
+                  <div className="template-row" key={j.id} style={{ gridTemplateColumns: '0.9fr 1.2fr 0.9fr 0.9fr 0.8fr 0.7fr', alignItems: 'center', cursor: 'pointer' }}
+                       onClick={() => { setCpf(j.cpf); setJor((f) => ({ ...f, nome: j.nome || f.nome, nascimento: j.nascimento || f.nascimento, telefone: j.telefone || f.telefone })); setJorLink(j.link ? { link: j.link, data_expiracao: j.link_expira_em } : null); setJorStatus(j.status_autorizacao ? { status_autorizacao: j.status_autorizacao, observacao: j.status_observacao, expirado: j.status_autorizacao === 'EXPIRADA', autorizado: /^(AUTHORIZED|AUTORIZADO)$/i.test(j.status_autorizacao) } : null) }}>
+                    <span>{j.cpf}</span>
+                    <span>{j.nome || '—'}{!vendedorFixo && j.vendedor ? <span className="kpi-sub"> &middot; {j.vendedor}</span> : null}</span>
+                    <span style={{ color: /^(AUTHORIZED|AUTORIZADO)$/i.test(j.status_autorizacao || '') ? 'var(--green, #7ddc9a)' : j.status_autorizacao === 'EXPIRADA' ? 'var(--red, #e88)' : 'var(--text)' }}>
+                      {rotuloStatus(j.status_autorizacao, j.status_autorizacao === 'EXPIRADA')}
+                    </span>
+                    <span>{j.simulacao?.net_amount != null ? fmtMoeda(Number(j.simulacao.net_amount)) : (j.simulado_em ? 'recusada' : '—')}</span>
+                    <span style={{ color: j.proposta_paga ? 'var(--green, #7ddc9a)' : 'var(--text)' }}>{j.proposal_id ? (j.proposta_paga ? 'Paga' : (j.proposta_status || j.proposal_id)) : '—'}</span>
+                    <span>{j.link ? <button type="button" className="reset-btn" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(j.link) }}>copiar</button> : '—'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

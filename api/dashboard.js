@@ -643,8 +643,22 @@ export default async function handler(req, res) {
       try {
         const acao = String(req.body?.acao || '').toLowerCase();
         const cpf = String(req.body?.cpf || '').replace(/\D/g, '');
-        if (!['gerar', 'status', 'simular'].includes(acao)) {
-          return res.status(400).json({ error: "acao deve ser 'gerar', 'status' ou 'simular'." });
+        const vendedor = req.body?.vendedor ? String(req.body.vendedor) : null;
+        if (!['gerar', 'status', 'simular', 'listar'].includes(acao)) {
+          return res.status(400).json({ error: "acao deve ser 'gerar', 'status', 'simular' ou 'listar'." });
+        }
+        // acompanhamento: o que a vendedora ja fez (link, status, simulacao)
+        if (acao === 'listar') {
+          const client = getPool();
+          const q = await client.query(
+            `select j.*, p.status as proposta_status, p.pago as proposta_paga, p.valor as proposta_valor
+               from c6_jornadas j
+               left join propostas_bancos p on p.banco = 'C6' and p.proposal_id = j.proposal_id
+              where ($1::text is null or j.vendedor = $1::text)
+              order by j.atualizado_em desc limit 100`,
+            [vendedor]
+          );
+          return res.status(200).json({ jornadas: q.rows });
         }
         if (cpf.length !== 11) return res.status(400).json({ error: 'CPF precisa ter 11 dígitos.' });
 
@@ -689,7 +703,24 @@ export default async function handler(req, res) {
 
         // 422 EXPIRED_BY_AUTHORIZER no status = autorizacao antiga venceu
         const expirado = out?.http_status === 422 && /EXPIRED/i.test(JSON.stringify(out?.erro || ''));
-        return res.status(200).json({ acao, ...out, expirado });
+        // status real da API vem em ingles (WAITING_FOR_AUTHORIZATION / AUTHORIZED / ...);
+        // a doc mostra em portugues. Guardamos o que veio + um flag de autorizado.
+        const statusRaw = out?.status_autorizacao || null;
+        const autorizado = /^(AUTHORIZED|AUTORIZADO)$/i.test(statusRaw || '');
+
+        // registra o passo no acompanhamento da vendedora (best-effort)
+        try {
+          const client = getPool();
+          const dados = acao === 'gerar'
+            ? { nome: payload.nome, nascimento: payload.data_nascimento, telefone: payload.telefone,
+                ...(out?.ok && out?.link ? { link: out.link, link_expira_em: out.data_expiracao || null } : {}) }
+            : acao === 'status'
+              ? { status: expirado ? 'EXPIRADA' : statusRaw, observacao: out?.observacao || null }
+              : { simulacao: out?.ok ? (out.simulacao || out.bruto || null) : { erro: out?.erro || null, enviado: out?.enviado || null } };
+          await client.query('select c6_jornada_registrar($1,$2,$3,$4::jsonb)', [vendedor, cpf, acao, JSON.stringify(dados)]);
+        } catch { /* acompanhamento nao pode derrubar a acao */ }
+
+        return res.status(200).json({ acao, ...out, expirado, autorizado });
       } catch (e) {
         const msg = e.name === 'AbortError' ? 'O C6 demorou demais para responder. Tente novamente.' : e.message;
         return res.status(500).json({ error: msg });
