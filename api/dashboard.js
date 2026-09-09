@@ -533,18 +533,26 @@ export default async function handler(req, res) {
       try {
         const parcelas = parseInt(req.body?.parcelas, 10);
         const client = getPool();
+        // Fonte: c6_tabelas_codigo (codigo + prazo -> pontos), vigente hoje.
+        // A vendedora escolhe/digita o CODIGO; a descricao e so leitura.
         const result = await client.query(
-          `select tipo, plano, parcelas, pontos from c6_planos_da_tabela()
-            where ($1::int is null or parcelas = $1::int)
-            order by tipo, plano`,
+          `select codigo, descricao, parcelas, pontos
+             from c6_tabelas_codigo
+            where ativo
+              and vigencia_inicio <= current_date
+              and (vigencia_fim is null or vigencia_fim >= current_date)
+              and ($1::int is null or parcelas = $1::int)
+            order by pontos desc, codigo`,
           [Number.isFinite(parcelas) ? parcelas : null]
         );
-        const opcoes = result.rows.map((r) => {
-          const nome = r.tipo === 'TOP' ? `Trabalhador TOP Seg Plan ${r.plano}`
-                     : r.tipo === 'ESP' ? `Trabalhador ESP Seg Plan ${r.plano}`
-                     : `Trabalhador Seguro Plano ${r.plano}`;
-          return { nome, tipo: r.tipo, plano: r.plano, parcelas: r.parcelas, pontos: r.pontos };
-        });
+        const opcoes = result.rows.map((r) => ({
+          codigo: r.codigo,
+          descricao: r.descricao,
+          // valor gravado em vendas_gerais.tabela: "800188 - Trabalhador TOP Seg Plan 13"
+          nome: r.descricao ? `${r.codigo} - ${r.descricao}` : r.codigo,
+          parcelas: r.parcelas,
+          pontos: r.pontos,
+        }));
         return res.status(200).json({ opcoes });
       } catch (e) {
         return res.status(500).json({ error: e.message });

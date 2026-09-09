@@ -2749,8 +2749,10 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         setAddMsg('Informe as parcelas antes de escolher a tabela do C6 — o peso depende do prazo.')
         return
       }
-      if (addForm.tabelaNome && c6Opcoes.length && !c6Opcoes.some((o) => o.nome === addForm.tabelaNome)) {
-        setAddMsg(`A tabela "${addForm.tabelaNome}" não existe para ${p}x. Escolha uma das tabelas da lista.`)
+      const cod = String(addForm.tabelaNome || '').replace(/\D/g, '')
+      const opc = c6Opcoes.find((o) => o.codigo === cod)
+      if (!cod || !opc) {
+        setAddMsg(`O código "${addForm.tabelaNome || ''}" não existe para ${p}x. Escolha um código da lista.`)
         return
       }
     }
@@ -2770,7 +2772,9 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         nome: addForm.nome,
         valor: addForm.valor.replace(',', '.'),
         banco: addForm.banco,
-        tabela: ehPorCodigo ? addForm.codigo : (ehPorTabelaNome || ehBancoComApi || ehTabelaLivreDeApiBanco ? addForm.tabelaNome : ''),
+        tabela: addForm.banco === 'C6'
+          ? (c6Opcoes.find((o) => o.codigo === String(addForm.tabelaNome || '').replace(/\D/g, ''))?.nome || addForm.tabelaNome)
+          : (ehPorCodigo ? addForm.codigo : (ehPorTabelaNome || ehBancoComApi || ehTabelaLivreDeApiBanco ? addForm.tabelaNome : '')),
         data_pagamento: addForm.dataPagamento,
         parcelas: (ehPorTabelaNome && !precisaParcelasComTabelaNome) ? '' : addForm.parcelas,
         seguro: (ehPorTabelaNome || ehBancoComApi) ? '' : addForm.seguro,
@@ -2801,7 +2805,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
   // formulario pede o prazo primeiro — nao volta mais pra lista estatica sem
   // filtro, que era o que deixava gravar nome e prazo incompativeis.
   const tabelaOpcoes = addForm.banco === 'FGTSV8' ? FGTSV8_TABELAS
-    : addForm.banco === 'C6' ? c6Opcoes.map((o) => ({ valor: o.nome, label: `${o.nome} (${o.parcelas}x · peso ${o.pontos})` }))
+    : addForm.banco === 'C6' ? []  // C6 usa o datalist de codigos (c6Opcoes), nao este select
     : NOVO_SAQUE_TABELAS
 
   return (
@@ -2880,12 +2884,35 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
                 </>
               )}
 
-              {BANCOS_POR_TABELA_NOME.includes(addForm.banco) && (
+              {BANCOS_POR_TABELA_NOME.includes(addForm.banco) && addForm.banco !== 'C6' && (
                 <label>Tabela
                   <select required value={addForm.tabelaNome} onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })}>
                     <option value="">selecione a tabela</option>
                     {tabelaOpcoes.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
                   </select>
+                </label>
+              )}
+              {addForm.banco === 'C6' && (
+                <label>C&oacute;digo da tabela {parseInt(addForm.parcelas, 10) > 0 ? `(${addForm.parcelas}x)` : ''}
+                  <input
+                    required
+                    list="c6-codigos"
+                    value={addForm.tabelaNome}
+                    onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })}
+                    placeholder={parseInt(addForm.parcelas, 10) > 0 ? 'ex.: 800188 — escolha ou digite' : 'informe as parcelas primeiro'}
+                    disabled={!(parseInt(addForm.parcelas, 10) > 0)}
+                  />
+                  <datalist id="c6-codigos">
+                    {c6Opcoes.map((o) => <option key={o.codigo} value={o.codigo}>{`${o.descricao || ''} · peso ${o.pontos}`}</option>)}
+                  </datalist>
+                  {(() => {
+                    const cod = String(addForm.tabelaNome || '').replace(/\D/g, '')
+                    const o = c6Opcoes.find((x) => x.codigo === cod)
+                    if (!cod) return null
+                    return o
+                      ? <span className="kpi-sub">{o.descricao || o.codigo} &middot; peso {o.pontos}</span>
+                      : <span className="kpi-sub" style={{ color: 'var(--red, #e88)' }}>c&oacute;digo n&atilde;o existe para {addForm.parcelas}x</span>
+                  })()}
                 </label>
               )}
               {BANCOS_TABELA_NOME_COM_PARCELAS.includes(addForm.banco) && (
