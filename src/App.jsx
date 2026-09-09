@@ -3114,6 +3114,147 @@ function PanModal({ vendedorFixo, onClose }) {
 }
 
 
+// C6 — consulta de proposta por adesão ou por CPF.
+// Por adesão vai na API do banco (webhook consulta-adesao-banco, ramo C6 que
+// já existia) e grava/atualiza pelo conferir_e_lancar_proposta.
+// Por CPF lista o que já temos em propostas_bancos: a API do C6 não tem busca
+// por CPF documentada, só por proposalNumber.
+function C6Modal({ vendedorFixo, onClose }) {
+  const [modo, setModo] = useState('adesao') // adesao | cpf
+  const [adesao, setAdesao] = useState('')
+  const [cpf, setCpf] = useState('')
+  const [res, setRes] = useState(null)
+  const [erro, setErro] = useState('')
+  const [carregando, setCarregando] = useState(false)
+
+  const consultar = async (e) => {
+    e?.preventDefault()
+    setErro(''); setRes(null)
+    const doc = String(cpf).replace(/\D/g, '')
+    if (modo === 'cpf' && doc.length !== 11) { setErro('CPF precisa ter 11 dígitos.'); return }
+    if (modo === 'adesao' && !String(adesao).replace(/\D/g, '')) { setErro('Informe o número da adesão.'); return }
+    setCarregando(true)
+    try {
+      const d = await postApi('c6_consulta', modo === 'adesao'
+        ? { adesao, cpf: doc || null }
+        : { cpf: doc })
+      if (d?.error) { setErro(d.error); return }
+      setRes(d)
+    } catch (e2) {
+      setErro('Erro na consulta: ' + (e2.message || ''))
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  const linhaStatus = (p) => (
+    <div className="template-row" key={p.proposal_id} style={{ gridTemplateColumns: '1.1fr 1.4fr 0.9fr 0.6fr 0.8fr', alignItems: 'center' }}>
+      <span style={{ wordBreak: 'break-all' }}>{p.proposal_id}</span>
+      <span>{p.tabela_nome || '-'}</span>
+      <span>{p.valor != null ? fmtMoeda(Number(p.valor)) : '-'}</span>
+      <span>{p.parcelas ?? '-'}</span>
+      <span style={{ color: p.pago ? 'var(--green, #7ddc9a)' : p.cancelado ? 'var(--red, #e88)' : 'var(--text)' }}>
+        {p.pago ? 'Paga' : p.cancelado ? 'Cancelada' : (p.status || '-')}
+      </span>
+    </div>
+  )
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+        <div className="funil-header">
+          <div><h2>C6 &mdash; consulta de proposta</h2></div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <form className="add-venda-form" onSubmit={consultar}>
+          <label>Buscar por
+            <select value={modo} onChange={(e) => { setModo(e.target.value); setRes(null); setErro('') }}>
+              <option value="adesao">Ades&atilde;o (consulta a API do C6)</option>
+              <option value="cpf">CPF (propostas j&aacute; registradas)</option>
+            </select>
+          </label>
+
+          {modo === 'adesao' ? (
+            <>
+              <label>Ades&atilde;o / n&uacute;mero da proposta
+                <input required value={adesao} onChange={(e) => setAdesao(e.target.value)} placeholder="ex.: 606185838" />
+              </label>
+              <label>CPF (opcional, ajuda a casar a venda)
+                <input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="somente n&uacute;meros" />
+              </label>
+            </>
+          ) : (
+            <label>CPF do cliente
+              <input required value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="somente n&uacute;meros" />
+            </label>
+          )}
+
+          <button type="submit" className="refresh-btn" disabled={carregando}>
+            {carregando ? 'Consultando...' : 'Consultar'}
+          </button>
+        </form>
+
+        {/* --- resultado por adesao --- */}
+        {res?.modo === 'adesao' && (
+          <div style={{ marginTop: 12 }}>
+            {res.api?.encontrado ? (
+              <>
+                <p className="kpi-label">{res.api.nome_banco || 'Proposta encontrada'}</p>
+                <p className="kpi-value" style={{ color: res.local?.pago ? 'var(--green, #7ddc9a)' : 'var(--text)' }}>
+                  {res.api.status_banco || '-'}
+                </p>
+                <p className="kpi-sub">
+                  {res.api.valor_banco != null ? fmtMoeda(Number(res.api.valor_banco)) : '-'}
+                  {res.api.parcelas_banco ? ` · ${res.api.parcelas_banco}x` : ''}
+                  {res.api.cpf_banco ? ` · CPF ${res.api.cpf_banco}` : ''}
+                </p>
+                <p className="kpi-sub">
+                  tabela no nosso cadastro: {res.local?.tabela_nome || '—'}
+                  {res.local?.tabela_id ? ` (${res.local.tabela_id})` : ''}
+                </p>
+                {res.gravacao && (
+                  <p className="kpi-sub">
+                    {res.gravacao.ok === false
+                      ? `não foi possível atualizar: ${res.gravacao.erro || '?'}`
+                      : `cadastro atualizado${res.local?.lancado_em_vendas ? ' · já lançada em vendas' : ''}`}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="state-msg">
+                {res.api?.mensagem || 'Proposta não encontrada na API do C6 para essa adesão.'}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* --- resultado por CPF --- */}
+        {res?.modo === 'cpf' && (
+          <div style={{ marginTop: 12 }}>
+            {(res.propostas || []).length === 0 ? (
+              <p className="state-msg">
+                Nenhuma proposta C6 registrada para esse CPF. Se a venda existe no portal,
+                consulte pela ades&atilde;o &mdash; a API do C6 s&oacute; busca por n&uacute;mero de proposta.
+              </p>
+            ) : (
+              <div className="panel table-panel">
+                <p className="section-label">Propostas C6 desse CPF ({res.propostas.length})</p>
+                <div className="template-row head" style={{ gridTemplateColumns: '1.1fr 1.4fr 0.9fr 0.6fr 0.8fr' }}>
+                  <span>Ades&atilde;o</span><span>Tabela</span><span>Valor</span><span>Parc.</span><span>Status</span>
+                </div>
+                {res.propostas.map(linhaStatus)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {erro && <p className="state-msg error" style={{ marginTop: 10 }}>{erro}</p>}
+      </div>
+    </div>
+  )
+}
+
 function NovoSaqueModal({ vendedorFixo, onClose }) {
   const [etapa, setEtapa] = useState('cpf') // cpf | status | manual | ofertas | pagamento | feito
   const [cpf, setCpf] = useState('')
@@ -3943,6 +4084,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const [showAdd, setShowAdd] = useState(false)
   const [showNovoSaque, setShowNovoSaque] = useState(false)
   const [showPan, setShowPan] = useState(false)
+  const [showC6, setShowC6] = useState(false)
   const [showSomaJornada, setShowSomaJornada] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(() => (
@@ -4095,6 +4237,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <button className="refresh-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro de proposta">
             PAN
           </button>
+          <button className="refresh-btn" onClick={() => setShowC6(true)} title="C6: consulta de proposta por adesão (API do banco) ou por CPF (propostas já registradas)">
+            C6
+          </button>
           <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simula&ccedil;&atilde;o e cadastro de proposta">
             Soma
           </button>
@@ -4211,6 +4356,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
       )}
       {showNovoSaque && <NovoSaqueModal vendedorFixo={vendedor} onClose={() => setShowNovoSaque(false)} />}
       {showPan && <PanModal vendedorFixo={vendedor} onClose={() => setShowPan(false)} />}
+      {showC6 && <C6Modal vendedorFixo={vendedor} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal vendedorFixo={vendedor} onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
 
@@ -4262,6 +4408,7 @@ function VendedorasView() {
   const [showAdd, setShowAdd] = useState(false)
   const [showNovoSaque, setShowNovoSaque] = useState(false)
   const [showPan, setShowPan] = useState(false)
+  const [showC6, setShowC6] = useState(false)
   const [showSomaJornada, setShowSomaJornada] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
@@ -4464,6 +4611,9 @@ function VendedorasView() {
           </button>
           <button className="refresh-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro de proposta">
             PAN
+          </button>
+          <button className="refresh-btn" onClick={() => setShowC6(true)} title="C6: consulta de proposta por adesão (API do banco) ou por CPF (propostas já registradas)">
+            C6
           </button>
           <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simula&ccedil;&atilde;o e cadastro de proposta">
             Soma
@@ -4704,6 +4854,7 @@ function VendedorasView() {
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
       {showPan && <PanModal onClose={() => setShowPan(false)} />}
+      {showC6 && <C6Modal onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
 
       {showMetaConfig && metaForm && (

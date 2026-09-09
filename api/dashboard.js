@@ -551,6 +551,80 @@ export default async function handler(req, res) {
       }
     }
 
+    // C6 — consulta por adesao (vai na API do banco pelo consulta-adesao-banco)
+    // ou por CPF (le o que ja temos em propostas_bancos; a API do C6 nao tem
+    // busca por CPF documentada). Quando vem por adesao e a API responde,
+    // grava/atualiza via conferir_e_lancar_proposta, igual ao fluxo do PAN.
+    if (type === 'c6_consulta') {
+      try {
+        const adesao = String(req.body?.adesao || '').replace(/\D/g, '');
+        const cpf = String(req.body?.cpf || '').replace(/\D/g, '');
+        if (!adesao && cpf.length !== 11) {
+          return res.status(400).json({ error: 'Informe a adesão ou um CPF com 11 dígitos.' });
+        }
+        const client = getPool();
+
+        // --- por CPF: so o que ja esta registrado nas nossas bases ---
+        if (!adesao) {
+          const q = await client.query(
+            `select proposal_id, status, tabela_nome, tabela_id, valor, parcelas,
+                    pago, cancelado, lancado_em_vendas, criado_em, atualizado_em
+               from propostas_bancos
+              where banco = 'C6' and regexp_replace(coalesce(cpf,''), '\\D', '', 'g') = $1
+              order by criado_em desc limit 20`,
+            [cpf]
+          );
+          return res.status(200).json({ modo: 'cpf', cpf, propostas: q.rows });
+        }
+
+        // --- por adesao: consulta a API do C6 pelo webhook que ja existe ---
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 40000);
+        let norm;
+        try {
+          const resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/consulta-adesao-banco', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ banco: 'C6', adesao, cpf: cpf || null, valor: null }),
+            signal: controller.signal,
+          });
+          const texto = await resp.text();
+          try { norm = JSON.parse(texto); } catch { norm = { encontrado: false, mensagem: texto?.slice(0, 300) }; }
+        } finally {
+          clearTimeout(t);
+        }
+
+        let gravacao = null;
+        if (norm?.encontrado) {
+          try {
+            const g = await client.query(
+              'select conferir_e_lancar_proposta($1,$2,$3::jsonb) as r',
+              ['C6', adesao, JSON.stringify(norm)]
+            );
+            gravacao = g.rows[0]?.r || null;
+          } catch (e2) {
+            gravacao = { ok: false, erro: e2.message };
+          }
+        }
+
+        // Estado atual da proposta nas nossas bases, depois da gravacao
+        const local = await client.query(
+          `select proposal_id, status, tabela_nome, tabela_id, valor, parcelas,
+                  pago, cancelado, lancado_em_vendas, criado_em, atualizado_em
+             from propostas_bancos
+            where banco = 'C6' and proposal_id = $1 limit 1`,
+          [adesao]
+        );
+
+        return res.status(200).json({
+          modo: 'adesao', adesao, api: norm, gravacao, local: local.rows[0] || null,
+        });
+      } catch (e) {
+        const msg = e.name === 'AbortError' ? 'A consulta ao C6 demorou demais. Tente novamente.' : e.message;
+        return res.status(500).json({ error: msg });
+      }
+    }
+
     if (type === 'vendas_import_v3') {
       try {
         const rows = req.body?.rows;
