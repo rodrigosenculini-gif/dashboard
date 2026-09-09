@@ -633,6 +633,69 @@ export default async function handler(req, res) {
       }
     }
 
+    // C6 — jornada do Emprestimo do Trabalhador (Consignado Privado):
+    //   gerar   -> link de autorizacao de consulta de dados (nome, cpf, nascimento, telefone)
+    //   status  -> AGUARDANDO_AUTORIZACAO / AUTORIZADO / NAO_AUTORIZADO
+    //              (a API tambem devolve 422 EXPIRED_BY_AUTHORIZER: precisa gerar de novo)
+    //   simular -> simulacao (so faz sentido depois de AUTORIZADO)
+    // Cada acao bate num webhook proprio do n8n; o n8n cuida do token do C6.
+    if (type === 'c6_jornada') {
+      try {
+        const acao = String(req.body?.acao || '').toLowerCase();
+        const cpf = String(req.body?.cpf || '').replace(/\D/g, '');
+        if (!['gerar', 'status', 'simular'].includes(acao)) {
+          return res.status(400).json({ error: "acao deve ser 'gerar', 'status' ou 'simular'." });
+        }
+        if (cpf.length !== 11) return res.status(400).json({ error: 'CPF precisa ter 11 dígitos.' });
+
+        let url; let payload;
+        if (acao === 'simular') {
+          url = 'https://hotnwh.querosacarfgts.com.br/webhook/c6-simulacao';
+          payload = {
+            cpf,
+            birth_date: req.body?.data_nascimento || null,
+            covenant_code: req.body?.covenant_code || null,
+            covenant_group: req.body?.covenant_group || null,
+            installment_quantity: req.body?.parcelas ? parseInt(req.body.parcelas, 10) : null,
+            requested_amount: req.body?.valor != null ? Number(String(req.body.valor).replace(',', '.')) : null,
+            income_amount: req.body?.renda != null ? Number(String(req.body.renda).replace(',', '.')) : null,
+            enrollment: req.body?.matricula || null,
+          };
+          for (const k of Object.keys(payload)) if (payload[k] == null || Number.isNaN(payload[k])) delete payload[k];
+        } else {
+          url = 'https://hotnwh.querosacarfgts.com.br/webhook/c6-autorizacao';
+          payload = { acao, cpf };
+          if (acao === 'gerar') {
+            if (!req.body?.nome || !req.body?.data_nascimento) {
+              return res.status(400).json({ error: 'Para gerar o link, informe nome completo e data de nascimento.' });
+            }
+            payload.nome = String(req.body.nome).trim();
+            payload.data_nascimento = req.body.data_nascimento; // AAAA-MM-DD
+            if (req.body?.telefone) payload.telefone = String(req.body.telefone).replace(/\D/g, '');
+          }
+        }
+
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 60000);
+        let out;
+        try {
+          const resp = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload), signal: controller.signal,
+          });
+          const texto = await resp.text();
+          try { out = JSON.parse(texto); } catch { out = { ok: false, erro: texto?.slice(0, 300) }; }
+        } finally { clearTimeout(t); }
+
+        // 422 EXPIRED_BY_AUTHORIZER no status = autorizacao antiga venceu
+        const expirado = out?.http_status === 422 && /EXPIRED/i.test(JSON.stringify(out?.erro || ''));
+        return res.status(200).json({ acao, ...out, expirado });
+      } catch (e) {
+        const msg = e.name === 'AbortError' ? 'O C6 demorou demais para responder. Tente novamente.' : e.message;
+        return res.status(500).json({ error: msg });
+      }
+    }
+
     if (type === 'vendas_import_v3') {
       try {
         const rows = req.body?.rows;

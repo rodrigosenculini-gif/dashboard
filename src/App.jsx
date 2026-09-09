@@ -3170,12 +3170,52 @@ function PanModal({ vendedorFixo, onClose }) {
 // Por CPF lista o que já temos em propostas_bancos: a API do C6 não tem busca
 // por CPF documentada, só por proposalNumber.
 function C6Modal({ vendedorFixo, onClose }) {
-  const [modo, setModo] = useState('adesao') // adesao | cpf
+  const [modo, setModo] = useState('adesao') // adesao | cpf | jornada
   const [adesao, setAdesao] = useState('')
   const [cpf, setCpf] = useState('')
   const [res, setRes] = useState(null)
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(false)
+
+  // Jornada do Emprestimo do Trabalhador: gerar link -> cliente autoriza ->
+  // status AUTORIZADO -> simular. O link e do CLIENTE (prova de vida): a
+  // vendedora manda pra ele, nao abre por ele.
+  const [jor, setJor] = useState({ nome: '', nascimento: '', telefone: '', parcelas: '', valor: '', renda: '', matricula: '', codigo: '' })
+  const [jorLink, setJorLink] = useState(null)
+  const [jorStatus, setJorStatus] = useState(null)
+  const [jorSim, setJorSim] = useState(null)
+  const [jorMsg, setJorMsg] = useState('')
+  const [jorBusy, setJorBusy] = useState('')
+
+  const jornada = async (acao) => {
+    const doc = String(cpf).replace(/\D/g, '')
+    if (doc.length !== 11) { setJorMsg('CPF precisa ter 11 dígitos.'); return }
+    setJorBusy(acao); setJorMsg('')
+    try {
+      const d = await postApi('c6_jornada', {
+        acao, cpf: doc, nome: jor.nome, data_nascimento: jor.nascimento, telefone: jor.telefone,
+        parcelas: jor.parcelas, valor: jor.valor, renda: jor.renda, matricula: jor.matricula, covenant_code: jor.codigo,
+      })
+      if (d?.error) { setJorMsg(d.error); return }
+      const txt = (x) => (typeof x === 'string' ? x : JSON.stringify(x || '')).slice(0, 400)
+      if (acao === 'gerar') {
+        if (d.ok) { setJorLink({ link: d.link, data_expiracao: d.data_expiracao }); setJorStatus(null); setJorMsg('Link gerado. Envie ao cliente para ele autorizar.') }
+        else setJorMsg('C6 recusou a geração: ' + txt(d.erro || d.bruto))
+      } else if (acao === 'status') {
+        setJorStatus({ status_autorizacao: d.status_autorizacao, observacao: d.observacao, expirado: d.expirado })
+        if (d.expirado) setJorMsg('A autorização anterior expirou. Gere um novo link.')
+        else if (!d.ok) setJorMsg('Status: ' + txt(d.erro))
+      } else {
+        setJorSim(d)
+        if (!d.ok) setJorMsg('Simulação recusada: ' + txt(d.erro || d.bruto))
+      }
+    } catch (e2) {
+      setJorMsg('Erro: ' + (e2.message || ''))
+    } finally {
+      setJorBusy('')
+    }
+  }
+  const autorizado = jorStatus?.status_autorizacao === 'AUTORIZADO'
 
   const consultar = async (e) => {
     e?.preventDefault()
@@ -3222,10 +3262,15 @@ function C6Modal({ vendedorFixo, onClose }) {
             <select value={modo} onChange={(e) => { setModo(e.target.value); setRes(null); setErro('') }}>
               <option value="adesao">Ades&atilde;o (consulta a API do C6)</option>
               <option value="cpf">CPF (propostas j&aacute; registradas)</option>
+              <option value="jornada">Jornada: autoriza&ccedil;&atilde;o + simula&ccedil;&atilde;o</option>
             </select>
           </label>
 
-          {modo === 'adesao' ? (
+          {modo === 'jornada' ? (
+            <label>CPF do cliente
+              <input required value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="somente n&uacute;meros" />
+            </label>
+          ) : modo === 'adesao' ? (
             <>
               <label>Ades&atilde;o / n&uacute;mero da proposta
                 <input required value={adesao} onChange={(e) => setAdesao(e.target.value)} placeholder="ex.: 606185838" />
@@ -3240,10 +3285,86 @@ function C6Modal({ vendedorFixo, onClose }) {
             </label>
           )}
 
-          <button type="submit" className="refresh-btn" disabled={carregando}>
-            {carregando ? 'Consultando...' : 'Consultar'}
-          </button>
+          {modo !== 'jornada' && (
+            <button type="submit" className="refresh-btn" disabled={carregando}>
+              {carregando ? 'Consultando...' : 'Consultar'}
+            </button>
+          )}
         </form>
+
+        {modo === 'jornada' && (
+          <div className="add-venda-form" style={{ marginTop: 8 }}>
+            <p className="section-label">1. Autoriza&ccedil;&atilde;o de consulta de dados</p>
+            <label>Nome completo
+              <input value={jor.nome} onChange={(e) => setJor({ ...jor, nome: e.target.value })} placeholder="como no documento" />
+            </label>
+            <label>Data de nascimento
+              <input type="date" value={jor.nascimento} onChange={(e) => setJor({ ...jor, nascimento: e.target.value })} />
+            </label>
+            <label>Celular (com DDD)
+              <input value={jor.telefone} onChange={(e) => setJor({ ...jor, telefone: e.target.value })} placeholder="17988005963" />
+            </label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="refresh-btn" disabled={!!jorBusy} onClick={() => jornada('gerar')}>
+                {jorBusy === 'gerar' ? 'Gerando...' : 'Gerar link de autoriza\u00e7\u00e3o'}
+              </button>
+              <button type="button" className="reset-btn" disabled={!!jorBusy} onClick={() => jornada('status')}>
+                {jorBusy === 'status' ? 'Consultando...' : 'Consultar status'}
+              </button>
+            </div>
+            {jorLink?.link && (
+              <p className="kpi-sub" style={{ wordBreak: 'break-all' }}>
+                Link para o cliente: <a href={jorLink.link} target="_blank" rel="noreferrer">{jorLink.link}</a>
+                {jorLink.data_expiracao ? ` \u00b7 expira ${jorLink.data_expiracao}` : ''}
+                {' '}<button type="button" className="reset-btn" onClick={() => navigator.clipboard?.writeText(jorLink.link)}>copiar</button>
+              </p>
+            )}
+            {jorStatus && (
+              <p className="kpi-value" style={{ color: autorizado ? 'var(--green, #7ddc9a)' : jorStatus.expirado ? 'var(--red, #e88)' : 'var(--text)' }}>
+                {jorStatus.expirado ? 'EXPIRADA' : (jorStatus.status_autorizacao || 'sem status')}
+                {jorStatus.observacao ? <span className="kpi-sub"> &middot; {jorStatus.observacao}</span> : null}
+              </p>
+            )}
+
+            <p className="section-label" style={{ marginTop: 12 }}>2. Simula&ccedil;&atilde;o {autorizado ? '' : '(libera ap\u00f3s AUTORIZADO)'}</p>
+            <label>Parcelas
+              <input value={jor.parcelas} onChange={(e) => setJor({ ...jor, parcelas: e.target.value })} placeholder="ex.: 24" disabled={!autorizado} />
+            </label>
+            <label>Valor solicitado (R$)
+              <input value={jor.valor} onChange={(e) => setJor({ ...jor, valor: e.target.value })} placeholder="ex.: 3000" disabled={!autorizado} />
+            </label>
+            <label>Renda mensal (R$)
+              <input value={jor.renda} onChange={(e) => setJor({ ...jor, renda: e.target.value })} placeholder="ex.: 2500" disabled={!autorizado} />
+            </label>
+            <label>C&oacute;digo da tabela (opcional)
+              <input value={jor.codigo} onChange={(e) => setJor({ ...jor, codigo: e.target.value })} placeholder="ex.: 800080" disabled={!autorizado} />
+            </label>
+            <label>Matr&iacute;cula (10 d&iacute;gitos, s&oacute; se a API pedir)
+              <input value={jor.matricula} onChange={(e) => setJor({ ...jor, matricula: e.target.value })} placeholder="deixe vazio na primeira tentativa" disabled={!autorizado} />
+            </label>
+            <button type="button" className="refresh-btn" disabled={!autorizado || !!jorBusy} onClick={() => jornada('simular')}>
+              {jorBusy === 'simular' ? 'Simulando...' : 'Simular'}
+            </button>
+            {jorSim?.ok && jorSim.simulacao && (
+              <div className="panel" style={{ marginTop: 8 }}>
+                <p className="kpi-label">{jorSim.simulacao.product?.description || jorSim.simulacao.covenant?.description || 'Simula\u00e7\u00e3o'}</p>
+                <p className="kpi-value">{jorSim.simulacao.net_amount != null ? fmtMoeda(Number(jorSim.simulacao.net_amount)) : '-'}</p>
+                <p className="kpi-sub">
+                  {jorSim.simulacao.installment_quantity ? `${jorSim.simulacao.installment_quantity}x de ` : ''}
+                  {jorSim.simulacao.installment_amount != null ? fmtMoeda(Number(jorSim.simulacao.installment_amount)) : '-'}
+                  {jorSim.simulacao.monthly_customer_rate != null ? ` \u00b7 ${jorSim.simulacao.monthly_customer_rate}% a.m.` : ''}
+                  {jorSim.simulacao.iof_amount != null ? ` \u00b7 IOF ${fmtMoeda(Number(jorSim.simulacao.iof_amount))}` : ''}
+                </p>
+              </div>
+            )}
+            {jorSim && !jorSim.ok && jorSim.enviado && (
+              <details style={{ marginTop: 6 }}><summary className="kpi-sub">o que foi enviado / o que o C6 respondeu</summary>
+                <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap' }}>{JSON.stringify({ enviado: jorSim.enviado, erro: jorSim.erro }, null, 2)}</pre>
+              </details>
+            )}
+            {jorMsg && <p className="state-msg" style={{ marginTop: 8 }}>{jorMsg}</p>}
+          </div>
+        )}
 
         {/* --- resultado por adesao --- */}
         {res?.modo === 'adesao' && (
