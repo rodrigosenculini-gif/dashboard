@@ -3169,7 +3169,8 @@ function PanModal({ vendedorFixo, onClose }) {
 // já existia) e grava/atualiza pelo conferir_e_lancar_proposta.
 // Por CPF lista o que já temos em propostas_bancos: a API do C6 não tem busca
 // por CPF documentada, só por proposalNumber.
-function C6Modal({ vendedorFixo, onClose }) {
+function C6Modal({ vendedorFixo, vendedoresDisponiveis, onClose }) {
+  const [vendSel, setVendSel] = useState('')  // view geral: vendedora dona da jornada
   const [modo, setModo] = useState('adesao') // adesao | cpf | jornada
   const [adesao, setAdesao] = useState('')
   const [cpf, setCpf] = useState('')
@@ -3190,10 +3191,11 @@ function C6Modal({ vendedorFixo, onClose }) {
   const jornada = async (acao) => {
     const doc = String(cpf).replace(/\D/g, '')
     if (doc.length !== 11) { setJorMsg('CPF precisa ter 11 dígitos.'); return }
+    if (!vendedorFixo && !vendSel && acao !== 'status') { setJorMsg('Selecione a vendedora dona dessa jornada.'); return }
     setJorBusy(acao); setJorMsg('')
     try {
       const d = await postApi('c6_jornada', {
-        acao, cpf: doc, vendedor: vendedorFixo || null,
+        acao, cpf: doc, vendedor: vendedorFixo || vendSel || null,
         nome: jor.nome, data_nascimento: jor.nascimento, telefone: jor.telefone,
         parcelas: jor.parcelas, valor: jor.valor, renda: jor.renda, matricula: jor.matricula, covenant_code: jor.codigo,
       })
@@ -3280,6 +3282,14 @@ function C6Modal({ vendedorFixo, onClose }) {
             </select>
           </label>
 
+          {modo === 'jornada' && !vendedorFixo && (
+            <label>Vendedora
+              <select value={vendSel} onChange={(e) => setVendSel(e.target.value)}>
+                <option value="">selecione a vendedora</option>
+                {(vendedoresDisponiveis || []).map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+          )}
           {modo === 'jornada' ? (
             <label>CPF do cliente
               <input required value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="somente n&uacute;meros" />
@@ -5214,7 +5224,7 @@ function VendedorasView() {
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
       {showPan && <PanModal onClose={() => setShowPan(false)} />}
-      {showC6 && <C6Modal onClose={() => setShowC6(false)} />}
+      {showC6 && <C6Modal vendedoresDisponiveis={vendedores} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
 
       {showMetaConfig && metaForm && (
