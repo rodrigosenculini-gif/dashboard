@@ -2263,3 +2263,165 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .trello-check-item label{ display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer; }
 .trello-check-item .feito{ text-decoration:line-through; color:var(--muted); }
 .trello-check-add{ display:flex; gap:8px; margin-top:4px; }
+
+/* ================= IA — painel de consulta =================
+   Ancorado no TOPO e descendo. Sem overlay escuro: a página
+   continua legível atrás, e só fecha em Encerrar/minimizar. */
+.askia-camada{
+  position:fixed; inset:0; z-index:640; pointer-events:none;
+  display:flex; justify-content:center; align-items:flex-start; padding:66px 20px 20px;
+}
+
+.askia-painel{
+  pointer-events:auto; position:relative; width:100%; max-width:600px;
+  height:min(600px, calc(100vh - 110px));
+  display:flex; flex-direction:column; overflow:hidden;
+  background:rgba(22,31,26,.90); backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+  border:1px solid var(--border); border-radius:18px;
+  box-shadow:0 26px 64px rgba(0,0,0,.55);
+  transform-origin:top center;
+  animation:askiaDesce .26s cubic-bezier(.2,.8,.3,1);
+}
+@keyframes askiaDesce{
+  from{ opacity:0; transform:translateY(-16px) scale(.985); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion:reduce){
+  .askia-painel{ animation:none; }
+}
+
+/* borrão de cor que passeia devagar atrás do conteúdo */
+.askia-brilho{
+  position:absolute; inset:-40% -10% auto -10%; height:150%; z-index:0; pointer-events:none;
+  opacity:.20; filter:blur(46px);
+  background:
+    radial-gradient(38% 42% at 22% 18%, var(--gold), transparent 70%),
+    radial-gradient(34% 40% at 76% 12%, var(--lime), transparent 70%),
+    radial-gradient(30% 36% at 50% 42%, var(--rose), transparent 72%);
+  animation:askiaFlutua 16s ease-in-out infinite alternate;
+}
+@keyframes askiaFlutua{
+  0%{ transform:translate3d(-4%, -2%, 0) scale(1); }
+  50%{ transform:translate3d(5%, 3%, 0) scale(1.08); }
+  100%{ transform:translate3d(-3%, 4%, 0) scale(1.02); }
+}
+@media (prefers-reduced-motion:reduce){ .askia-brilho{ animation:none; } }
+
+.askia-topo{
+  position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:11px 12px 11px 13px; border-bottom:1px solid var(--border);
+}
+.askia-modo{ position:relative; }
+.askia-modo-btn{
+  display:inline-flex; align-items:center; gap:8px; background:none; border:none;
+  color:var(--text); font-family:inherit; font-size:13.5px; font-weight:600;
+  padding:4px 6px; border-radius:8px; cursor:pointer;
+}
+.askia-modo-btn:hover{ background:var(--surface-2); }
+.askia-faisca{ display:inline-flex; color:var(--gold); }
+.askia-chevron{ display:inline-flex; color:var(--muted); transition:transform .18s; }
+.askia-chevron.aberto{ transform:rotate(180deg); }
+
+.askia-menu{
+  position:absolute; top:calc(100% + 7px); left:0; z-index:5; min-width:262px;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:5px; display:flex; flex-direction:column; gap:2px;
+  box-shadow:0 16px 34px rgba(0,0,0,.5);
+}
+.askia-menu-item{
+  display:flex; flex-direction:column; gap:2px; text-align:left; background:none;
+  border:none; padding:9px 11px; border-radius:9px; cursor:pointer; font-family:inherit;
+}
+.askia-menu-item:hover{ background:var(--surface-2); }
+.askia-menu-item strong{ font-size:12.5px; font-weight:600; color:var(--text); }
+.askia-menu-item small{ font-size:11px; color:var(--muted); line-height:1.35; }
+.askia-menu-item.on strong{ color:var(--lime); }
+
+.askia-acoes{ display:flex; align-items:center; gap:2px; }
+.askia-icone{
+  display:grid; place-items:center; width:29px; height:29px; padding:0;
+  background:none; border:none; border-radius:8px; color:var(--muted); cursor:pointer;
+  transition:background .13s, color .13s;
+}
+.askia-icone:hover{ background:var(--surface-2); color:var(--text); }
+.askia-icone:disabled{ opacity:.35; cursor:default; }
+.askia-icone-sair:hover{ color:var(--rose); }
+
+.askia-mensagens{
+  position:relative; z-index:1; flex:1; overflow-y:auto;
+  padding:16px 18px; display:flex; flex-direction:column; gap:14px;
+}
+.askia-aviso{ color:var(--muted); font-size:12.5px; text-align:center; margin:8px 0; }
+.askia-aviso-alinhado{ text-align:left; line-height:1.55; margin:0 0 4px; }
+.askia-ok{ color:var(--lime); font-size:12.5px; margin:0; }
+
+.askia-boas-vindas{ display:flex; flex-direction:column; gap:9px; }
+.askia-ola{ margin:0; font-size:14px; color:var(--text); line-height:1.5; }
+.askia-sugestao-titulo{ margin:6px 0 0; font-size:11.5px; color:var(--muted); }
+.askia-sugestoes{ display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+.askia-sugestao{
+  background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
+  padding:8px 12px; border-radius:10px; font-size:12.5px; font-family:inherit;
+  cursor:pointer; text-align:left; transition:border-color .14s, color .14s;
+}
+.askia-sugestao:hover{ border-color:var(--gold); color:var(--text); }
+
+/* usuário: bolha discreta à direita. IA: texto solto, sem bolha. */
+.askia-user{
+  align-self:flex-end; max-width:80%; background:var(--surface-2);
+  border:1px solid var(--border); border-radius:14px 14px 4px 14px;
+  padding:9px 13px; font-size:13px; line-height:1.5; white-space:pre-wrap; color:var(--text);
+}
+.askia-ia{ align-self:stretch; display:flex; flex-direction:column; gap:5px; }
+.askia-ia-texto{ font-size:13.5px; line-height:1.62; color:var(--text); white-space:pre-wrap; }
+.askia-ia-acoes{ display:flex; align-items:center; gap:1px; margin-left:-5px; }
+.askia-copiado{ font-size:11px; color:var(--lime); margin-left:5px; }
+
+.askia-digitando{ display:flex; gap:5px; padding:5px 0; }
+.askia-digitando i{
+  width:6px; height:6px; border-radius:50%; background:var(--muted);
+  animation:askiaPulo 1.15s ease-in-out infinite;
+}
+.askia-digitando i:nth-child(2){ animation-delay:.16s; }
+.askia-digitando i:nth-child(3){ animation-delay:.32s; }
+@keyframes askiaPulo{ 0%,60%,100%{ opacity:.3; transform:translateY(0); } 30%{ opacity:1; transform:translateY(-4px); } }
+
+.askia-barra{
+  position:relative; z-index:1; display:flex; align-items:flex-end; gap:8px;
+  margin:0 14px 14px; padding:7px 7px 7px 15px;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:24px;
+  transition:border-color .15s;
+}
+.askia-barra:focus-within{ border-color:var(--gold); }
+.askia-input{
+  flex:1; background:none; border:none; color:var(--text); resize:none;
+  font-family:inherit; font-size:13.5px; line-height:1.5; padding:8px 0; max-height:110px;
+}
+.askia-input:focus{ outline:none; }
+.askia-input::placeholder{ color:var(--muted); }
+.askia-enviar{
+  display:grid; place-items:center; width:33px; height:33px; flex-shrink:0; padding:0;
+  border:none; border-radius:50%; cursor:pointer; color:#12160f;
+  background:linear-gradient(120deg, var(--gold), var(--lime));
+  transition:opacity .15s;
+}
+.askia-enviar:disabled{ opacity:.32; cursor:default; }
+
+/* pílula quando minimizado */
+.askia-pilula{
+  position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:640;
+  display:inline-flex; align-items:center; gap:8px; padding:9px 17px;
+  background:rgba(22,31,26,.92); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--border); border-radius:22px; color:var(--text);
+  font-family:inherit; font-size:12.5px; cursor:pointer;
+  box-shadow:0 14px 32px rgba(0,0,0,.45);
+  animation:askiaSobe .22s cubic-bezier(.2,.8,.3,1);
+}
+.askia-pilula:hover{ border-color:var(--gold); }
+.askia-pilula svg{ color:var(--gold); }
+@keyframes askiaSobe{ from{ opacity:0; transform:translate(-50%,-8px); } to{ opacity:1; transform:translate(-50%,0); } }
+@media (prefers-reduced-motion:reduce){ .askia-pilula{ animation:none; } }
+
+/* o painel de treinamento herda o espaçamento do painel */
+.askia-painel .trein-painel{ position:relative; z-index:1; flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+.askia-painel .trein-painel > *{ min-height:0; }

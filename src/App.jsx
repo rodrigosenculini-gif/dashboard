@@ -3795,24 +3795,59 @@ function TreinamentoPainel({ vendedor }) {
   )
 }
 
+function AskIaIcone({ nome }) {
+  const p = { viewBox: '0 0 24 24', width: 15, height: 15, fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' }
+  if (nome === 'copiar') return <svg {...p}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" /></svg>
+  if (nome === 'refazer') return <svg {...p}><path d="M20 11A8 8 0 1 0 18 16" /><path d="M20 5v6h-6" /></svg>
+  if (nome === 'limpar') return <svg {...p}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" /></svg>
+  if (nome === 'minimizar') return <svg {...p}><path d="M6 12h12" /></svg>
+  if (nome === 'fechar') return <svg {...p}><path d="M6 6l12 12M18 6L6 18" /></svg>
+  if (nome === 'enviar') return <svg {...p} strokeWidth={2}><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+  if (nome === 'seta') return <svg {...p}><path d="M6 9l6 6 6-6" /></svg>
+  // faísca
+  return <svg {...p}><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" /></svg>
+}
+
+const ASK_MODOS = [
+  { id: 'consulta', label: 'Consulta rápida', sub: 'Respostas tiradas do FAQ oficial dos produtos' },
+  { id: 'memoria', label: 'Ensinar a IA', sub: 'Registre uma informação nova para todas as vendedoras' },
+  { id: 'treinamento', label: 'Treinamento', sub: 'Pratique e melhore seu atendimento' },
+]
+
 function AIChatButton({ vendedor }) {
   const [open, setOpen] = useState(false)
-  const [modo, setModo] = useState('consulta') // 'consulta' | 'treinamento'
+  const [minimizado, setMinimizado] = useState(false)
+  const [modo, setModo] = useState('consulta')
+  const [menuAberto, setMenuAberto] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [historicoCarregado, setHistoricoCarregado] = useState(false)
   const [carregandoHistorico, setCarregandoHistorico] = useState(false)
-  const [mostrarMemoria, setMostrarMemoria] = useState(false)
+  const [copiado, setCopiado] = useState(null)
   const [memoriaPergunta, setMemoriaPergunta] = useState('')
   const [memoriaResposta, setMemoriaResposta] = useState('')
   const [enviandoMemoria, setEnviandoMemoria] = useState(false)
   const [memoriaMsg, setMemoriaMsg] = useState('')
   const listRef = useRef(null)
+  const inputRef = useRef(null)
+  const menuRef = useRef(null)
+
+  const modoAtual = ASK_MODOS.find((m) => m.id === modo) || ASK_MODOS[0]
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
   }, [messages, sending])
+
+  useEffect(() => {
+    if (open && !minimizado && modo === 'consulta') inputRef.current?.focus()
+  }, [open, minimizado, modo])
+
+  useEffect(() => {
+    function fora(e) { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuAberto(false) }
+    document.addEventListener('mousedown', fora)
+    return () => document.removeEventListener('mousedown', fora)
+  }, [])
 
   useEffect(() => {
     if (!open || modo !== 'consulta' || historicoCarregado) return
@@ -3821,70 +3856,85 @@ function AIChatButton({ vendedor }) {
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
-        if (data?.ok && Array.isArray(data.mensagens) && data.mensagens.length > 0) {
-          setMessages(data.mensagens)
-        }
+        if (data?.ok && Array.isArray(data.mensagens) && data.mensagens.length > 0) setMessages(data.mensagens)
       })
       .catch(() => {})
-      .finally(() => {
-        setHistoricoCarregado(true)
-        setCarregandoHistorico(false)
-      })
+      .finally(() => { setHistoricoCarregado(true); setCarregandoHistorico(false) })
   }, [open, modo, historicoCarregado, vendedor])
 
   async function enviarMemoria() {
     const pergunta = memoriaPergunta.trim()
     const resposta = memoriaResposta.trim()
     if (!pergunta || !resposta || enviandoMemoria) return
-    setEnviandoMemoria(true)
-    setMemoriaMsg('')
+    setEnviandoMemoria(true); setMemoriaMsg('')
     try {
       const url = `${IA_WEBHOOK_URL}?Acao=memoria&Vendedora=${encodeURIComponent(vendedor || 'geral')}&Pergunta=${encodeURIComponent(pergunta)}&Resposta=${encodeURIComponent(resposta)}`
-      const res = await fetch(url)
-      const data = await res.json()
+      const data = await (await fetch(url)).json()
       if (data?.ok) {
-        setMemoriaMsg(data.mensagem || 'Informação registrada!')
-        setMemoriaPergunta('')
-        setMemoriaResposta('')
+        setMemoriaMsg(data.mensagem || 'Informação registrada.')
+        setMemoriaPergunta(''); setMemoriaResposta('')
       } else {
         setMemoriaMsg('Não consegui salvar agora. Tente de novo.')
       }
-    } catch (e) {
+    } catch {
       setMemoriaMsg('Erro ao salvar. Tente de novo.')
     } finally {
       setEnviandoMemoria(false)
     }
   }
 
-  async function send() {
-    const pergunta = input.trim()
+  async function perguntar(pergunta, { repetindo = false } = {}) {
     if (!pergunta || sending) return
-    setInput('')
-    setMessages((m) => [...m, { role: 'user', text: pergunta }])
+    if (!repetindo) setMessages((m) => [...m, { role: 'user', text: pergunta }])
     setSending(true)
     try {
       const url = `${IA_WEBHOOK_URL}?Pergunta=${encodeURIComponent(pergunta)}&Vendedora=${encodeURIComponent(vendedor || 'geral')}`
-      const res = await fetch(url)
-      const data = await res.json()
+      const data = await (await fetch(url)).json()
       const resposta = data?.resposta || 'Não consegui consultar agora. Tente novamente em instantes.'
       setMessages((m) => [...m, { role: 'ia', text: resposta }])
-    } catch (e) {
+    } catch {
       setMessages((m) => [...m, { role: 'ia', text: 'Erro ao consultar a IA. Verifique a conexão e tente de novo.' }])
     } finally {
       setSending(false)
     }
   }
 
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      send()
-    }
+  function send() {
+    const p = input.trim()
+    if (!p) return
+    setInput('')
+    perguntar(p)
   }
+
+  // refaz a última pergunta, trocando a resposta que estava ali
+  function refazer(indice) {
+    const anterior = [...messages].slice(0, indice).reverse().find((m) => m.role === 'user')
+    if (!anterior || sending) return
+    setMessages((m) => m.filter((_, i) => i !== indice))
+    perguntar(anterior.text, { repetindo: true })
+  }
+
+  async function copiar(texto, i) {
+    try {
+      await navigator.clipboard.writeText(texto)
+      setCopiado(i)
+      setTimeout(() => setCopiado((c) => (c === i ? null : c)), 1600)
+    } catch { /* navegador bloqueou a área de transferência */ }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+  }
+
+  function encerrar() {
+    setOpen(false); setMinimizado(false); setMenuAberto(false)
+  }
+
+  const temConversa = messages.length > 0
 
   return (
     <>
-      <button className="reset-btn ai-trigger-btn" title="Consultar IA" onClick={() => setOpen(true)}>
+      <button className="reset-btn ai-trigger-btn" title="Consultar IA" onClick={() => { setOpen(true); setMinimizado(false) }}>
         <svg viewBox="0 0 1024 1024" className="ai-trigger-icon" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="aiTigerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -3899,103 +3949,141 @@ function AIChatButton({ vendedor }) {
           </g>
         </svg>
       </button>
-      {open && (
-        <div className="ai-chat-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false) }}>
-          <div className="ai-chat-sheet">
-            <div className="ai-chat-gradient" />
-            <div className="ai-chat-header">
-              <div>
-                <div className="ai-chat-title">{modo === 'consulta' ? 'Consulta rápida · IA' : 'Treinamento · IA'}</div>
-                <div className="ai-chat-subtitle">
-                  {modo === 'consulta'
-                    ? 'Pergunte sobre qualquer produto — a resposta vem direto do FAQ oficial.'
-                    : 'Treine e melhore seu atendimento nesta aba!'}
-                </div>
+
+      {open && minimizado && (
+        <button className="askia-pilula" onClick={() => setMinimizado(false)}>
+          <AskIaIcone nome="faisca" />
+          {temConversa ? 'Continuar conversa' : 'Abrir a IA'}
+        </button>
+      )}
+
+      {open && !minimizado && (
+        <div className="askia-camada">
+          <div className="askia-painel" role="dialog" aria-label="Consulta com a IA">
+            <div className="askia-brilho" aria-hidden="true" />
+
+            <header className="askia-topo">
+              <div className="askia-modo" ref={menuRef}>
+                <button className="askia-modo-btn" onClick={() => setMenuAberto((v) => !v)}>
+                  <span className="askia-faisca"><AskIaIcone nome="faisca" /></span>
+                  {modoAtual.label}
+                  <span className={`askia-chevron ${menuAberto ? 'aberto' : ''}`}><AskIaIcone nome="seta" /></span>
+                </button>
+                {menuAberto && (
+                  <div className="askia-menu">
+                    {ASK_MODOS.map((m) => (
+                      <button key={m.id} className={`askia-menu-item ${m.id === modo ? 'on' : ''}`}
+                              onClick={() => { setModo(m.id); setMenuAberto(false); setMemoriaMsg('') }}>
+                        <strong>{m.label}</strong>
+                        <small>{m.sub}</small>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {modo === 'consulta' && (
-                  <button
-                    className="reset-btn"
-                    onClick={() => { setMostrarMemoria((v) => !v); setMemoriaMsg('') }}
-                  >
-                    {mostrarMemoria ? 'Chat' : 'Memória'}
+
+              <div className="askia-acoes">
+                {modo === 'consulta' && temConversa && (
+                  <button className="askia-icone" title="Limpar conversa" onClick={() => setMessages([])}>
+                    <AskIaIcone nome="limpar" />
                   </button>
                 )}
-                <button
-                  className="reset-btn"
-                  onClick={() => setModo(modo === 'consulta' ? 'treinamento' : 'consulta')}
-                >
-                  {modo === 'consulta' ? 'Treinamento' : 'Consulta'}
+                <button className="askia-icone" title="Minimizar" onClick={() => setMinimizado(true)}>
+                  <AskIaIcone nome="minimizar" />
                 </button>
-                <button className="ai-chat-close" onClick={() => setOpen(false)}>Encerrar ✕</button>
+                <button className="askia-icone askia-icone-sair" title="Encerrar" onClick={encerrar}>
+                  <AskIaIcone nome="fechar" />
+                </button>
               </div>
-            </div>
+            </header>
 
-            {modo === 'consulta' ? (
-              mostrarMemoria ? (
-                <div className="ai-chat-messages" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div className="ai-chat-empty" style={{ padding: 0, textAlign: 'left' }}>
-                    Adicione uma informação nova pra IA aprender — vale pra todas as vendedoras, não só pra você. Descreva a situação/pergunta separada da resposta, pra IA achar mais fácil quando for relevante.
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <label style={{ fontSize: 11.5, color: 'var(--muted)', textTransform: 'uppercase' }}>Pergunta / situação</label>
-                    <input
-                      type="text"
-                      className="ai-chat-input"
-                      style={{ width: '100%' }}
-                      value={memoriaPergunta}
-                      onChange={(e) => setMemoriaPergunta(e.target.value)}
-                      placeholder='Ex: "Cliente autônomo pode contratar o Empréstimo na Conta de Luz?"'
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <label style={{ fontSize: 11.5, color: 'var(--muted)', textTransform: 'uppercase' }}>Resposta</label>
-                    <textarea
-                      className="ai-chat-input"
-                      style={{ minHeight: 100, width: '100%' }}
-                      value={memoriaResposta}
-                      onChange={(e) => setMemoriaResposta(e.target.value)}
-                      placeholder="Explique a resposta certa — evite deixar específico demais de um banco/caso só, se a regra valer pra geral."
-                    />
-                  </div>
-                  {memoriaMsg && (
-                    <div className="ai-chat-subtitle" style={{ color: 'var(--lime)' }}>{memoriaMsg}</div>
-                  )}
-                  <button className="ai-chat-send" onClick={enviarMemoria} disabled={enviandoMemoria || !memoriaPergunta.trim() || !memoriaResposta.trim()} style={{ alignSelf: 'flex-start' }}>
-                    {enviandoMemoria ? 'Salvando...' : 'Salvar'}
-                  </button>
-                </div>
-              ) : (
+            {modo === 'consulta' && (
               <>
-                <div className="ai-chat-messages" ref={listRef}>
-                  {carregandoHistorico && (
-                    <div className="ai-chat-empty">Carregando conversa anterior...</div>
+                <div className="askia-mensagens" ref={listRef}>
+                  {carregandoHistorico && <p className="askia-aviso">Carregando a conversa anterior...</p>}
+                  {!carregandoHistorico && !temConversa && (
+                    <div className="askia-boas-vindas">
+                      <p className="askia-ola">Oi{vendedor ? `, ${String(vendedor).split(/[ .]/)[0]}` : ''}. Pergunte o que precisar sobre os produtos.</p>
+                      <p className="askia-sugestao-titulo">Por exemplo:</p>
+                      <div className="askia-sugestoes">
+                        {['Cliente negativado pode contratar o CLT?',
+                          'Qual o prazo de pagamento do FGTS?',
+                          'Quais bancos aceitam cliente autônomo?'].map((s) => (
+                          <button key={s} className="askia-sugestao" onClick={() => perguntar(s)}>{s}</button>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                  {!carregandoHistorico && messages.length === 0 && (
-                    <div className="ai-chat-empty">Digite sua dúvida abaixo. Ex: "Cliente negativado pode contratar o CLT?"</div>
-                  )}
+
                   {messages.map((m, i) => (
-                    <div key={i} className={`ai-msg ai-msg-${m.role}`}>{m.text}</div>
+                    m.role === 'user' ? (
+                      <div key={i} className="askia-user">{m.text}</div>
+                    ) : (
+                      <div key={i} className="askia-ia">
+                        <div className="askia-ia-texto">{m.text}</div>
+                        <div className="askia-ia-acoes">
+                          <button className="askia-icone" title="Copiar resposta" onClick={() => copiar(m.text, i)}>
+                            <AskIaIcone nome="copiar" />
+                          </button>
+                          <button className="askia-icone" title="Perguntar de novo" onClick={() => refazer(i)} disabled={sending}>
+                            <AskIaIcone nome="refazer" />
+                          </button>
+                          {copiado === i && <span className="askia-copiado">Copiado</span>}
+                        </div>
+                      </div>
+                    )
                   ))}
-                  {sending && <div className="ai-msg ai-msg-ia ai-msg-loading">Consultando...</div>}
+
+                  {sending && (
+                    <div className="askia-ia">
+                      <div className="askia-digitando"><i /><i /><i /></div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="ai-chat-inputbar">
+                <div className="askia-barra">
                   <textarea
-                    className="ai-chat-input"
+                    ref={inputRef}
+                    className="askia-input"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Escreva sua dúvida..."
                     rows={1}
                   />
-                  <button className="ai-chat-send" onClick={send} disabled={sending || !input.trim()}>Enviar</button>
+                  <button className="askia-enviar" onClick={send} disabled={sending || !input.trim()} title="Enviar">
+                    <AskIaIcone nome="enviar" />
+                  </button>
                 </div>
               </>
-              )
-            ) : (
-              <TreinamentoPainel vendedor={vendedor} />
             )}
+
+            {modo === 'memoria' && (
+              <div className="askia-mensagens">
+                <p className="askia-aviso askia-aviso-alinhado">
+                  O que você registrar aqui vale para todas as vendedoras. Separe a situação da resposta — assim a IA acha
+                  mais fácil quando for relevante.
+                </p>
+                <div className="chip-campo">
+                  <label>Pergunta ou situação</label>
+                  <input className="chip-input" value={memoriaPergunta} onChange={(e) => setMemoriaPergunta(e.target.value)}
+                         placeholder='Ex: "Cliente autônomo pode contratar o Empréstimo na Conta de Luz?"' />
+                </div>
+                <div className="chip-campo">
+                  <label>Resposta</label>
+                  <textarea className="chip-input" rows={5} value={memoriaResposta} onChange={(e) => setMemoriaResposta(e.target.value)}
+                            placeholder="Explique a resposta certa. Se a regra vale pra geral, evite deixar específica de um banco só." />
+                </div>
+                {memoriaMsg && <p className="askia-ok">{memoriaMsg}</p>}
+                <button className="chip-salvar" style={{ alignSelf: 'flex-start' }}
+                        onClick={enviarMemoria}
+                        disabled={enviandoMemoria || !memoriaPergunta.trim() || !memoriaResposta.trim()}>
+                  {enviandoMemoria ? 'Salvando...' : 'Ensinar a IA'}
+                </button>
+              </div>
+            )}
+
+            {modo === 'treinamento' && <TreinamentoPainel vendedor={vendedor} />}
           </div>
         </div>
       )}
