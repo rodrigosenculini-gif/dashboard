@@ -3807,6 +3807,7 @@ function AskIaIcone({ nome }) {
   if (nome === 'fechar') return <svg {...p}><path d="M6 6l12 12M18 6L6 18" /></svg>
   if (nome === 'enviar') return <svg {...p} strokeWidth={2}><path d="M12 19V5M6 11l6-6 6 6" /></svg>
   if (nome === 'seta') return <svg {...p}><path d="M6 9l6 6 6-6" /></svg>
+  if (nome === 'buscar') return <svg {...p}><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4 4" /></svg>
   // faísca
   return <svg {...p}><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" /></svg>
 }
@@ -3828,6 +3829,8 @@ function AIChatButton({ vendedor }) {
   const [historicoCarregado, setHistoricoCarregado] = useState(false)
   const [carregandoHistorico, setCarregandoHistorico] = useState(false)
   const [copiado, setCopiado] = useState(null)
+  const [buscaAberta, setBuscaAberta] = useState(false)
+  const [busca, setBusca] = useState('')
   const [memoriaPergunta, setMemoriaPergunta] = useState('')
   const [memoriaResposta, setMemoriaResposta] = useState('')
   const [enviandoMemoria, setEnviandoMemoria] = useState(false)
@@ -3838,9 +3841,18 @@ function AIChatButton({ vendedor }) {
 
   const modoAtual = ASK_MODOS.find((m) => m.id === modo) || ASK_MODOS[0]
 
+  const irAoFim = () => {
+    const el = listRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }
+  useEffect(() => { irAoFim() }, [messages, sending])
+
+  // Reabrir (ou sair do minimizado) volta pro fim, nao pro comeco da conversa.
   useEffect(() => {
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
-  }, [messages, sending])
+    if (!open || minimizado || busca) return
+    const t = setTimeout(irAoFim, 0)
+    return () => clearTimeout(t)
+  }, [open, minimizado, modo, busca, historicoCarregado])
 
   useEffect(() => {
     if (open && !minimizado && modo === 'consulta') inputRef.current?.focus()
@@ -3931,9 +3943,15 @@ function AIChatButton({ vendedor }) {
 
   function encerrar() {
     setOpen(false); setMinimizado(false); setMenuAberto(false)
+    setBuscaAberta(false); setBusca('')
   }
 
   const temConversa = messages.length > 0
+  const termo = busca.trim().toLowerCase()
+  // guarda o indice original: copiar/refazer precisam dele mesmo filtrado
+  const visiveis = messages
+    .map((m, i) => ({ ...m, _i: i }))
+    .filter((m) => !termo || String(m.text).toLowerCase().includes(termo))
 
   return (
     <>
@@ -3987,6 +4005,12 @@ function AIChatButton({ vendedor }) {
 
               <div className="askia-acoes">
                 {modo === 'consulta' && temConversa && (
+                  <button className={`askia-icone ${buscaAberta ? 'on' : ''}`} title="Buscar na conversa"
+                          onClick={() => { setBuscaAberta((v) => !v); setBusca('') }}>
+                    <AskIaIcone nome="buscar" />
+                  </button>
+                )}
+                {modo === 'consulta' && temConversa && (
                   <button className="askia-icone" title="Limpar conversa" onClick={() => setMessages([])}>
                     <AskIaIcone nome="limpar" />
                   </button>
@@ -4002,7 +4026,23 @@ function AIChatButton({ vendedor }) {
 
             {modo === 'consulta' && (
               <>
+                {buscaAberta && (
+                  <div className="askia-busca">
+                    <AskIaIcone nome="buscar" />
+                    <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)}
+                           placeholder="Buscar algo já respondido nesta conversa" />
+                    {termo && <span className="askia-busca-contagem">{visiveis.length} de {messages.length}</span>}
+                    <button className="askia-icone" title="Fechar busca"
+                            onClick={() => { setBuscaAberta(false); setBusca('') }}>
+                      <AskIaIcone nome="fechar" />
+                    </button>
+                  </div>
+                )}
+
                 <div className="askia-mensagens" ref={listRef}>
+                  {termo && visiveis.length === 0 && (
+                    <p className="askia-aviso">Nada nesta conversa fala sobre &ldquo;{busca.trim()}&rdquo;.</p>
+                  )}
                   {carregandoHistorico && <p className="askia-aviso">Carregando a conversa anterior...</p>}
                   {!carregandoHistorico && !temConversa && (
                     <div className="askia-boas-vindas">
@@ -4018,20 +4058,20 @@ function AIChatButton({ vendedor }) {
                     </div>
                   )}
 
-                  {messages.map((m, i) => (
+                  {visiveis.map((m) => (
                     m.role === 'user' ? (
-                      <div key={i} className="askia-user">{m.text}</div>
+                      <div key={m._i} className="askia-user">{m.text}</div>
                     ) : (
-                      <div key={i} className="askia-ia">
+                      <div key={m._i} className="askia-ia">
                         <div className="askia-ia-texto">{m.text}</div>
                         <div className="askia-ia-acoes">
-                          <button className="askia-icone" title="Copiar resposta" onClick={() => copiar(m.text, i)}>
+                          <button className="askia-icone" title="Copiar resposta" onClick={() => copiar(m.text, m._i)}>
                             <AskIaIcone nome="copiar" />
                           </button>
-                          <button className="askia-icone" title="Perguntar de novo" onClick={() => refazer(i)} disabled={sending}>
+                          <button className="askia-icone" title="Perguntar de novo" onClick={() => refazer(m._i)} disabled={sending || !!termo}>
                             <AskIaIcone nome="refazer" />
                           </button>
-                          {copiado === i && <span className="askia-copiado">Copiado</span>}
+                          {copiado === m._i && <span className="askia-copiado">Copiado</span>}
                         </div>
                       </div>
                     )

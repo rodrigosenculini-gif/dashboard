@@ -176,6 +176,8 @@ export default function Chips({ onVoltar }) {
   const [erro, setErro] = useState(null)
   const [editando, setEditando] = useState(null)
   const [marcados, setMarcados] = useState([])
+  const [lote, setLote] = useState(null)        // lista do e-mail aguardando confirmacao
+  const [aplicandoLote, setAplicandoLote] = useState(false)
 
   const revisaoCache = useRevisaoCache()
 
@@ -211,6 +213,24 @@ export default function Chips({ onVoltar }) {
     await postJson('chips_recarregar', { ids: marcados })
     carregar({ forcar: true })
   }
+  // Traz exatamente a mesma lista que saiu no e-mail (mesma RPC, mesma
+  // janela de dias) pra marcar tudo de uma vez, sem copiar numero a numero.
+  async function abrirLoteDoEmail() {
+    const d = await getJson('chips_para_recarga', { dias: '3' }, { forcar: true })
+    setLote(d)
+  }
+  async function confirmarLote() {
+    if (!lote?.ids?.length) return
+    setAplicandoLote(true)
+    try {
+      await postJson('chips_recarregar', { ids: lote.ids })
+      setLote(null)
+      carregar({ forcar: true })
+    } finally {
+      setAplicandoLote(false)
+    }
+  }
+
   async function excluir(id) {
     if (!window.confirm('Remover este chip do controle?')) return
     await postJson('chips_excluir', { id })
@@ -225,6 +245,9 @@ export default function Chips({ onVoltar }) {
           <span className="status-line">{carregando ? 'carregando...' : `${rows.length} de ${resumo.total || 0} chips`}</span>
           <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>
           <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando}>&#8635; Atualizar</button>
+          <button className="reset-btn" onClick={abrirLoteDoEmail} title="Marcar como recarregados os números que saíram no último e-mail">
+            &#10003; Recarga do e-mail
+          </button>
           <button className="chip-salvar" onClick={() => setEditando({ ...VAZIO })}>+ Adicionar número</button>
         </div>
       </div>
@@ -327,6 +350,43 @@ export default function Chips({ onVoltar }) {
           </tbody>
         </table>
       </div>
+
+      {lote && (
+        <div className="chip-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setLote(null) }}>
+          <div className="chip-editor">
+            <header className="chip-editor-top">
+              <h3>Marcar recarga em lote</h3>
+              <button className="chip-x" onClick={() => setLote(null)} aria-label="Fechar">&#10005;</button>
+            </header>
+            <div className="chip-editor-corpo">
+              <p className="askia-aviso-alinhado" style={{ color: 'var(--muted)', fontSize: 12.5, margin: 0 }}>
+                Estes são os {lote.total} número(s) da janela de {lote.janela_dias} dias &mdash; os mesmos do e-mail
+                de hoje, {lote.vencidos} deles já vencidos. Confirmar registra a recarga em todos e recalcula a
+                próxima data de cada um.
+              </p>
+              <div className="chips-lote-lista">
+                {(lote.chips || []).map((c) => (
+                  <div key={c.id} className="chips-lote-item">
+                    <span className="chips-fone">{fmtFone(c.telefone)}</span>
+                    <span>{c.operadora || '—'}</span>
+                    <span>{c.instancia || '—'}</span>
+                    <span className={c.dias < 0 ? 'chips-prazo alerta' : 'chips-prazo'}>
+                      {c.dias < 0 ? `vencida há ${Math.abs(c.dias)}d` : c.dias === 0 ? 'hoje' : `em ${c.dias}d`}
+                    </span>
+                  </div>
+                ))}
+                {!lote.total && <p className="home-vazio">Nenhum número pendente de recarga agora.</p>}
+              </div>
+            </div>
+            <footer className="chip-editor-rodape">
+              <button className="reset-btn" onClick={() => setLote(null)}>Cancelar</button>
+              <button className="chip-salvar" onClick={confirmarLote} disabled={aplicandoLote || !lote.total}>
+                {aplicandoLote ? 'Marcando...' : `Marcar ${lote.total} como recarregado`}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {editando && (
         <Editor chip={editando} opcoes={opcoes}

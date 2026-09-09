@@ -2265,35 +2265,45 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .trello-check-add{ display:flex; gap:8px; margin-top:4px; }
 
 /* ================= IA — painel de consulta =================
-   Ancorado no TOPO e descendo. Sem overlay escuro: a página
-   continua legível atrás, e só fecha em Encerrar/minimizar. */
+   Sai do proprio botao (canto superior direito), escorrendo pra baixo
+   como uma gota que se abre. Sem overlay: a pagina continua legivel. */
 .askia-camada{
   position:fixed; inset:0; z-index:640; pointer-events:none;
-  display:flex; justify-content:center; align-items:flex-start; padding:66px 20px 20px;
 }
 
 .askia-painel{
-  pointer-events:auto; position:relative; width:100%; max-width:600px;
-  height:min(600px, calc(100vh - 110px));
+  pointer-events:auto; position:absolute;
+  top:58px; right:max(20px, calc((100vw - 1280px) / 2 + 24px));
+  width:min(430px, calc(100vw - 40px));
+  height:min(560px, calc(100vh - 90px));
   display:flex; flex-direction:column; overflow:hidden;
-  background:rgba(22,31,26,.90); backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+  background:rgba(20,28,23,.96); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
   border:1px solid var(--border); border-radius:18px;
-  box-shadow:0 26px 64px rgba(0,0,0,.55);
-  transform-origin:top center;
-  animation:askiaDesce .26s cubic-bezier(.2,.8,.3,1);
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+  transform-origin:top right;
+  animation:askiaGota .34s cubic-bezier(.22,.9,.28,1);
 }
-@keyframes askiaDesce{
-  from{ opacity:0; transform:translateY(-16px) scale(.985); }
-  to{ opacity:1; transform:translateY(0) scale(1); }
+/* a "gota": comeca do tamanho do botao, no canto, e escorre abrindo */
+@keyframes askiaGota{
+  0%{   opacity:0; transform:translate(14px,-26px) scale(.12); border-radius:50%; }
+  45%{  opacity:1; transform:translate(4px,-6px) scale(.6);   border-radius:34px; }
+  100%{ opacity:1; transform:translate(0,0) scale(1);          border-radius:18px; }
 }
-@media (prefers-reduced-motion:reduce){
-  .askia-painel{ animation:none; }
+/* bico ligando o painel ao botao */
+.askia-painel::before{
+  content:''; position:absolute; top:-6px; right:26px; width:12px; height:12px;
+  background:rgba(20,28,23,.96); border-left:1px solid var(--border); border-top:1px solid var(--border);
+  transform:rotate(45deg); border-radius:2px;
+}
+@media (prefers-reduced-motion:reduce){ .askia-painel{ animation:none; } }
+@media (max-width:640px){
+  .askia-painel{ right:12px; left:12px; width:auto; height:calc(100vh - 100px); }
+  .askia-painel::before{ right:18px; }
 }
 
-/* borrão de cor que passeia devagar atrás do conteúdo */
 .askia-brilho{
   position:absolute; inset:-40% -10% auto -10%; height:150%; z-index:0; pointer-events:none;
-  opacity:.20; filter:blur(46px);
+  opacity:.16; filter:blur(46px);
   background:
     radial-gradient(38% 42% at 22% 18%, var(--gold), transparent 70%),
     radial-gradient(34% 40% at 76% 12%, var(--lime), transparent 70%),
@@ -2307,26 +2317,29 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 }
 @media (prefers-reduced-motion:reduce){ .askia-brilho{ animation:none; } }
 
+/* z-index alto: o menu precisa passar POR CIMA das mensagens */
 .askia-topo{
-  position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between;
-  gap:12px; padding:11px 12px 11px 13px; border-bottom:1px solid var(--border);
+  position:relative; z-index:4; display:flex; align-items:center; justify-content:space-between;
+  gap:8px; padding:10px 10px 10px 12px; border-bottom:1px solid var(--border);
+  background:rgba(20,28,23,.97);
 }
 .askia-modo{ position:relative; }
 .askia-modo-btn{
-  display:inline-flex; align-items:center; gap:8px; background:none; border:none;
-  color:var(--text); font-family:inherit; font-size:13.5px; font-weight:600;
-  padding:4px 6px; border-radius:8px; cursor:pointer;
+  display:inline-flex; align-items:center; gap:7px; background:none; border:none;
+  color:var(--text); font-family:inherit; font-size:13px; font-weight:600;
+  padding:4px 6px; border-radius:8px; cursor:pointer; white-space:nowrap;
 }
 .askia-modo-btn:hover{ background:var(--surface-2); }
 .askia-faisca{ display:inline-flex; color:var(--gold); }
 .askia-chevron{ display:inline-flex; color:var(--muted); transition:transform .18s; }
 .askia-chevron.aberto{ transform:rotate(180deg); }
 
+/* menu 100% opaco — antes ficava atras do texto das mensagens */
 .askia-menu{
-  position:absolute; top:calc(100% + 7px); left:0; z-index:5; min-width:262px;
-  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  position:absolute; top:calc(100% + 8px); left:0; z-index:30; min-width:252px;
+  background:#141c17; border:1px solid var(--border); border-radius:12px;
   padding:5px; display:flex; flex-direction:column; gap:2px;
-  box-shadow:0 16px 34px rgba(0,0,0,.5);
+  box-shadow:0 18px 40px rgba(0,0,0,.7);
 }
 .askia-menu-item{
   display:flex; flex-direction:column; gap:2px; text-align:left; background:none;
@@ -2337,28 +2350,45 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .askia-menu-item small{ font-size:11px; color:var(--muted); line-height:1.35; }
 .askia-menu-item.on strong{ color:var(--lime); }
 
-.askia-acoes{ display:flex; align-items:center; gap:2px; }
+.askia-acoes{ display:flex; align-items:center; gap:1px; }
 .askia-icone{
-  display:grid; place-items:center; width:29px; height:29px; padding:0;
+  display:grid; place-items:center; width:28px; height:28px; padding:0;
   background:none; border:none; border-radius:8px; color:var(--muted); cursor:pointer;
   transition:background .13s, color .13s;
 }
 .askia-icone:hover{ background:var(--surface-2); color:var(--text); }
+.askia-icone.on{ background:var(--surface-2); color:var(--gold); }
 .askia-icone:disabled{ opacity:.35; cursor:default; }
 .askia-icone-sair:hover{ color:var(--rose); }
 
+/* busca dentro da conversa */
+.askia-busca{
+  position:relative; z-index:3; display:flex; align-items:center; gap:8px;
+  padding:8px 10px 8px 13px; border-bottom:1px solid var(--border);
+  background:var(--surface-2); color:var(--muted);
+}
+.askia-busca input{
+  flex:1; background:none; border:none; color:var(--text);
+  font-family:inherit; font-size:12.5px; padding:2px 0;
+}
+.askia-busca input:focus{ outline:none; }
+.askia-busca input::placeholder{ color:var(--muted); }
+.askia-busca-contagem{ font-size:11px; color:var(--lime); white-space:nowrap; }
+
+/* overscroll-behavior:contain impede a view de tras de rolar junto */
 .askia-mensagens{
-  position:relative; z-index:1; flex:1; overflow-y:auto;
-  padding:16px 18px; display:flex; flex-direction:column; gap:14px;
+  position:relative; z-index:1; flex:1; min-height:0;
+  overflow-y:auto; overscroll-behavior:contain;
+  padding:15px 16px; display:flex; flex-direction:column; gap:13px;
 }
 .askia-aviso{ color:var(--muted); font-size:12.5px; text-align:center; margin:8px 0; }
 .askia-aviso-alinhado{ text-align:left; line-height:1.55; margin:0 0 4px; }
 .askia-ok{ color:var(--lime); font-size:12.5px; margin:0; }
 
 .askia-boas-vindas{ display:flex; flex-direction:column; gap:9px; }
-.askia-ola{ margin:0; font-size:14px; color:var(--text); line-height:1.5; }
+.askia-ola{ margin:0; font-size:13.5px; color:var(--text); line-height:1.5; }
 .askia-sugestao-titulo{ margin:6px 0 0; font-size:11.5px; color:var(--muted); }
-.askia-sugestoes{ display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+.askia-sugestoes{ display:flex; flex-direction:column; gap:6px; align-items:stretch; }
 .askia-sugestao{
   background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
   padding:8px 12px; border-radius:10px; font-size:12.5px; font-family:inherit;
@@ -2366,14 +2396,13 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 }
 .askia-sugestao:hover{ border-color:var(--gold); color:var(--text); }
 
-/* usuário: bolha discreta à direita. IA: texto solto, sem bolha. */
 .askia-user{
-  align-self:flex-end; max-width:80%; background:var(--surface-2);
+  align-self:flex-end; max-width:85%; background:var(--surface-2);
   border:1px solid var(--border); border-radius:14px 14px 4px 14px;
-  padding:9px 13px; font-size:13px; line-height:1.5; white-space:pre-wrap; color:var(--text);
+  padding:9px 12px; font-size:12.5px; line-height:1.5; white-space:pre-wrap; color:var(--text);
 }
 .askia-ia{ align-self:stretch; display:flex; flex-direction:column; gap:5px; }
-.askia-ia-texto{ font-size:13.5px; line-height:1.62; color:var(--text); white-space:pre-wrap; }
+.askia-ia-texto{ font-size:13px; line-height:1.6; color:var(--text); white-space:pre-wrap; }
 .askia-ia-acoes{ display:flex; align-items:center; gap:1px; margin-left:-5px; }
 .askia-copiado{ font-size:11px; color:var(--lime); margin-left:5px; }
 
@@ -2387,41 +2416,49 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 @keyframes askiaPulo{ 0%,60%,100%{ opacity:.3; transform:translateY(0); } 30%{ opacity:1; transform:translateY(-4px); } }
 
 .askia-barra{
-  position:relative; z-index:1; display:flex; align-items:flex-end; gap:8px;
-  margin:0 14px 14px; padding:7px 7px 7px 15px;
-  background:var(--surface-2); border:1px solid var(--border); border-radius:24px;
+  position:relative; z-index:2; display:flex; align-items:flex-end; gap:8px;
+  margin:0 12px 12px; padding:6px 6px 6px 14px;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:22px;
   transition:border-color .15s;
 }
 .askia-barra:focus-within{ border-color:var(--gold); }
 .askia-input{
   flex:1; background:none; border:none; color:var(--text); resize:none;
-  font-family:inherit; font-size:13.5px; line-height:1.5; padding:8px 0; max-height:110px;
+  font-family:inherit; font-size:13px; line-height:1.5; padding:7px 0; max-height:96px;
 }
 .askia-input:focus{ outline:none; }
 .askia-input::placeholder{ color:var(--muted); }
 .askia-enviar{
-  display:grid; place-items:center; width:33px; height:33px; flex-shrink:0; padding:0;
+  display:grid; place-items:center; width:31px; height:31px; flex-shrink:0; padding:0;
   border:none; border-radius:50%; cursor:pointer; color:#12160f;
   background:linear-gradient(120deg, var(--gold), var(--lime));
   transition:opacity .15s;
 }
 .askia-enviar:disabled{ opacity:.32; cursor:default; }
 
-/* pílula quando minimizado */
+/* minimizado: pilula junto ao botao, nao no meio da tela */
 .askia-pilula{
-  position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:640;
-  display:inline-flex; align-items:center; gap:8px; padding:9px 17px;
-  background:rgba(22,31,26,.92); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-  border:1px solid var(--border); border-radius:22px; color:var(--text);
+  position:fixed; top:56px; right:max(20px, calc((100vw - 1280px) / 2 + 24px)); z-index:640;
+  display:inline-flex; align-items:center; gap:8px; padding:8px 15px;
+  background:rgba(20,28,23,.96); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--border); border-radius:20px; color:var(--text);
   font-family:inherit; font-size:12.5px; cursor:pointer;
-  box-shadow:0 14px 32px rgba(0,0,0,.45);
-  animation:askiaSobe .22s cubic-bezier(.2,.8,.3,1);
+  box-shadow:0 14px 32px rgba(0,0,0,.5);
+  transform-origin:top right; animation:askiaGota .26s cubic-bezier(.22,.9,.28,1);
 }
 .askia-pilula:hover{ border-color:var(--gold); }
 .askia-pilula svg{ color:var(--gold); }
-@keyframes askiaSobe{ from{ opacity:0; transform:translate(-50%,-8px); } to{ opacity:1; transform:translate(-50%,0); } }
 @media (prefers-reduced-motion:reduce){ .askia-pilula{ animation:none; } }
+@media (max-width:640px){ .askia-pilula{ right:12px; } }
 
-/* o painel de treinamento herda o espaçamento do painel */
+/* lista do lote de recarga */
+.chips-lote-lista{ display:flex; flex-direction:column; gap:1px; max-height:320px; overflow-y:auto; overscroll-behavior:contain; }
+.chips-lote-item{
+  display:grid; grid-template-columns:minmax(0,1.2fr) .7fr .8fr auto; gap:10px; align-items:center;
+  padding:7px 10px; border-bottom:1px solid var(--border); font-size:12px; color:var(--muted);
+}
+.chips-lote-item:last-child{ border-bottom:none; }
+.chips-lote-item .chips-fone{ color:var(--text); }
+
 .askia-painel .trein-painel{ position:relative; z-index:1; flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
 .askia-painel .trein-painel > *{ min-height:0; }
