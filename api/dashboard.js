@@ -728,6 +728,30 @@ export default async function handler(req, res) {
       }
     }
 
+    // ---- Chips e Trello: todos batem numa RPC que recebe jsonb ou args simples ----
+    const RPC_POST = {
+      chips_salvar:        { sql: 'select dashboard_chips_salvar($1::jsonb) as r',                       args: (b) => [JSON.stringify(b)] },
+      chips_excluir:       { sql: 'select dashboard_chips_excluir($1::bigint) as r',                     args: (b) => [b.id] },
+      chips_recarregar:    { sql: 'select dashboard_chips_recarregar($1::bigint[],$2::date,$3::numeric,$4::text) as r',
+                             args: (b) => [b.ids || [], b.data || null, b.valor ?? null, b.observacao || null] },
+      trello_card_salvar:  { sql: 'select dashboard_trello_card_salvar($1::jsonb) as r',                 args: (b) => [JSON.stringify(b)] },
+      trello_card_mover:   { sql: 'select dashboard_trello_card_mover($1::bigint,$2::bigint,$3::int) as r',
+                             args: (b) => [b.id, b.lista_id, b.ordem ?? 0] },
+      trello_card_excluir: { sql: 'select dashboard_trello_card_excluir($1::bigint) as r',               args: (b) => [b.id] },
+      trello_lista_salvar: { sql: 'select dashboard_trello_lista_salvar($1::jsonb) as r',                args: (b) => [JSON.stringify(b)] },
+      trello_lista_excluir:{ sql: 'select dashboard_trello_lista_excluir($1::bigint) as r',              args: (b) => [b.id] },
+    };
+    if (RPC_POST[type]) {
+      try {
+        const client = getPool();
+        const { sql, args } = RPC_POST[type];
+        const r = await client.query(sql, args(req.body || {}));
+        return res.status(200).json(r.rows[0]?.r ?? { ok: false });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     return res.status(400).json({ error: `type inválido para POST: ${type}` });
   }
 
@@ -773,6 +797,29 @@ export default async function handler(req, res) {
       const client = getPool();
       const r = await client.query('select * from leilao_config where id = 1');
       return res.json({ data: r.rows[0] || null });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ---- Tela Geral / Chips / Trello: RPCs que devolvem um jsonb só ----
+  const RPC_JSON = {
+    home:              { sql: 'select dashboard_home($1::date) as r', args: () => [req.query.dia || null] },
+    chips_listar:      { sql: 'select dashboard_chips_listar($1::text,$2::text,$3::text,$4::boolean) as r',
+                         args: () => [req.query.busca || null, req.query.status || null,
+                                      req.query.plataforma || null, req.query.so_recarga === '1'] },
+    chips_opcoes:      { sql: 'select dashboard_chips_opcoes() as r', args: () => [] },
+    chips_para_recarga:{ sql: 'select dashboard_chips_para_recarga($1::int) as r',
+                         args: () => [parseInt(req.query.dias, 10) || 3] },
+    trello_quadro:     { sql: 'select dashboard_trello_quadro($1::bigint) as r',
+                         args: () => [req.query.quadro_id || null] },
+  };
+  if (RPC_JSON[type]) {
+    try {
+      const client = getPool();
+      const { sql, args } = RPC_JSON[type];
+      const r = await client.query(sql, args());
+      return res.status(200).json(r.rows[0]?.r ?? null);
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

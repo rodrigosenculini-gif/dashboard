@@ -3,6 +3,9 @@ import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContaine
 import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
 import RefinButton from './RefinLeads'
+import VisaoInicial from './VisaoInicial'
+import Chips from './Chips'
+import Trello from './Trello'
 import * as XLSX from 'xlsx'
 
 // Lê CSV (; ou ,) ou XLSX e devolve as linhas CRUAS, com os nomes de coluna
@@ -60,8 +63,11 @@ const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
 const BREAKDOWN_ROW_H = 33
 const VISIBLE_DEFAULT = 6
 
+// 'inicio' é a tela Geral (home). A antiga 'geral' era o dashboard de
+// Disparos e virou 'disparos' — VIEWS_NAV é o que aparece no menu de views.
 const VIEWS = [
-  { id: 'geral', label: 'Disparos' },
+  { id: 'inicio', label: 'Geral' },
+  { id: 'disparos', label: 'Disparos' },
   { id: 'leilao', label: 'Meta — Detalhado' },
   { id: 'produtos', label: 'Entradas LP' },
   { id: 'n8n', label: 'n8n — Execuções' },
@@ -5806,12 +5812,19 @@ function VisaoGeral() {
 
 const VIEW_STORAGE_KEY = 'disparos_dashboard_view'
 
+// Views que aparecem como atalho na tela Geral (a própria Geral fica de fora)
+const VIEWS_ATALHO = VIEWS.filter((v) => v.id !== 'inicio')
+
 function Dashboard() {
+  // Na primeira visita cai na Geral; depois disso a sessão lembra onde parou.
   const [view, setView] = useState(() => {
     try {
-      return localStorage.getItem(VIEW_STORAGE_KEY) || 'geral'
+      const salvo = localStorage.getItem(VIEW_STORAGE_KEY)
+      if (!salvo) return 'inicio'
+      // 'geral' era o id antigo do dashboard de Disparos
+      return salvo === 'geral' ? 'disparos' : salvo
     } catch {
-      return 'geral'
+      return 'inicio'
     }
   })
 
@@ -5820,27 +5833,48 @@ function Dashboard() {
     try { localStorage.setItem(VIEW_STORAGE_KEY, v) } catch { /* ignora */ }
   }
 
+  const acoesVendedoras = (
+    <>
+      <RefinButton vendedor={null} modo="gestao" />
+      <ArquivosButton dono={null} />
+      <PlaybookMenuButton />
+      <AIChatButton vendedor={undefined} />
+    </>
+  )
+
   return (
     <div className="app">
       <div className="app-header">
         <img src="/tiger-icon.png" alt="" className="app-logo" />
+        {view !== 'inicio' && (
+          <button className="voltar-inicio" onClick={() => changeView('inicio')} title="Voltar para a tela Geral">
+            <span aria-hidden="true">&#8962;</span> Início
+          </button>
+        )}
         <ViewSwitcher view={view} setView={changeView} />
         {view === 'vendedoras' && (
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <RefinButton vendedor={null} modo="gestao" />
-            <ArquivosButton dono={null} />
-            <PlaybookMenuButton />
-            <AIChatButton vendedor={undefined} />
+            {acoesVendedoras}
           </div>
         )}
       </div>
-      {view === 'geral' && <VisaoGeral />}
+      {view === 'inicio' && (
+        <VisaoInicial
+          views={VIEWS_ATALHO}
+          onIrPara={changeView}
+          onAbrirTrello={() => changeView('trello')}
+          onAbrirChips={() => changeView('chips')}
+        />
+      )}
+      {view === 'disparos' && <VisaoGeral />}
       {view === 'leilao' && <LeilaoDetalhado />}
       {view === 'produtos' && <EntradasLP />}
       {view === 'n8n' && <N8nExecucoes />}
       {view === 'vendedoras' && <VendedorasView />}
       {view === 'vendas' && <VendasView />}
       {view === 'ia' && <IATreinamento />}
+      {view === 'trello' && <Trello onVoltar={() => changeView('inicio')} />}
+      {view === 'chips' && <Chips onVoltar={() => changeView('inicio')} />}
     </div>
   )
 }
