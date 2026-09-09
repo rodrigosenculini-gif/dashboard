@@ -2077,12 +2077,13 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .home-spark{ height:54px; margin:0 -6px; }
 .home-spark-vazio{ height:0; }
 
-.home-metricas{ display:grid; grid-template-columns:repeat(6, 1fr); gap:7px; }
+.home-metricas{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+/* o ranking nao e um KPI: atravessa a grade inteira */
+.home-metricas-full{ grid-column:1 / -1; }
 .home-metrica{
-  grid-column:span 2; min-width:0; background:var(--surface-2); border:1px solid var(--border);
-  border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:2px;
+  min-width:0; background:var(--surface-2); border:1px solid var(--border);
+  border-radius:9px; padding:9px 11px; display:flex; flex-direction:column; gap:1px;
 }
-.home-metrica.largo{ grid-column:span 3; }
 .home-metrica-label{
   font-size:10.5px; color:var(--muted); letter-spacing:.02em;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -2097,7 +2098,12 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .home-metrica-valor.destaque{ color:var(--lime); }
 .home-metrica-sub{
   font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  min-height:13px;   /* reserva a linha mesmo sem apoio, pra todos ficarem da mesma altura */
 }
+/* paineis lado a lado alinham as linhas de KPI entre si */
+.home-grid{ align-items:stretch; }
+.home-painel{ justify-content:flex-start; }
+.home-metricas{ margin-top:auto; }
 
 .home-toggle{ display:inline-flex; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
 .home-toggle button{
@@ -2517,3 +2523,17 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
   .kpi-value{ font-size:22px; }
   .kpi-split{ font-size:19px; }
 }
+
+/* ---- Regra geral dos KPIs: todos com a mesma estrutura e alinhamento ----
+   rotulo em cima a esquerda, valor grande a direita, apoio embaixo.
+   A altura minima igual evita cards de alturas diferentes na mesma linha. */
+.kpi{ display:flex; flex-direction:column; min-height:104px; }
+.kpi-label{ margin:0 0 auto; padding-bottom:12px; }
+.kpi-value{ margin-top:auto; }
+.kpi-sub{ text-align:right; }
+
+/* Cards de produto (Vendas): conteudo centralizado, ja que o card estica */
+.kpi-grid-produtos .kpi{ align-items:center; text-align:center; }
+.kpi-grid-produtos .kpi-label{ padding-bottom:8px; }
+.kpi-grid-produtos .kpi-value{ text-align:center; }
+.kpi-grid-produtos .kpi-sub{ text-align:center; }

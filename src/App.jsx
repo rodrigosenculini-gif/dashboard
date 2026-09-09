@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
+import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, LabelList } from 'recharts'
 import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
 import RefinButton from './RefinLeads'
@@ -4635,6 +4635,9 @@ function VendedorasView() {
         porDiaMap[row.dia][row.vendedor] = modo === 'ponto' ? Number(row.pontos_total) : Number(row.valor_total)
         porDiaMap[row.dia][`${row.vendedor}__valor`] = Number(row.valor_total)
         porDiaMap[row.dia][`${row.vendedor}__pontos`] = Number(row.pontos_total)
+        // total do dia (o que a pilha inteira soma), pro rotulo fixo do gráfico
+        porDiaMap[row.dia].__total = (porDiaMap[row.dia].__total || 0) + total
+        porDiaMap[row.dia].__totalVendas = (porDiaMap[row.dia].__totalVendas || 0) + Number(row.vendas)
       }
       // maior total primeiro — antes ficava na ordem de chegada da query (aleatório)
       const vendedoresVistos = Object.keys(totalPorVendedor).sort((a, b) => totalPorVendedor[b] - totalPorVendedor[a])
@@ -4848,7 +4851,18 @@ function VendedorasView() {
             />
             <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
             {porDia.vendedoresVistos.map((v, i) => (
-              <Bar key={v} dataKey={v} stackId="a" fill={VENDEDOR_CORES[i % VENDEDOR_CORES.length]} />
+              <Bar key={v} dataKey={v} stackId="a" fill={VENDEDOR_CORES[i % VENDEDOR_CORES.length]}>
+                {/* rotulo do TOTAL do dia so na ultima barra da pilha, pra
+                    aparecer sempre e nao so ao passar o mouse */}
+                {i === porDia.vendedoresVistos.length - 1 && (
+                  <LabelList
+                    dataKey="__total"
+                    position="top"
+                    style={{ fill: '#8a978f', fontSize: 10, fontFamily: 'IBM Plex Mono' }}
+                    formatter={(v) => (modo === 'ponto' ? `${fmtInt(Math.round(v || 0))} pts` : fmtMoeda(v || 0))}
+                  />
+                )}
+              </Bar>
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -5925,17 +5939,13 @@ function VisaoGeral() {
         </ResponsiveContainer>
       </div>
 
-      <div className="kpi-grid">
+      <div className="kpi-grid kpi-grid-4">
         <div className="kpi"><p className="kpi-label">Total Leads</p><p className="kpi-value">{fmtInt(kpis?.total_leads)}</p></div>
         <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o %</p><p className="kpi-value">{fmtPct(kpis?.interacao_pct)}</p></div>
         <div className="kpi"><p className="kpi-label">Intera&ccedil;&atilde;o (qtd)</p><p className="kpi-value">{fmtInt(kpis?.interacao_qtd)}</p></div>
-      </div>
-      <div className="kpi-grid">
+        <div className="kpi"><p className="kpi-label">Convers&atilde;o</p><p className="kpi-value accent">{fmtPct(kpis?.conversao_pct)}</p></div>
         <div className="kpi"><p className="kpi-label">Pagas</p><p className="kpi-value">{fmtInt(kpis?.pagas)}</p></div>
         <div className="kpi"><p className="kpi-label">Valor Pago</p><p className="kpi-value">{fmtMoney(kpis?.valor_pago)}</p></div>
-      </div>
-      <div className="kpi-grid">
-        <div className="kpi"><p className="kpi-label">Convers&atilde;o</p><p className="kpi-value">{fmtPct(kpis?.conversao_pct)}</p></div>
         <div className="kpi"><p className="kpi-label">Valor</p><p className="kpi-value">{fmtMoney(kpis?.valor)}</p></div>
         <div className="kpi"><p className="kpi-label">Tempo m&eacute;dio resposta</p><p className="kpi-value">{fmtMin(kpis?.tempo_resposta_min)}</p></div>
       </div>
