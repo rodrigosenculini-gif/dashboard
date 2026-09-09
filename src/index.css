@@ -2462,3 +2462,25 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 
 .askia-painel .trein-painel{ position:relative; z-index:1; flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
 .askia-painel .trein-painel > *{ min-height:0; }
+
+/* tela mostrada quando um erro de runtime derruba a renderizacao */
+.tela-erro{
+  max-width:620px; margin:14vh auto; padding:30px 32px; text-align:left;
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+}
+.tela-erro h1{ margin:0 0 10px; font-size:19px; font-weight:600; color:var(--text); }
+.tela-erro p{ margin:0 0 16px; font-size:13.5px; line-height:1.6; color:var(--muted); }
+.tela-erro pre{
+  margin:0 0 20px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--border);
+  border-radius:10px; font-family:var(--font-mono); font-size:11.5px; color:var(--rose);
+  white-space:pre-wrap; word-break:break-word;
+}
+.tela-erro-botoes{ display:flex; flex-wrap:wrap; gap:10px; }
+.tela-erro-botoes button{
+  background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+  padding:9px 16px; border-radius:10px; font-size:12.5px; font-family:inherit; cursor:pointer;
+}
+.tela-erro-botoes button:first-child{
+  background:linear-gradient(120deg, var(--gold), var(--lime)); color:#12160f; font-weight:700; border:none;
+}
+.tela-erro-botoes button:hover{ border-color:var(--gold); }

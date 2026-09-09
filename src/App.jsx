@@ -813,7 +813,7 @@ function LeilaoDetalhado() {
   const campanha = campanhaSel.join(',')
 
   useEffect(() => {
-    callApi('filtros', {}, opts)
+    callApi('filtros', {})
       .then((d) => setCampanhas(d?.[0]?.campanhas || []))
       .catch(() => {})
   }, [])
@@ -1028,7 +1028,7 @@ function EntradasLP() {
   }), [campanha, produto, origem, dataInicio, dataFim, horaInicio, horaFim])
 
   useEffect(() => {
-    callApi('produtos_filtros', {}, opts)
+    callApi('produtos_filtros', {})
       .then((d) => setFiltros({
         campanhas: d?.[0]?.campanhas || [],
         produtos: d?.[0]?.produtos || [],
@@ -4562,7 +4562,7 @@ function VendedorasView() {
 
   const loadMetas = useCallback(async () => {
     try {
-      const m = await callApi('metas_progresso', { vendedor }, opts)
+      const m = await callApi('metas_progresso', { vendedor })
       setMetas(m?.[0] ?? null)
     } catch { /* silencioso */ }
   }, [vendedor])
@@ -4597,7 +4597,7 @@ function VendedorasView() {
   }
 
   useEffect(() => {
-    callApi('vendedoras_filtros', {}, opts)
+    callApi('vendedoras_filtros', {})
       .then((d) => { setVendedores(d?.[0]?.vendedores || []); setBancosDisponiveis(d?.[0]?.bancos || []) })
       .catch(() => {})
   }, [])
@@ -5082,7 +5082,7 @@ function VendasView() {
   const [filtrosBanco, setFiltrosBanco] = useState([])
 
   useEffect(() => {
-    callApi('vendas_filtros', {}, opts)
+    callApi('vendas_filtros', {})
       .then((d) => setFiltrosBanco(d?.[0]?.bancos || []))
       .catch(() => {})
   }, [])
@@ -5794,7 +5794,7 @@ function VisaoGeral() {
 
   const loadFiltros = useCallback(async () => {
     try {
-      const data = await callApi('filtros', {}, opts)
+      const data = await callApi('filtros', {})
       if (data && data[0]) {
         setFiltros({
           campanhas: data[0].campanhas || [],
