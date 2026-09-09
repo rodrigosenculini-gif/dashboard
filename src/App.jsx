@@ -6,6 +6,7 @@ import RefinButton from './RefinLeads'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
 import Trello from './Trello'
+import { callApi as callApiCache, useRevisaoCache, TTL_MS } from './dadosCache'
 import * as XLSX from 'xlsx'
 
 // Lê CSV (; ou ,) ou XLSX e devolve as linhas CRUAS, com os nomes de coluna
@@ -58,7 +59,7 @@ async function parseArquivoCru(file) {
   })
 }
 
-const REFRESH_MS = 60_000 // atualiza sozinho a cada 60s
+const REFRESH_MS = TTL_MS // atualiza sozinho a cada 3 min
 // altura de uma linha do breakdown (padding 7+7, conteúdo ~18, borda 1)
 const BREAKDOWN_ROW_H = 33
 const VISIBLE_DEFAULT = 6
@@ -76,12 +77,11 @@ const VIEWS = [
   { id: 'ia', label: 'IA — Treinamento' },
 ]
 
-async function callApi(type, params) {
-  const qs = new URLSearchParams({ type, ...params })
-  const res = await fetch(`/api/dashboard?${qs.toString()}`)
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || `Erro ao buscar ${type}`)
-  return data
+// Passa pelo cache: devolve na hora o que ja foi carregado, congela
+// periodo fechado e so revalida quando o Supabase mudou. `opts.forcar`
+// (botao Atualizar) ignora tudo isso e vai direto na rede.
+async function callApi(type, params, opts) {
+  return callApiCache(type, params || {}, opts || {})
 }
 
 async function postApi(type, body) {
@@ -797,6 +797,7 @@ function KpiCardWithSub({ label, value, sub, accent }) {
 }
 
 function LeilaoDetalhado() {
+  const revisaoCache = useRevisaoCache()
   const [kpis, setKpis] = useState(null)
   const [falhaMin, setFalhaMin] = useState([])
   const [templates, setTemplates] = useState([])
@@ -812,21 +813,21 @@ function LeilaoDetalhado() {
   const campanha = campanhaSel.join(',')
 
   useEffect(() => {
-    callApi('filtros', {})
+    callApi('filtros', {}, opts)
       .then((d) => setCampanhas(d?.[0]?.campanhas || []))
       .catch(() => {})
   }, [])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts) => {
     setLoading(true)
     setError(null)
     const date_from = dataInicio ? new Date(dataInicio + 'T00:00:00').toISOString() : ''
     const date_to = dataFim ? new Date(dataFim + 'T23:59:59').toISOString() : ''
     try {
       const [kpiData, falhaData, templateData] = await Promise.all([
-        callApi('hoje_kpis', { date_from, date_to, campanha, hora_inicio: horaInicio, hora_fim: horaFim }),
-        callApi('falha_por_minuto', { minutos: '60', campanha }),
-        callApi('por_template_hoje', { date_from, date_to, campanha }),
+        callApi('hoje_kpis', { date_from, date_to, campanha, hora_inicio: horaInicio, hora_fim: horaFim }, opts),
+        callApi('falha_por_minuto', { minutos: '60', campanha }, opts),
+        callApi('por_template_hoje', { date_from, date_to, campanha }, opts),
       ])
       setKpis(kpiData?.[0] ?? null)
       setFalhaMin(
@@ -842,7 +843,7 @@ function LeilaoDetalhado() {
     } finally {
       setLoading(false)
     }
-  }, [dataInicio, dataFim, campanha, horaInicio, horaFim])
+  }, [dataInicio, dataFim, campanha, horaInicio, horaFim, revisaoCache])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -874,7 +875,7 @@ function LeilaoDetalhado() {
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
             &#8595; Baixar
           </button>
-          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+          <button className="refresh-btn" onClick={() => load({ forcar: true })} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
         </div>
@@ -995,6 +996,7 @@ function ProdutosCampanhasList({ items, loading }) {
 }
 
 function EntradasLP() {
+  const revisaoCache = useRevisaoCache()
   const [kpis, setKpis] = useState(null)
   const [entradas, setEntradas] = useState([])
   const [campanhasProdutos, setCampanhasProdutos] = useState([])
@@ -1005,8 +1007,9 @@ function EntradasLP() {
   const [origemSel, setOrigemSel] = useState([])
   const produto = produtoSel.join(',')
   const origem = origemSel.join(',')
-  const [dataInicio, setDataInicio] = useState('')
-  const [dataFim, setDataFim] = useState('')
+  const mesAtual = presetRange('este_mes')
+  const [dataInicio, setDataInicio] = useState(mesAtual.from)
+  const [dataFim, setDataFim] = useState(mesAtual.to)
   const [horaInicio, setHoraInicio] = useState('')
   const [horaFim, setHoraFim] = useState('')
   const [loading, setLoading] = useState(true)
@@ -1025,7 +1028,7 @@ function EntradasLP() {
   }), [campanha, produto, origem, dataInicio, dataFim, horaInicio, horaFim])
 
   useEffect(() => {
-    callApi('produtos_filtros', {})
+    callApi('produtos_filtros', {}, opts)
       .then((d) => setFiltros({
         campanhas: d?.[0]?.campanhas || [],
         produtos: d?.[0]?.produtos || [],
@@ -1034,7 +1037,7 @@ function EntradasLP() {
       .catch(() => {})
   }, [])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts) => {
     setLoading(true)
     setError(null)
     try {
@@ -1042,7 +1045,7 @@ function EntradasLP() {
         callApi('produtos_kpis', args),
         callApi('produtos_entradas_por_dia', args),
         callApi('produtos_aprovadas_por_dia', args),
-        callApi('produtos_campanhas', { campanha: args.campanha, produto: args.produto, origem: args.origem, date_from: args.date_from, date_to: args.date_to }),
+        callApi('produtos_campanhas', { campanha: args.campanha, produto: args.produto, origem: args.origem, date_from: args.date_from, date_to: args.date_to }, opts),
       ])
       setKpis(kpiData?.[0] ?? null)
 
@@ -1068,7 +1071,7 @@ function EntradasLP() {
     } finally {
       setLoading(false)
     }
-  }, [args])
+  }, [args, revisaoCache])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -1092,13 +1095,13 @@ function EntradasLP() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
             &#8595; Baixar
           </button>
-          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+          <button className="refresh-btn" onClick={() => load({ forcar: true })} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
           <button className="dots-btn" onClick={() => setShowFunil(true)} title="Funil de Entradas LP">
@@ -1632,7 +1635,7 @@ function N8nExecucoes() {
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
             &#8595; Baixar
           </button>
-          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+          <button className="refresh-btn" onClick={() => load({ forcar: true })} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
         </div>
@@ -4340,7 +4343,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
           <button ref={tourFactaRef} className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
           </button>
-          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+          <button className="refresh-btn" onClick={() => load({ forcar: true })} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
         </div>
@@ -4471,6 +4474,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   )
 }
 function VendedorasView() {
+  const revisaoCache = useRevisaoCache()
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [vendedores, setVendedores] = useState([])
   const [bancosDisponiveis, setBancosDisponiveis] = useState([])
@@ -4518,7 +4522,7 @@ function VendedorasView() {
 
   const loadMetas = useCallback(async () => {
     try {
-      const m = await callApi('metas_progresso', { vendedor })
+      const m = await callApi('metas_progresso', { vendedor }, opts)
       setMetas(m?.[0] ?? null)
     } catch { /* silencioso */ }
   }, [vendedor])
@@ -4553,7 +4557,7 @@ function VendedorasView() {
   }
 
   useEffect(() => {
-    callApi('vendedoras_filtros', {})
+    callApi('vendedoras_filtros', {}, opts)
       .then((d) => { setVendedores(d?.[0]?.vendedores || []); setBancosDisponiveis(d?.[0]?.bancos || []) })
       .catch(() => {})
   }, [])
@@ -4564,9 +4568,9 @@ function VendedorasView() {
     if (page === 0) return { limit: 10, offset: 0 }
     if (page === 1) return { limit: 40, offset: 0 }
     return { limit: 30, offset: 40 + (page - 2) * 30 }
-  }, [page])
+  }, [page, revisaoCache])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts) => {
     setLoading(true)
     setError(null)
     // data_status é uma coluna "date" pura, sem hora/fuso — manda o texto
@@ -4575,9 +4579,9 @@ function VendedorasView() {
     const date_to = dataFim || ''
     try {
       const [dia, tab, medias] = await Promise.all([
-        callApi('vendedoras_por_dia', { vendedor: vendedorLista, date_from, date_to, banco }),
-        callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }),
-        callApi('vendedoras_medias_geral', {}),
+        callApi('vendedoras_por_dia', { vendedor: vendedorLista, date_from, date_to, banco }, opts),
+        callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }, opts),
+        callApi('vendedoras_medias_geral', {}, opts),
       ])
       setMediasGeral(medias?.[0] ?? null)
 
@@ -4603,14 +4607,14 @@ function VendedorasView() {
 
       if (vendedor) {
         const [kv, mv] = await Promise.all([
-          callApi('vendedoras_kpis_vendedor', { vendedor, date_from, date_to }),
-          callApi('vendedoras_meta', { vendedor }),
+          callApi('vendedoras_kpis_vendedor', { vendedor, date_from, date_to }, opts),
+          callApi('vendedoras_meta', { vendedor }, opts),
         ])
         setKpisVendedor(kv?.[0] ?? null)
         setMetaVendedor(mv?.[0] ?? null)
         setKpisGeral(null)
       } else {
-        const kg = await callApi('vendedoras_kpis_geral', { date_from, date_to, banco })
+        const kg = await callApi('vendedoras_kpis_geral', { date_from, date_to, banco }, opts)
         setKpisGeral(kg?.[0] ?? null)
         setKpisVendedor(null)
         setMetaVendedor(null)
@@ -4622,7 +4626,7 @@ function VendedorasView() {
     } finally {
       setLoading(false)
     }
-  }, [vendedor, vendedorLista, banco, dataInicio, dataFim, limit, offset, modo])
+  }, [vendedor, vendedorLista, banco, dataInicio, dataFim, limit, offset, modo, revisaoCache])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -4634,7 +4638,7 @@ function VendedorasView() {
     setSyncing(true)
     setSyncMsg('')
     try {
-      const r = await callApi('vendedoras_sync', {})
+      const r = await callApi('vendedoras_sync', {}, opts)
       const s = r?.[0]
       setSyncMsg(
         s
@@ -4943,7 +4947,7 @@ function VendedorasView() {
         <AddVendaModal
           vendedoresDisponiveis={vendedores}
           onClose={() => setShowAdd(false)}
-          onAdded={async () => { await callApi('vendedoras_sync', {}); await load() }}
+          onAdded={async () => { await callApi('vendedoras_sync', {}, opts); await load() }}
         />
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
@@ -5021,6 +5025,7 @@ function VendedorasView() {
 const VENDAS_CORES = ['#a9d97f', '#d99089', '#7fa8d9', '#d9b877', '#c17fd9', '#7fd9c1']
 
 function VendasView() {
+  const revisaoCache = useRevisaoCache()
   const mesAtual = presetRange('este_mes')
   const [dataInicio, setDataInicio] = useState(mesAtual.from)
   const [dataFim, setDataFim] = useState(mesAtual.to)
@@ -5037,7 +5042,7 @@ function VendasView() {
   const [filtrosBanco, setFiltrosBanco] = useState([])
 
   useEffect(() => {
-    callApi('vendas_filtros', {})
+    callApi('vendas_filtros', {}, opts)
       .then((d) => setFiltrosBanco(d?.[0]?.bancos || []))
       .catch(() => {})
   }, [])
@@ -5052,16 +5057,16 @@ function VendasView() {
   const [showEngrenagem, setShowEngrenagem] = useState(false)
   const fileInputRef = useRef(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts) => {
     setLoading(true)
     setError(null)
     try {
       const [kp, pp, dm, pc, po] = await Promise.all([
-        callApi('vendas_kpis', { date_from: dataInicio, date_to: dataFim, produto, banco }),
-        callApi('vendas_por_produto', { date_from: dataInicio, date_to: dataFim }),
-        callApi('vendas_dias_mes', { produto, banco }),
-        callApi('vendas_por_campanha', { date_from: dataInicio, date_to: dataFim, produto, banco }),
-        callApi('vendas_por_origem', { date_from: dataInicio, date_to: dataFim, produto, banco }),
+        callApi('vendas_kpis', { date_from: dataInicio, date_to: dataFim, produto, banco }, opts),
+        callApi('vendas_por_produto', { date_from: dataInicio, date_to: dataFim }, opts),
+        callApi('vendas_dias_mes', { produto, banco }, opts),
+        callApi('vendas_por_campanha', { date_from: dataInicio, date_to: dataFim, produto, banco }, opts),
+        callApi('vendas_por_origem', { date_from: dataInicio, date_to: dataFim, produto, banco }, opts),
       ])
       setKpis(kp?.[0] ?? null)
       setPorProduto(pp ?? [])
@@ -5074,7 +5079,7 @@ function VendasView() {
     } finally {
       setLoading(false)
     }
-  }, [dataInicio, dataFim, produto, banco])
+  }, [dataInicio, dataFim, produto, banco, revisaoCache])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -5142,7 +5147,7 @@ function VendasView() {
     setSyncing(true)
     setSyncMsg('')
     try {
-      const r = await callApi('vendas_sync', {})
+      const r = await callApi('vendas_sync', {}, opts)
       const s = r?.[0]
       setSyncMsg(
         s
@@ -5313,7 +5318,7 @@ function VendasView() {
           <button className="refresh-btn" onClick={handleSync} disabled={syncing} title="Cruzar CPFs com disparochat/total_produtos/leads_chatwoot e reconciliar pagamentos">
             {syncing ? 'Sincronizando...' : '↻ Sincronizar'}
           </button>
-          <button className="refresh-btn" onClick={load} disabled={loading} title="Atualizar agora">
+          <button className="refresh-btn" onClick={() => load({ forcar: true })} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
         </div>
@@ -5695,6 +5700,7 @@ function LeilaoConfigOverlay({ onClose }) {
 }
 
 function VisaoGeral() {
+  const revisaoCache = useRevisaoCache()
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [], tiposEnvio: [], mensagens: [] })
   const [campanhaSel, setCampanhaSel] = useState([])
   const campanha = campanhaSel.join(',')
@@ -5706,8 +5712,11 @@ function VisaoGeral() {
   const meta = metaSel.join(',')
   const tipoEnvio = tipoEnvioSel.join(',')
   const mensagemFiltro = mensagemFiltroSel.join(',')
-  const [dataInicio, setDataInicio] = useState('')
-  const [dataFim, setDataFim] = useState('')
+  // Abre sempre no mes corrente: sem filtro de data a consulta varria
+  // 1M de linhas de disparochat a cada entrada na view.
+  const mesAtual = presetRange('este_mes')
+  const [dataInicio, setDataInicio] = useState(mesAtual.from)
+  const [dataFim, setDataFim] = useState(mesAtual.to)
   const [horaInicio, setHoraInicio] = useState('')
   const [horaFim, setHoraFim] = useState('')
   const [showFunil, setShowFunil] = useState(false)
@@ -5745,7 +5754,7 @@ function VisaoGeral() {
 
   const loadFiltros = useCallback(async () => {
     try {
-      const data = await callApi('filtros', {})
+      const data = await callApi('filtros', {}, opts)
       if (data && data[0]) {
         setFiltros({
           campanhas: data[0].campanhas || [],
@@ -5760,13 +5769,13 @@ function VisaoGeral() {
     }
   }, [])
 
-  const loadDados = useCallback(async () => {
+  const loadDados = useCallback(async (opts) => {
     setLoading(true)
     setError(null)
     try {
       const [kpiData, enviosData, campanhasData, conversaData, metaData, mensagemData] = await Promise.all([
-        callApi('kpis', apiArgsBase),
-        callApi('envios', apiArgsBase),
+        callApi('kpis', apiArgsBase, opts),
+        callApi('envios', apiArgsBase, opts),
         callApi('campanhas', {
           campanha: apiArgsBase.campanha,
           origem: apiArgsBase.origem,
@@ -5775,10 +5784,10 @@ function VisaoGeral() {
           mensagem: apiArgsBase.mensagem,
           date_from: apiArgsBase.date_from,
           date_to: apiArgsBase.date_to,
-        }),
-        callApi('por_conversa', apiArgsBase),
-        callApi('por_meta', apiArgsBase),
-        callApi('por_mensagem', apiArgsBase),
+        }, opts),
+        callApi('por_conversa', apiArgsBase, opts),
+        callApi('por_meta', apiArgsBase, opts),
+        callApi('por_mensagem', apiArgsBase, opts),
       ])
 
       setKpis(kpiData?.[0] ?? null)
@@ -5793,7 +5802,7 @@ function VisaoGeral() {
     } finally {
       setLoading(false)
     }
-  }, [apiArgsBase])
+  }, [apiArgsBase, revisaoCache])
 
   useEffect(() => { loadFiltros() }, [loadFiltros])
   useEffect(() => { loadDados() }, [loadDados])
@@ -5817,13 +5826,13 @@ function VisaoGeral() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setOrigemSel([]); setMetaSel([]); setTipoEnvioSel([]); setMensagemFiltroSel([]); setDataInicio(''); setDataFim(''); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setOrigemSel([]); setMetaSel([]); setTipoEnvioSel([]); setMensagemFiltroSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
             &#8595; Baixar
           </button>
-          <button className="refresh-btn" onClick={loadDados} disabled={loading} title="Atualizar agora">
+          <button className="refresh-btn" onClick={() => loadDados({ forcar: true })} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
           <button className="dots-btn" onClick={() => setShowLeilao(true)} title="Configurar janela do leilão">

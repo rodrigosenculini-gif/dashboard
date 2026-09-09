@@ -1,12 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react'
 
-async function getJson(type, params = {}) {
-  const qs = new URLSearchParams({ type, ...params })
-  const res = await fetch(`/api/dashboard?${qs.toString()}`)
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || `Erro ao buscar ${type}`)
-  return data
-}
+import { callApi, useRevisaoCache } from './dadosCache'
+
+const getJson = (type, params = {}, opts) => callApi(type, params, opts)
 async function postJson(type, body) {
   const res = await fetch(`/api/dashboard?type=${type}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -150,12 +146,14 @@ export default function Trello({ onVoltar }) {
   const [arrastando, setArrastando] = useState(null)
   const [alvo, setAlvo] = useState(null)
 
-  const carregar = useCallback(async () => {
+  const revisaoCache = useRevisaoCache()
+
+  const carregar = useCallback(async (opts) => {
     setCarregando(true); setErro(null)
-    try { setDados(await getJson('trello_quadro')) }
+    try { setDados(await getJson('trello_quadro', {}, opts)) }
     catch (e) { setErro(e.message) }
     finally { setCarregando(false) }
-  }, [])
+  }, [revisaoCache])
   useEffect(() => { carregar() }, [carregar])
 
   const listas = dados?.listas || []
@@ -167,14 +165,14 @@ export default function Trello({ onVoltar }) {
     const id = arrastando
     setArrastando(null)
     await postJson('trello_card_mover', { id, lista_id: listaId, ordem: indice })
-    carregar()
+    carregar({ forcar: true })
   }
 
   async function novaLista() {
     const nome = window.prompt('Nome da nova lista')
     if (!nome?.trim()) return
     await postJson('trello_lista_salvar', { quadro_id: dados.quadro.id, nome: nome.trim() })
-    carregar()
+    carregar({ forcar: true })
   }
 
   return (
@@ -184,7 +182,7 @@ export default function Trello({ onVoltar }) {
         <div className="topbar-right">
           <span className="status-line">{carregando ? 'carregando...' : `${total} tarefa(s)`}</span>
           <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>
-          <button className="refresh-btn" onClick={carregar} disabled={carregando}>&#8635; Atualizar</button>
+          <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando}>&#8635; Atualizar</button>
           <button className="reset-btn" onClick={novaLista}>+ Lista</button>
         </div>
       </div>
@@ -239,7 +237,7 @@ export default function Trello({ onVoltar }) {
       {editando && (
         <CardEditor card={editando} listas={listas}
                     onFechar={() => setEditando(null)}
-                    onSalvo={() => { setEditando(null); carregar() }} />
+                    onSalvo={() => { setEditando(null); carregar({ forcar: true }) }} />
       )}
     </>
   )

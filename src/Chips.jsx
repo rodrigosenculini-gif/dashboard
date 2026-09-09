@@ -1,12 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
-async function getJson(type, params = {}) {
-  const qs = new URLSearchParams({ type, ...params })
-  const res = await fetch(`/api/dashboard?${qs.toString()}`)
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || `Erro ao buscar ${type}`)
-  return data
-}
+
+import { callApi, useRevisaoCache } from './dadosCache'
+
+const getJson = (type, params = {}, opts) => callApi(type, params, opts)
 async function postJson(type, body) {
   const res = await fetch(`/api/dashboard?type=${type}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -180,12 +177,14 @@ export default function Chips({ onVoltar }) {
   const [editando, setEditando] = useState(null)
   const [marcados, setMarcados] = useState([])
 
-  const carregar = useCallback(async () => {
+  const revisaoCache = useRevisaoCache()
+
+  const carregar = useCallback(async (opts) => {
     setCarregando(true); setErro(null)
     try {
       const d = await getJson('chips_listar', {
         busca, status: statusFiltro, so_recarga: soRecarga ? '1' : '0',
-      })
+      }, opts)
       setDados(d)
       setMarcados([])
     } catch (e) {
@@ -193,7 +192,7 @@ export default function Chips({ onVoltar }) {
     } finally {
       setCarregando(false)
     }
-  }, [busca, statusFiltro, soRecarga])
+  }, [busca, statusFiltro, soRecarga, revisaoCache])
 
   useEffect(() => {
     const t = setTimeout(carregar, busca ? 350 : 0)
@@ -210,12 +209,12 @@ export default function Chips({ onVoltar }) {
   async function recarregar() {
     if (!marcados.length) return
     await postJson('chips_recarregar', { ids: marcados })
-    carregar()
+    carregar({ forcar: true })
   }
   async function excluir(id) {
     if (!window.confirm('Remover este chip do controle?')) return
     await postJson('chips_excluir', { id })
-    carregar()
+    carregar({ forcar: true })
   }
 
   return (
@@ -225,7 +224,7 @@ export default function Chips({ onVoltar }) {
         <div className="topbar-right">
           <span className="status-line">{carregando ? 'carregando...' : `${rows.length} de ${resumo.total || 0} chips`}</span>
           <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>
-          <button className="refresh-btn" onClick={carregar} disabled={carregando}>&#8635; Atualizar</button>
+          <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando}>&#8635; Atualizar</button>
           <button className="chip-salvar" onClick={() => setEditando({ ...VAZIO })}>+ Adicionar número</button>
         </div>
       </div>
@@ -332,7 +331,7 @@ export default function Chips({ onVoltar }) {
       {editando && (
         <Editor chip={editando} opcoes={opcoes}
                 onFechar={() => setEditando(null)}
-                onSalvo={() => { setEditando(null); carregar() }} />
+                onSalvo={() => { setEditando(null); carregar({ forcar: true }) }} />
       )}
     </>
   )

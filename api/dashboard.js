@@ -804,6 +804,7 @@ export default async function handler(req, res) {
 
   // ---- Tela Geral / Chips / Trello: RPCs que devolvem um jsonb só ----
   const RPC_JSON = {
+    versao:            { sql: 'select dashboard_versao() as r', args: () => [] },
     home:              { sql: 'select dashboard_home($1::date) as r', args: () => [req.query.dia || null] },
     chips_listar:      { sql: 'select dashboard_chips_listar($1::text,$2::text,$3::text,$4::boolean) as r',
                          args: () => [req.query.busca || null, req.query.status || null,

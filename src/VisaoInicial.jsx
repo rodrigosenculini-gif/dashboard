@@ -1,15 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis } from 'recharts'
+import { callApi, useRevisaoCache, TTL_MS } from './dadosCache'
 
-const REFRESH_MS = 60_000
+const REFRESH_MS = TTL_MS
 
-async function getJson(type, params = {}) {
-  const qs = new URLSearchParams({ type, ...params })
-  const res = await fetch(`/api/dashboard?${qs.toString()}`)
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || `Erro ao buscar ${type}`)
-  return data
-}
+const getJson = (type, params = {}, opts) => callApi(type, params, opts)
 
 const n = (v) => (v === null || v === undefined ? 0 : Number(v))
 const fInt = (v) => n(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
@@ -82,18 +77,20 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
   // ranking das vendedoras: valor ou pontos
   const [modo, setModo] = useState('valor')
 
-  const carregar = useCallback(async () => {
+  const revisaoCache = useRevisaoCache()
+
+  const carregar = useCallback(async (opts) => {
     setCarregando(true)
     setErro(null)
     try {
-      setDados(await getJson('home', {}))
+      setDados(await getJson('home', {}, opts))
       setAtualizadoEm(new Date())
     } catch (e) {
       setErro(e.message || 'Não foi possível carregar os indicadores.')
     } finally {
       setCarregando(false)
     }
-  }, [])
+  }, [revisaoCache])
 
   useEffect(() => { carregar() }, [carregar])
   useEffect(() => {
@@ -123,9 +120,9 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
         <h1><span className="pulse" /> Geral &mdash; Hotline</h1>
         <div className="topbar-right">
           <span className="status-line">
-            {carregando ? 'atualizando...' : atualizadoEm ? `hoje, ${diaLabel} · atualizado às ${fHora(atualizadoEm)}` : ''}
+            {carregando ? 'atualizando...' : atualizadoEm ? `KPIs de hoje (${diaLabel}) · gráficos do mês · atualizado às ${fHora(atualizadoEm)}` : ''}
           </span>
-          <button className="refresh-btn" onClick={carregar} disabled={carregando} title="Atualizar agora">
+          <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando} title="Atualizar agora">
             &#8635; Atualizar
           </button>
           {acoes}
@@ -190,7 +187,8 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
         </Painel>
 
         <Painel titulo="Vendedoras" cor="var(--lime)" sparkId="sparkVendedoras"
-                serie={null} onAbrir={() => onIrPara('vendedoras')}
+                serie={(vdd.serie || []).map((x) => ({ dia: x.dia, v: emPontos ? x.pontos : x.v }))}
+                onAbrir={() => onIrPara('vendedoras')}
                 acao={
                   <div className="home-toggle" role="group" aria-label="Ver por">
                     <button className={!emPontos ? 'on' : ''} onClick={() => setModo('valor')}>Valor</button>
