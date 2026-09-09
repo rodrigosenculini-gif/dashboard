@@ -24,11 +24,33 @@ async function parseArquivoCru(file) {
   const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0)
   if (lines.length < 2) return []
   const delim = (lines[0].match(/;/g) || []).length >= (lines[0].match(/,/g) || []).length ? ';' : ','
-  const header = lines[0].split(delim).map((h) => h.trim())
+
+  // Divide respeitando aspas: o relatorio do portal v8 vem com TODOS os valores
+  // entre aspas duplas, e um campo pode conter o proprio delimitador.
+  const splitLinha = (linha) => {
+    const out = []
+    let campo = ''
+    let dentroDeAspas = false
+    for (let i = 0; i < linha.length; i++) {
+      const c = linha[i]
+      if (c === '"') {
+        if (dentroDeAspas && linha[i + 1] === '"') { campo += '"'; i++ }  // aspas escapada
+        else dentroDeAspas = !dentroDeAspas
+      } else if (c === delim && !dentroDeAspas) {
+        out.push(campo); campo = ''
+      } else {
+        campo += c
+      }
+    }
+    out.push(campo)
+    return out.map((x) => x.trim())
+  }
+
+  const header = splitLinha(lines[0])
   return lines.slice(1).map((l) => {
-    const cols = l.split(delim)
+    const cols = splitLinha(l)
     const o = {}
-    header.forEach((h, i) => { o[h] = (cols[i] ?? '').trim() })
+    header.forEach((h, i) => { o[h] = cols[i] ?? '' })
     return o
   })
 }
