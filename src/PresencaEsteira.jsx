@@ -198,10 +198,12 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
         <div className='refin-toolbar'>
           <input className='nuvem-busca' placeholder='nome, CPF ou adesão' value={busca}
             onChange={(e) => setBusca(e.target.value)} />
-          <select className='refin-toggle' value={faixa} onChange={(e) => setFaixa(e.target.value)}>
+          <span className='ia-field-inline'>
+          <select value={faixa} onChange={(e) => setFaixa(e.target.value)}>
             <option value='todas'>Todas as situações</option>
             {Object.entries(FAIXAS_P).map(([k, v]) => <option key={k} value={k}>{v.rotulo}</option>)}
           </select>
+          </span>
           <label className='refin-toggle' style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
             <input type='checkbox' checked={soTrat} onChange={(e) => setSoTrat(e.target.checked)} />
             só tratáveis
@@ -235,12 +237,14 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
                   <span><LinkConversa item={i} /></span>
                   {geral && (
                     <span>
-                      <select className='refin-toggle' value={i.vendedor || ''}
+                      <span className='ia-field-inline'>
+                      <select value={i.vendedor || ''}
                         onChange={(e) => atribuir(i.operacao_id, e.target.value)}>
                         <option value=''>ninguém</option>
                         {vends.map((v) => <option key={v} value={v}>{v}</option>)}
                         {i.vendedor && !vends.includes(i.vendedor) && <option value={i.vendedor}>{i.vendedor}</option>}
                       </select>
+                      </span>
                     </span>
                   )}
                   <span>
@@ -259,8 +263,9 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
 
         {sel && (
           <PresencaDetalhe item={sel} cat={cat} geral={geral} vendedor={vendedor} modo={modo}
-            abaInicial={abaInicial} onClose={() => setSel(null)}
-            onFeito={(t) => { setMsg(t); setSel(null); carregar(true) }} />
+            abaInicial={abaInicial}
+            onClose={() => { if (itemInicial) onClose(); else setSel(null) }}
+            onFeito={(t) => { if (itemInicial) { onClose(); return } setMsg(t); setSel(null); carregar(true) }} />
         )}
       </div>
     </div>
