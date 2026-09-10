@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis } from 'recharts'
 import { callApi, useRevisaoCache, TTL_MS } from './dadosCache'
+import PresencaEsteiraModal, { apiPresenca, brlP, tempoNaSituacao, FAIXAS_P } from './PresencaEsteira'
 
 const REFRESH_MS = TTL_MS
 
@@ -79,6 +80,25 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
   const [dados, setDados] = useState(null)
   const [erro, setErro] = useState(null)
   const [carregando, setCarregando] = useState(true)
+  // Esteira do Presenca: so as tratáveis, com atalho para resolver sem sair daqui.
+  const [esteira, setEsteira] = useState([])
+  const [presencaAberta, setPresencaAberta] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    const puxar = () => apiPresenca('esteira', null, '&tratavel=1')
+      .then((d) => { if (vivo) setEsteira(d.itens || []) })
+      .catch(() => {})
+    puxar()
+    const t = setInterval(puxar, REFRESH_MS)
+    return () => { vivo = false; clearInterval(t) }
+  }, [])
+
+  const espKpis = useMemo(() => ({
+    qtd: esteira.length,
+    semDono: esteira.filter((i) => !i.vendedor).length,
+    valor: esteira.reduce((a, i) => a + n(i.valor_liberado), 0),
+    maisAntiga: esteira.reduce((a, i) => Math.max(a, n(i.minutos_na_situacao)), 0),
+  }), [esteira])
   const [atualizadoEm, setAtualizadoEm] = useState(null)
   // ranking das vendedoras: valor ou pontos
   const [modo, setModo] = useState('valor')
@@ -245,6 +265,64 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
                    sub={fMoney(vnd.projecao_mes)} />
         </Painel>
       </div>
+
+      {!!esteira.length && (
+        <section className="home-painel" style={{ marginTop: 16 }}>
+          <header className="home-painel-top">
+            <button className="home-painel-titulo" onClick={() => setPresencaAberta(true)} title="Abrir a esteira do Presença">
+              <span className="home-painel-marca" style={{ background: '#e24b4a' }} />
+              Presença — a tratar
+              <span className="home-painel-seta" aria-hidden="true">&rsaquo;</span>
+            </button>
+          </header>
+
+          <div className="home-metricas">
+            <Metrica label="A tratar" valor={fInt(espKpis.qtd)} tom="destaque" />
+            <Metrica label="Sem responsável" valor={fInt(espKpis.semDono)} />
+            <Metrica label="Valor parado" valor={fMoney(espKpis.valor)} />
+            <Metrica label="Mais antiga" valor={tempoNaSituacao(espKpis.maisAntiga)} />
+          </div>
+
+          <div className="refin-tabela-wrap" style={{ marginTop: 12 }}>
+            <table className="ia-tabela">
+              <thead>
+                <tr>
+                  <th>Cliente</th><th>Adesão</th><th>Situação</th><th>Pendência</th>
+                  <th>Valor</th><th>Parada há</th><th>Responsável</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {esteira.slice(0, 8).map((i) => {
+                  const f = FAIXAS_P[i.faixa] || FAIXAS_P.outro
+                  return (
+                    <tr key={i.operacao_id}>
+                      <td>{i.nome || '—'}</td>
+                      <td className="refin-mono">{i.operacao_id}</td>
+                      <td><span className="ia-tag" style={{ borderColor: f.cor, color: f.cor }}>{f.rotulo}</span></td>
+                      <td>{i.pendencia_nome || <span className="refin-dim">—</span>}</td>
+                      <td>{brlP(i.valor_liberado)}</td>
+                      <td className="refin-mono">{tempoNaSituacao(i.minutos_na_situacao)}</td>
+                      <td>{i.vendedor || <span className="refin-dim">ninguém</span>}</td>
+                      <td className="ia-td-acao">
+                        <button className="reset-btn" onClick={() => setPresencaAberta(true)}>tratar</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {esteira.length > 8 && (
+              <div className="refin-dim" style={{ padding: '8px 4px' }}>
+                e mais {esteira.length - 8} — abra a esteira para ver todas.
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {presencaAberta && (
+        <PresencaEsteiraModal vendedor={null} modo="geral" onClose={() => setPresencaAberta(false)} />
+      )}
     </>
   )
 }
