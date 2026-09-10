@@ -5521,7 +5521,8 @@ function VendasView() {
   const [ajuste, setAjuste] = useState(null)          // { rows, previa }
   const [ajustando, setAjustando] = useState(false)
 
-  // Ajuste v8/C6: le o arquivo cru, simula na RPC v3 e mostra a previa.
+  // Importacao: le o relatorio cru (v8, C6, Novo Saque, Soma, Presenca ou
+  // planilha do VendeAI), simula na RPC v3 e mostra a previa antes de gravar.
   // So grava quando a pessoa confirmar no modal.
   const handleAjusteFile = async (e) => {
     const file = e.target.files?.[0]
@@ -5548,7 +5549,7 @@ function VendasView() {
       const r = await postApi('vendas_import_v3', { rows: ajuste.rows, aplicar: true })
       if (r?.error) { setImportMsg(r.error); return }
       const rs = r.resumo || {}
-      setImportMsg(`Ajuste aplicado — ${fmtInt(rs.atualizar)} atualizadas, ${fmtInt(rs.inserir)} inseridas, ${fmtInt(rs.ja_correto)} já corretas, ${fmtInt(rs.rejeitado)} rejeitadas, ${fmtInt(rs.ignorado)} ignoradas (outros bancos).`)
+      setImportMsg(`Importação aplicada — ${fmtInt(rs.atualizar)} atualizadas, ${fmtInt(rs.inserir)} inseridas, ${fmtInt(rs.ja_correto)} já corretas, ${fmtInt(rs.rejeitado)} rejeitadas, ${fmtInt(rs.ignorado)} ignoradas (banco sem importação).`)
       setAjuste(null)
       await handleSync()
     } catch (err) {
@@ -5611,13 +5612,9 @@ function VendasView() {
           <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setProdutoSel([]); setBancoSel([]) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
-          <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
-          <button className="refresh-btn" onClick={handleImportClick} disabled={importing} title="Importar vendas de um arquivo CSV">
-            {importing ? 'Importando...' : '↑ Importar'}
-          </button>
           <input type="file" accept=".csv,.xlsx,.xls" ref={ajusteInputRef} onChange={handleAjusteFile} style={{ display: 'none' }} />
-          <button className="refresh-btn" onClick={() => ajusteInputRef.current?.click()} disabled={ajustando} title="Ajustar tabela/parcelas/valor de v8 e C6 pela planilha do VendeAI ou pelo relatorio do portal v8 (simula antes de gravar)">
-            {ajustando ? 'Lendo...' : '⇆ Ajustar v8/C6'}
+          <button className="refresh-btn" onClick={() => ajusteInputRef.current?.click()} disabled={ajustando} title="Importar relatório de qualquer banco (v8, C6, Novo Saque, Soma, Presença) ou a planilha do VendeAI. Mostra a prévia linha a linha antes de gravar.">
+            {ajustando ? 'Lendo...' : '↑ Importação'}
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar tabela filtrada em CSV">
             &#8595; Baixar
@@ -5820,7 +5817,7 @@ function VendasView() {
         <div className="funil-overlay" onClick={() => setAjuste(null)}>
           <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 980 }}>
             <div className="funil-header">
-              <div><h2>Ajuste v8/C6 &mdash; pr&eacute;via</h2></div>
+              <div><h2>Importa&ccedil;&atilde;o &mdash; pr&eacute;via</h2></div>
               <button className="funil-close" onClick={() => setAjuste(null)}>&times;</button>
             </div>
             <p className="kpi-sub" style={{ marginBottom: 10 }}>
@@ -5829,7 +5826,7 @@ function VendasView() {
               {fmtInt(ajuste.previa.resumo?.inserir)} a inserir &middot;{' '}
               {fmtInt(ajuste.previa.resumo?.ja_correto)} j&aacute; corretas &middot;{' '}
               <span style={{ color: '#e08585' }}>{fmtInt(ajuste.previa.resumo?.rejeitado)} rejeitadas</span> &middot;{' '}
-              {fmtInt(ajuste.previa.resumo?.ignorado)} de outros bancos (ignoradas)
+              {fmtInt(ajuste.previa.resumo?.ignorado)} ignoradas (banco sem importação)
             </p>
             <div className="panel table-panel" style={{ maxHeight: 420, overflowY: 'auto' }}>
               <div className="template-row head" style={{ gridTemplateColumns: '0.5fr 0.6fr 0.9fr 1.6fr 1.6fr 1.6fr' }}>
