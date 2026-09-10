@@ -3,6 +3,7 @@ import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContaine
 import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
 import RefinButton from './RefinLeads'
+import PresencaButton from './PresencaEsteira'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
 import Trello from './Trello'
@@ -4637,6 +4638,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <RefinButton vendedor={vendedor} modo="vendedora" />
+          <PresencaButton vendedor={vendedor} modo="vendedora" />
           <ArquivosButton dono={vendedor} />
           <PlaybookMenuButton />
           <span ref={tourAiRef} style={{ display: 'inline-flex' }}><AIChatButton vendedor={vendedor} /></span>
@@ -6278,6 +6280,7 @@ function Dashboard() {
   const acoesVendedoras = (
     <>
       <RefinButton vendedor={null} modo="gestao" />
+      <PresencaButton vendedor={null} modo="geral" />
       <ArquivosButton dono={null} />
       <PlaybookMenuButton />
       <AIChatButton vendedor={undefined} />
