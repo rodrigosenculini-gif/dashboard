@@ -22,9 +22,22 @@ export async function apiPresenca(type, body, params = '') {
   return data
 }
 
-const TTL_ESTEIRA = 5 * 60_000
+// 1 min: como o cache devolve na hora e revalida por tras, revalidar mais
+// vezes nao custa espera nenhuma para quem esta olhando.
+const TTL_ESTEIRA = 60_000
 const cache = { por: {}, cat: null, vends: null }
 let emVoo = {}
+
+// Quem muda a esteira (assumir, atribuir, agir) precisa derrubar TODOS os
+// escopos, nao so o proprio: a vendedora assume no escopo dela e isso tem que
+// aparecer no 'geral' e na home imediatamente, sem esperar o TTL.
+const ouvintes = new Set()
+export function assinarEsteira(fn) { ouvintes.add(fn); return () => ouvintes.delete(fn) }
+export function invalidarEsteira() {
+  cache.por = {}
+  emVoo = {}
+  ouvintes.forEach((fn) => { try { fn() } catch { /* ignora ouvinte quebrado */ } })
+}
 
 async function buscarEsteira(escopo, forcar = false) {
   const c = cache.por[escopo.chave]
@@ -127,6 +140,7 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
     setErro(''); setMsg('')
     try {
       await apiPresenca('assumir', { operacao: it.operacao_id, modo, solicitante: vendedor })
+      invalidarEsteira()
       setAchados(null); setBuscaLivre('')
       await carregar(true)
       setAbaInicial(it.pode_reapresentar ? 'conta' : 'documento')
@@ -150,6 +164,8 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
     const t = setInterval(() => carregar(true), TTL_ESTEIRA)
     return () => clearInterval(t)
   }, [carregar])
+
+  useEffect(() => assinarEsteira(() => carregar(true)), [carregar])
 
   useEffect(() => {
     if (cache.cat) return
@@ -191,6 +207,7 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
     if (c) c.dados = c.dados.map((i) => (i.operacao_id === op ? { ...i, vendedor: quem || null } : i))
     try {
       await apiPresenca('atribuir', { operacao: op, vendedor: quem, modo, solicitante: vendedor || 'geral' })
+      invalidarEsteira()
       setMsg(quem ? `Atribuída a ${quem}.` : 'Atribuição removida.')
     } catch (e) { setErro(e.message); carregar(true) }
   }
@@ -368,6 +385,7 @@ function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose
     try {
       const r = await apiPresenca('acao', Object.assign({ modo, solicitante: vendedor || 'geral' }, corpo))
       if (r.ok === false) throw new Error(r.erro || 'o banco recusou a operação')
+      if (['reapresentar', 'cancelar', 'upload'].includes(corpo.acao)) invalidarEsteira()
       onFeito('Enviado ao Presença.')
     } catch (e) { setErro(e.message) } finally { setOcupado(false) }
   }
