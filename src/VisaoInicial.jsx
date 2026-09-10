@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis } from 'recharts'
 import { callApi, useRevisaoCache, TTL_MS } from './dadosCache'
-import PresencaEsteiraModal, { apiPresenca, brlP, tempoNaSituacao, FAIXAS_P } from './PresencaEsteira'
+import PresencaEsteiraModal, { apiPresenca, brlP, tempoNaSituacao, FAIXAS_P, assinarEsteira } from './PresencaEsteira'
 
 const REFRESH_MS = TTL_MS
 
@@ -90,8 +90,10 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
       .then((d) => { if (vivo) setEsteira(d.itens || []) })
       .catch(() => {})
     puxar()
-    const t = setInterval(puxar, REFRESH_MS)
-    return () => { vivo = false; clearInterval(t) }
+    // 1 min, e tambem na hora em que alguem mexe na esteira nesta aba
+    const t = setInterval(puxar, 60_000)
+    const solta = assinarEsteira(puxar)
+    return () => { vivo = false; clearInterval(t); solta() }
   }, [])
 
   const espKpis = useMemo(() => ({
