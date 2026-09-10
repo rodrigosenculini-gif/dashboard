@@ -108,6 +108,32 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
   const [faixa, setFaixa] = useState('todas')
   const [soTrat, setSoTrat] = useState(false)
   const [sel, setSel] = useState(itemInicial)
+  // busca livre: a vendedora acha uma adesao que ainda nao e dela e assume
+  const [buscaLivre, setBuscaLivre] = useState('')
+  const [achados, setAchados] = useState(null)
+  const [buscando, setBuscando] = useState(false)
+
+  async function procurar() {
+    const t = buscaLivre.trim()
+    if (t.length < 3) { setErro('digite ao menos 3 caracteres'); return }
+    setErro(''); setBuscando(true); setAchados(null)
+    try {
+      const d = await apiPresenca('buscar', null, `&q=${encodeURIComponent(t)}`)
+      setAchados(d.itens || [])
+    } catch (e) { setErro(e.message) } finally { setBuscando(false) }
+  }
+
+  async function assumir(it) {
+    setErro(''); setMsg('')
+    try {
+      await apiPresenca('assumir', { operacao: it.operacao_id, modo, solicitante: vendedor })
+      setAchados(null); setBuscaLivre('')
+      await carregar(true)
+      setAbaInicial(it.pode_reapresentar ? 'conta' : 'documento')
+      setSel({ ...it, vendedor })
+    } catch (e) { setErro(e.message) }
+  }
+
   const [abaInicial, setAbaInicial] = useState(
     itemInicial ? (itemInicial.pode_reapresentar ? 'conta' : 'documento') : null)
 
@@ -195,6 +221,38 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
           <div className='ia-kpi'><span>Valor tratável</span><strong>{brlP(kpis.valor)}</strong></div>
         </div>
 
+        {!geral && (
+          <div className='refin-toolbar'>
+            <input className='nuvem-busca' placeholder='adesão, CPF ou nome para assumir'
+              value={buscaLivre} onChange={(e) => setBuscaLivre(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') procurar() }} />
+            <button type='button' className='refresh-btn' onClick={procurar} disabled={buscando}>
+              {buscando ? 'procurando…' : 'procurar'}</button>
+            {achados && !achados.length && <span className='kpi-sub'>nada encontrado</span>}
+          </div>
+        )}
+
+        {!geral && !!(achados && achados.length) && (
+          <div className='panel table-panel'>
+            {achados.map((it) => (
+              <div className='template-row' key={'b' + it.operacao_id}
+                   style={{ gridTemplateColumns: '1.6fr 0.7fr 1fr 0.8fr 1fr 0.8fr' }}>
+                <span className='campanha-nome'>{it.nome || '—'}</span>
+                <span>{it.operacao_id}</span>
+                <span style={{ color: (FAIXAS_P[it.faixa] || FAIXAS_P.outro).cor }}>
+                  {(FAIXAS_P[it.faixa] || FAIXAS_P.outro).rotulo}</span>
+                <span>{brlP(it.valor_liberado)}</span>
+                <span className='kpi-sub'>{it.vendedor ? `com ${it.vendedor}` : 'sem responsável'}</span>
+                <span>
+                  {(!it.vendedor || it.vendedor === vendedor)
+                    ? <button type='button' className='reset-btn' onClick={() => assumir(it)}>assumir e tratar</button>
+                    : <span className='kpi-sub'>—</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className='refin-toolbar'>
           <input className='nuvem-busca' placeholder='nome, CPF ou adesão' value={busca}
             onChange={(e) => setBusca(e.target.value)} />
@@ -276,7 +334,30 @@ function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose
   const [aba, setAba] = useState(abaInicial || (item.pode_reapresentar ? 'conta' : 'documento'))
   const [erro, setErro] = useState('')
   const [ocupado, setOcupado] = useState(false)
-  const [conta, setConta] = useState({ banco: '', agencia: '', conta: '', digitoConta: '', tipoConta: '' })
+  const [conta, setConta] = useState({ banco: '', agencia: '', conta: '', digitoConta: '', tipoConta: 'ContaCorrente' })
+  const [contaCarregando, setContaCarregando] = useState(false)
+
+  // traz a conta que o banco tem hoje, para a vendedora corrigir so o que mudou
+  useEffect(() => {
+    if (aba !== 'conta') return
+    let vivo = true
+    setContaCarregando(true)
+    apiPresenca('acao', { acao: 'conta', operacaoId: item.operacao_id, modo, solicitante: vendedor || 'geral' })
+      .then((r) => {
+        const d = (r && r.resposta && (r.resposta.value || r.resposta.valueOrDefault)) || null
+        if (!vivo || !d) return
+        setConta((c) => ({
+          banco: c.banco || d.codigoBanco || '',
+          agencia: c.agencia || d.agencia || '',
+          conta: c.conta || d.conta || '',
+          digitoConta: c.digitoConta || d.digitoConta || '',
+          tipoConta: d.tipoConta || c.tipoConta || 'ContaCorrente',
+        }))
+      })
+      .catch(() => {})
+      .finally(() => { if (vivo) setContaCarregando(false) })
+    return () => { vivo = false }
+  }, [aba, item.operacao_id, modo, vendedor])
   const [docTipo, setDocTipo] = useState('')
   const [arquivo, setArquivo] = useState(null)
   const [motivo, setMotivo] = useState('')
@@ -347,8 +428,14 @@ function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose
               onChange={(e) => setConta({ ...conta, conta: e.target.value })} /></label>
             <label>Dígito<input required value={conta.digitoConta}
               onChange={(e) => setConta({ ...conta, digitoConta: e.target.value })} /></label>
-            <label>Tipo de conta<input required value={conta.tipoConta} placeholder='corrente / poupança'
-              onChange={(e) => setConta({ ...conta, tipoConta: e.target.value })} /></label>
+            <label>Tipo de conta
+              <select required value={conta.tipoConta}
+                onChange={(e) => setConta({ ...conta, tipoConta: e.target.value })}>
+                <option value='ContaCorrente'>Conta corrente</option>
+                <option value='ContaPoupanca'>Conta poupança</option>
+              </select>
+            </label>
+            {contaCarregando && <span className='kpi-sub'>buscando a conta atual…</span>}
             <button type='submit' className='refresh-btn' disabled={ocupado}>
               {ocupado ? 'enviando…' : 'reapresentar pagamento'}</button>
           </form>
