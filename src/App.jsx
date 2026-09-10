@@ -3,7 +3,7 @@ import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContaine
 import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
 import RefinButton from './RefinLeads'
-import PresencaButton from './PresencaEsteira'
+import PresencaEsteiraModal from './PresencaEsteira'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
 import Trello from './Trello'
@@ -4515,6 +4515,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const [showPan, setShowPan] = useState(false)
   const [showC6, setShowC6] = useState(false)
   const [showSomaJornada, setShowSomaJornada] = useState(false)
+  const [showPresenca, setShowPresenca] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(() => (
     new URLSearchParams(window.location.search).get('onboarding') === '1' ? 0 : -1
@@ -4638,7 +4639,6 @@ function VendedoraPortal({ vendedor, onLogout }) {
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <RefinButton vendedor={vendedor} modo="vendedora" />
-          <PresencaButton vendedor={vendedor} modo="vendedora" />
           <ArquivosButton dono={vendedor} />
           <PlaybookMenuButton />
           <span ref={tourAiRef} style={{ display: 'inline-flex' }}><AIChatButton vendedor={vendedor} /></span>
@@ -4672,6 +4672,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
           </button>
           <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simula&ccedil;&atilde;o e cadastro de proposta">
             Soma
+          </button>
+          <button className="refresh-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação de pagamento">
+            Presença
           </button>
           <button ref={tourFactaRef} className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
@@ -4788,6 +4791,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
       {showPan && <PanModal vendedorFixo={vendedor} onClose={() => setShowPan(false)} />}
       {showC6 && <C6Modal vendedorFixo={vendedor} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal vendedorFixo={vendedor} onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
+      {showPresenca && <PresencaEsteiraModal vendedor={vendedor} modo="vendedora" onClose={() => setShowPresenca(false)} />}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
 
       {onboardingStep >= 0 && onboardingStep < 5 && (
@@ -4841,6 +4845,7 @@ function VendedorasView() {
   const [showPan, setShowPan] = useState(false)
   const [showC6, setShowC6] = useState(false)
   const [showSomaJornada, setShowSomaJornada] = useState(false)
+  const [showPresenca, setShowPresenca] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
@@ -5051,6 +5056,9 @@ function VendedorasView() {
           </button>
           <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simula&ccedil;&atilde;o e cadastro de proposta">
             Soma
+          </button>
+          <button className="refresh-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação de pagamento">
+            Presença
           </button>
           <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
             Consulta Facta
@@ -5311,6 +5319,7 @@ function VendedorasView() {
       {showPan && <PanModal onClose={() => setShowPan(false)} />}
       {showC6 && <C6Modal vendedoresDisponiveis={vendedores} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
+      {showPresenca && <PresencaEsteiraModal vendedor={null} modo="geral" onClose={() => setShowPresenca(false)} />}
 
       {showMetaConfig && metaForm && (
         <div className="funil-overlay" onClick={() => setShowMetaConfig(false)}>
@@ -6280,7 +6289,6 @@ function Dashboard() {
   const acoesVendedoras = (
     <>
       <RefinButton vendedor={null} modo="gestao" />
-      <PresencaButton vendedor={null} modo="geral" />
       <ArquivosButton dono={null} />
       <PlaybookMenuButton />
       <AIChatButton vendedor={undefined} />
