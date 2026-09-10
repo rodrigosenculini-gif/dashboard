@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-// Esteira do Presenca. Fica junto dos outros bancos e usa a MESMA casca deles
-// (funil-overlay / funil-panel / funil-header, add-venda-form, template-row),
-// nao a do Refin.
+// Esteira do Presenca. Usa a casca dos modais de banco (funil-overlay /
+// funil-panel / funil-header), nao a do Refin.
 //
-// Duas coisas distintas convivem numa linha:
 //   status_nome    = situacao da operacao (ex.: 'Analise mesa')
 //   pendencia_nome = pendencia aberta dentro dela (ex.: 'REANALISE MESA')
-// Existe operacao em 'Analise mesa' sem pendencia nenhuma, por isso sao separados.
+// Existe operacao em 'Analise mesa' sem pendencia, por isso sao colunas separadas.
+//
+// Cache: a lista inteira e buscada UMA vez e guardada por 5 min. Busca, filtro de
+// situacao e 'so trataveis' sao aplicados em memoria — nunca disparam rede, por
+// isso a tela nao pisca nem espera a cada clique. Passado o TTL, revalida em
+// segundo plano e continua mostrando o que ja tinha.
 
 export async function apiPresenca(type, body, params = '') {
   const url = `/api/presenca?type=${type}${params}`
@@ -19,8 +22,29 @@ export async function apiPresenca(type, body, params = '') {
   return data
 }
 
+const TTL_ESTEIRA = 5 * 60_000
+const cache = { por: {}, cat: null, vends: null }
+let emVoo = {}
+
+async function buscarEsteira(escopo, forcar = false) {
+  const c = cache.por[escopo.chave]
+  const velho = !c || Date.now() - c.quando > TTL_ESTEIRA
+  if (c && !velho && !forcar) return c.dados
+
+  // revalida sem bloquear: se ja temos algo, devolve na hora
+  if (!emVoo[escopo.chave]) {
+    emVoo[escopo.chave] = apiPresenca('esteira', null, escopo.params)
+      .then((d) => {
+        cache.por[escopo.chave] = { dados: d.itens || [], quando: Date.now() }
+        return cache.por[escopo.chave].dados
+      })
+      .finally(() => { delete emVoo[escopo.chave] })
+  }
+  if (c && !forcar) return c.dados
+  return emVoo[escopo.chave]
+}
+
 export const brlP = (v) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
-const dataBr = (d) => (d ? new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—')
 
 export function tempoNaSituacao(min) {
   const m = Number(min || 0)
@@ -66,65 +90,83 @@ function BotaoCopiar({ texto }) {
   )
 }
 
-export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedora', onClose }) {
+export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedora', itemInicial = null, onClose }) {
   const geral = modo === 'geral'
-  const [itens, setItens] = useState([])
-  const [cat, setCat] = useState({ motivos: [], tipos: [] })
-  const [vends, setVends] = useState([])
-  const [loading, setLoading] = useState(true)
+  const escopo = useMemo(() => ({
+    chave: geral ? 'geral' : `v:${vendedor || ''}`,
+    params: (!geral && vendedor) ? `&vendedor=${encodeURIComponent(vendedor)}` : '',
+  }), [geral, vendedor])
+
+  // se ja temos cache, entra com os dados na tela — sem 'Carregando...'
+  const [itens, setItens] = useState(() => (cache.por[escopo.chave] || {}).dados || [])
+  const [cat, setCat] = useState(cache.cat || { motivos: [], tipos: [] })
+  const [vends, setVends] = useState(cache.vends || [])
+  const [loading, setLoading] = useState(!(cache.por[escopo.chave] || {}).dados)
   const [erro, setErro] = useState('')
   const [msg, setMsg] = useState('')
   const [busca, setBusca] = useState('')
   const [faixa, setFaixa] = useState('todas')
   const [soTrat, setSoTrat] = useState(false)
-  const [sel, setSel] = useState(null)
-  const [abaInicial, setAbaInicial] = useState(null)
+  const [sel, setSel] = useState(itemInicial)
+  const [abaInicial, setAbaInicial] = useState(
+    itemInicial ? (itemInicial.pode_reapresentar ? 'conta' : 'documento') : null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErro('')
+  const carregar = useCallback(async (forcar = false) => {
+    setErro('')
     try {
-      let p = ''
-      if (!geral && vendedor) p += `&vendedor=${encodeURIComponent(vendedor)}`
-      if (faixa !== 'todas') p += `&faixa=${encodeURIComponent(faixa)}`
-      if (soTrat) p += '&tratavel=1'
-      const d = await apiPresenca('esteira', null, p)
-      setItens(d.itens || [])
+      const d = await buscarEsteira(escopo, forcar)
+      setItens(d)
     } catch (e) { setErro(e.message) } finally { setLoading(false) }
-  }, [geral, vendedor, faixa, soTrat])
+  }, [escopo])
 
-  useEffect(() => { carregar() }, [carregar])
-  useEffect(() => { apiPresenca('catalogos').then(setCat).catch(() => {}) }, [])
+  useEffect(() => { carregar(false) }, [carregar])
   useEffect(() => {
-    if (!geral) return
-    apiPresenca('vendedores').then((d) => setVends(d.vendedores || [])).catch(() => {})
+    const t = setInterval(() => carregar(true), TTL_ESTEIRA)
+    return () => clearInterval(t)
+  }, [carregar])
+
+  useEffect(() => {
+    if (cache.cat) return
+    apiPresenca('catalogos').then((d) => { cache.cat = d; setCat(d) }).catch(() => {})
+  }, [])
+  useEffect(() => {
+    if (!geral || cache.vends) return
+    apiPresenca('vendedores').then((d) => { cache.vends = d.vendedores || []; setVends(cache.vends) }).catch(() => {})
   }, [geral])
 
+  // TUDO daqui pra baixo e em memoria: nenhum filtro vai a rede
   const lista = useMemo(() => {
     const b = busca.trim().toLowerCase()
-    if (!b) return itens
-    return itens.filter((i) =>
-      String(i.nome || '').toLowerCase().includes(b) ||
-      String(i.cpf || '').includes(b.replace(/\D/g, '')) ||
-      String(i.operacao_id).includes(b))
-  }, [itens, busca])
+    return itens.filter((i) => {
+      if (soTrat && !i.tratavel) return false
+      if (faixa !== 'todas' && i.faixa !== faixa) return false
+      if (!b) return true
+      return String(i.nome || '').toLowerCase().includes(b) ||
+             String(i.cpf || '').includes(b.replace(/\D/g, '')) ||
+             String(i.operacao_id).includes(b)
+    })
+  }, [itens, busca, faixa, soTrat])
 
   const kpis = useMemo(() => {
     const trat = itens.filter((i) => i.tratavel)
     return {
       total: itens.length,
       trataveis: trat.length,
-      semDono: itens.filter((i) => i.tratavel && !i.vendedor).length,
+      semDono: trat.filter((i) => !i.vendedor).length,
       valor: trat.reduce((s, i) => s + Number(i.valor_liberado || 0), 0),
     }
   }, [itens])
 
   async function atribuir(op, quem) {
     setMsg(''); setErro('')
+    // otimista: muda na tela e no cache, sem recarregar a lista inteira
+    setItens((ant) => ant.map((i) => (i.operacao_id === op ? { ...i, vendedor: quem || null } : i)))
+    const c = cache.por[escopo.chave]
+    if (c) c.dados = c.dados.map((i) => (i.operacao_id === op ? { ...i, vendedor: quem || null } : i))
     try {
       await apiPresenca('atribuir', { operacao: op, vendedor: quem, modo, solicitante: vendedor || 'geral' })
       setMsg(quem ? `Atribuída a ${quem}.` : 'Atribuição removida.')
-      carregar()
-    } catch (e) { setErro(e.message) }
+    } catch (e) { setErro(e.message); carregar(true) }
   }
 
   const COLS = geral
@@ -146,33 +188,33 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
           <button className='funil-close' onClick={onClose}>&times;</button>
         </div>
 
-        <div className='template-row' style={{ gridTemplateColumns: 'repeat(4, 1fr)', border: 0 }}>
-          <span><span className='kpi-label'>Na esteira</span><span className='kpi-value'>{kpis.total}</span></span>
-          <span><span className='kpi-label'>Tratáveis</span><span className='kpi-value'>{kpis.trataveis}</span></span>
-          <span><span className='kpi-label'>Sem responsável</span><span className='kpi-value'>{kpis.semDono}</span></span>
-          <span><span className='kpi-label'>Valor tratável</span><span className='kpi-value'>{brlP(kpis.valor)}</span></span>
+        <div className='ia-kpis' style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+          <div className='ia-kpi'><span>Na esteira</span><strong>{kpis.total}</strong></div>
+          <div className='ia-kpi'><span>Tratáveis</span><strong>{kpis.trataveis}</strong></div>
+          <div className='ia-kpi'><span>Sem responsável</span><strong>{kpis.semDono}</strong></div>
+          <div className='ia-kpi'><span>Valor tratável</span><strong>{brlP(kpis.valor)}</strong></div>
         </div>
 
-        <div className='add-venda-form' style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input placeholder='nome, CPF ou adesão' value={busca} style={{ maxWidth: 220 }}
+        <div className='refin-toolbar'>
+          <input className='nuvem-busca' placeholder='nome, CPF ou adesão' value={busca}
             onChange={(e) => setBusca(e.target.value)} />
-          <select value={faixa} onChange={(e) => setFaixa(e.target.value)} style={{ maxWidth: 200 }}>
+          <select className='refin-toggle' value={faixa} onChange={(e) => setFaixa(e.target.value)}>
             <option value='todas'>Todas as situações</option>
             {Object.entries(FAIXAS_P).map(([k, v]) => <option key={k} value={k}>{v.rotulo}</option>)}
           </select>
-          <label className='kpi-sub' style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <label className='refin-toggle' style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
             <input type='checkbox' checked={soTrat} onChange={(e) => setSoTrat(e.target.checked)} />
             só tratáveis
           </label>
-          <button type='button' className='refresh-btn' onClick={carregar}>Atualizar</button>
+          <button type='button' className='refresh-btn' onClick={() => carregar(true)}>Atualizar</button>
         </div>
 
         {erro && <div className='state-msg'>{erro}</div>}
         {msg && <div className='state-msg'>{msg}</div>}
-        {loading && <div className='state-msg'>Carregando…</div>}
+        {loading && !itens.length && <div className='state-msg'>Carregando…</div>}
         {!loading && !lista.length && <div className='state-msg'>Nada na esteira agora.</div>}
 
-        {!loading && !!lista.length && (
+        {!!lista.length && (
           <div className='panel table-panel'>
             <div className='template-row head' style={{ gridTemplateColumns: COLS }}>
               <span>Cliente</span><span>Adesão</span><span>Situação</span><span>Pendência</span>
@@ -193,7 +235,8 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
                   <span><LinkConversa item={i} /></span>
                   {geral && (
                     <span>
-                      <select value={i.vendedor || ''} onChange={(e) => atribuir(i.operacao_id, e.target.value)}>
+                      <select className='refin-toggle' value={i.vendedor || ''}
+                        onChange={(e) => atribuir(i.operacao_id, e.target.value)}>
                         <option value=''>ninguém</option>
                         {vends.map((v) => <option key={v} value={v}>{v}</option>)}
                         {i.vendedor && !vends.includes(i.vendedor) && <option value={i.vendedor}>{i.vendedor}</option>}
@@ -217,7 +260,7 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
         {sel && (
           <PresencaDetalhe item={sel} cat={cat} geral={geral} vendedor={vendedor} modo={modo}
             abaInicial={abaInicial} onClose={() => setSel(null)}
-            onFeito={(t) => { setMsg(t); setSel(null); carregar() }} />
+            onFeito={(t) => { setMsg(t); setSel(null); carregar(true) }} />
         )}
       </div>
     </div>
