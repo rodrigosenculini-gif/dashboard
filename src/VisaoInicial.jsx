@@ -276,44 +276,38 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
             </button>
           </header>
 
-          <div className="home-metricas">
+          <div className="home-metricas" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
             <Metrica label="A tratar" valor={fInt(espKpis.qtd)} tom="destaque" />
             <Metrica label="Sem responsável" valor={fInt(espKpis.semDono)} />
             <Metrica label="Valor parado" valor={fMoney(espKpis.valor)} />
             <Metrica label="Mais antiga" valor={tempoNaSituacao(espKpis.maisAntiga)} />
           </div>
 
-          <div className="refin-tabela-wrap" style={{ marginTop: 12 }}>
-            <table className="ia-tabela">
-              <thead>
-                <tr>
-                  <th>Cliente</th><th>Adesão</th><th>Situação</th><th>Pendência</th>
-                  <th>Valor</th><th>Parada há</th><th>Responsável</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {esteira.slice(0, 8).map((i) => {
-                  const f = FAIXAS_P[i.faixa] || FAIXAS_P.outro
-                  return (
-                    <tr key={i.operacao_id}>
-                      <td>{i.nome || '—'}</td>
-                      <td className="refin-mono">{i.operacao_id}</td>
-                      <td><span className="ia-tag" style={{ borderColor: f.cor, color: f.cor }}>{f.rotulo}</span></td>
-                      <td>{i.pendencia_nome || <span className="refin-dim">—</span>}</td>
-                      <td>{brlP(i.valor_liberado)}</td>
-                      <td className="refin-mono">{tempoNaSituacao(i.minutos_na_situacao)}</td>
-                      <td>{i.vendedor || <span className="refin-dim">ninguém</span>}</td>
-                      <td className="ia-td-acao">
-                        <button className="reset-btn" onClick={() => setPresencaAberta(true)}>tratar</button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            {esteira.length > 8 && (
-              <div className="refin-dim" style={{ padding: '8px 4px' }}>
-                e mais {esteira.length - 8} — abra a esteira para ver todas.
+          <div className="panel table-panel" style={{ marginTop: 12 }}>
+            <div className="template-row head" style={{ gridTemplateColumns: '1.6fr 0.7fr 1fr 0.8fr 0.6fr 0.9fr 0.7fr' }}>
+              <span>Cliente</span><span>Adesão</span><span>Situação</span>
+              <span>Valor</span><span>Parada há</span><span>Responsável</span><span></span>
+            </div>
+            {esteira.slice(0, 6).map((i) => {
+              const f = FAIXAS_P[i.faixa] || FAIXAS_P.outro
+              return (
+                <div className="template-row" key={i.operacao_id}
+                     style={{ gridTemplateColumns: '1.6fr 0.7fr 1fr 0.8fr 0.6fr 0.9fr 0.7fr' }}>
+                  <span className="campanha-nome" title={i.pendencia_nome || ''}>{i.nome || '—'}</span>
+                  <span>{i.operacao_id}</span>
+                  <span style={{ color: f.cor }}>{f.rotulo}</span>
+                  <span>{brlP(i.valor_liberado)}</span>
+                  <span>{tempoNaSituacao(i.minutos_na_situacao)}</span>
+                  <span className="kpi-sub">{i.vendedor || 'ninguém'}</span>
+                  <span>
+                    <button type="button" className="reset-btn" onClick={() => setPresencaAberta(true)}>tratar</button>
+                  </span>
+                </div>
+              )
+            })}
+            {esteira.length > 6 && (
+              <div className="kpi-sub" style={{ padding: '8px 12px' }}>
+                e mais {esteira.length - 6} — abra a esteira para ver todas.
               </div>
             )}
           </div>
