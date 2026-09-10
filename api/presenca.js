@@ -70,6 +70,18 @@ async function handleGet(type, req, res) {
     return res.json({ motivos, tipos });
   }
 
+  if (type === 'buscar') {
+    const q0 = String(req.query.q || '').trim();
+    if (q0.length < 3) return res.status(400).json({ erro: 'digite ao menos 3 caracteres' });
+    const so = q0.replace(/\D/g, '');
+    const rows = await q(
+      "select * from presenca_esteira_view " +
+      "where operacao_id::text = $1 or cpf = lpad($1,11,'0') " +
+      "   or nome ilike '%' || $2 || '%' " +
+      "order by prioridade, data_operacao desc limit 20", [so || '0', q0]);
+    return res.json({ itens: rows });
+  }
+
   if (type === 'vendedores') {
     const rows = await q("select distinct vendedor from vendedoras_analise " +
       "where vendedor is not null and btrim(vendedor) <> '' order by vendedor");
@@ -121,6 +133,21 @@ async function handlePost(type, req, res) {
     const rows = await q(
       "select presenca_esteira_atribuir($1,$2,$3,$4) as r",
       [op, alvo, body.observacao ? String(body.observacao) : null, !!body.visto]);
+    return res.json(rows[0] ? rows[0].r : { ok: false });
+  }
+
+  if (type === 'assumir') {
+    const op = Number(body.operacao || 0);
+    if (!op) return res.status(400).json({ erro: 'operacao obrigatoria' });
+    if (!solicitante || solicitante === 'geral') {
+      return res.status(400).json({ erro: 'quem esta assumindo?' });
+    }
+    // so assume o que esta livre ou o que ja e dela: nunca tira de outra
+    const dono = await q("select vendedor from presenca_esteira where operacao_id = $1", [op]);
+    if (!dono.length) return res.status(404).json({ erro: 'adesao nao encontrada na esteira' });
+    const v = dono[0].vendedor;
+    if (v && v !== solicitante) return res.status(409).json({ erro: 'ja esta com ' + v });
+    const rows = await q("select presenca_esteira_atribuir($1,$2,null,false) as r", [op, solicitante]);
     return res.json(rows[0] ? rows[0].r : { ok: false });
   }
 
