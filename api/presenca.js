@@ -61,13 +61,19 @@ export default async function handler(req, res) {
 async function handleGet(type, req, res) {
   const vendedor = req.query.vendedor ? String(req.query.vendedor) : null;
   const faixa = req.query.faixa ? String(req.query.faixa) : null;
-  const soPendencia = String(req.query.pendencia || '') === '1';
+  const soTratavel = String(req.query.tratavel || '') === '1';
   const incluirFechadas = String(req.query.fechadas || '') === '1';
 
   if (type === 'catalogos') {
     const motivos = await q("select motivo_id, nome from presenca_motivos_cancelamento where ativo order by nome");
     const tipos = await q("select tipo_id, nome from presenca_tipos_documento order by nome");
     return res.json({ motivos, tipos });
+  }
+
+  if (type === 'vendedores') {
+    const rows = await q("select distinct vendedor from vendedoras_analise " +
+      "where vendedor is not null and btrim(vendedor) <> '' order by vendedor");
+    return res.json({ vendedores: rows.map((r) => r.vendedor) });
   }
 
   if (type === 'resumo') {
@@ -93,9 +99,9 @@ async function handleGet(type, req, res) {
     "where ($4::boolean is true or faixa not in ('pago','cancelado')) " +
     "  and ($1::text is null or vendedor = $1) " +
     "  and ($2::text is null or faixa = $2) " +
-    "  and ($3::boolean is not true or tem_pendencia) " +
+    "  and ($3::boolean is not true or tratavel) " +
     "order by prioridade, data_operacao desc nulls last limit 400",
-    [vendedor, faixa, soPendencia, incluirFechadas]);
+    [vendedor, faixa, soTratavel, incluirFechadas]);
   return res.json({ itens: rows });
 }
 
