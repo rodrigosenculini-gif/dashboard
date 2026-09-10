@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-// Esteira do Presenca. Fica junto dos outros bancos (Novo Saque, PAN, C6, Soma),
-// nao junto do Refin: e a tela unica do banco, e a simulacao entra aqui dentro.
+// Esteira do Presenca. Fica junto dos outros bancos e usa a MESMA casca deles
+// (funil-overlay / funil-panel / funil-header, add-venda-form, template-row),
+// nao a do Refin.
 //
-// Duas coisas diferentes convivem numa linha e nao podem ser confundidas:
+// Duas coisas distintas convivem numa linha:
 //   status_nome    = situacao da operacao (ex.: 'Analise mesa')
 //   pendencia_nome = pendencia aberta dentro dela (ex.: 'REANALISE MESA')
 // Existe operacao em 'Analise mesa' sem pendencia nenhuma, por isso sao separados.
@@ -21,13 +22,20 @@ export async function apiPresenca(type, body, params = '') {
 export const brlP = (v) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
 const dataBr = (d) => (d ? new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—')
 
-// tempo na situacao: minutos ate 1h, depois horas, depois dias
 export function tempoNaSituacao(min) {
   const m = Number(min || 0)
   if (m < 60) return `${m} min`
   if (m < 60 * 24) return `${Math.floor(m / 60)}h ${m % 60}min`
   const d = Math.floor(m / (60 * 24))
   return `${d}d ${Math.floor((m % (60 * 24)) / 60)}h`
+}
+
+// mesmo criterio da tela de vendedoras: sem conversa_sistema, cai no CRM VendeAI
+export function linkConversa(item) {
+  if (!item || !item.covnersation_id) return null
+  return item.conversa_sistema === 'chatwoot'
+    ? `https://chatwoot.querosacarfgts.com.br/app/accounts/1/conversations/${item.covnersation_id}`
+    : `https://crm.vendeaitecnologia.com.br/app/accounts/75/conversations/${item.covnersation_id}`
 }
 
 export const FAIXAS_P = {
@@ -41,14 +49,20 @@ export const FAIXAS_P = {
   outro:           { rotulo: 'Outro', cor: '#888780' },
 }
 
-function BotaoCopiar({ texto, rotulo = 'copiar link' }) {
+export function LinkConversa({ item }) {
+  const href = linkConversa(item)
+  if (!href) return <span className='kpi-sub'>—</span>
+  return <a href={href} target='_blank' rel='noopener noreferrer' className='conversa-link'>Abrir &#8599;</a>
+}
+
+function BotaoCopiar({ texto }) {
   const [ok, setOk] = useState(false)
   if (!texto) return null
   return (
-    <button className='reset-btn' onClick={async () => {
+    <button type='button' className='reset-btn' onClick={async () => {
       try { await navigator.clipboard.writeText(texto) } catch { /* sem permissao */ }
       setOk(true); setTimeout(() => setOk(false), 1800)
-    }}>{ok ? 'copiado ✓' : rotulo}</button>
+    }}>{ok ? 'copiado' : 'copiar link'}</button>
   )
 }
 
@@ -113,126 +127,96 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
     } catch (e) { setErro(e.message) }
   }
 
-  function abrirEm(item, aba) { setAbaInicial(aba); setSel(item) }
+  const COLS = geral
+    ? '1.5fr 0.7fr 1fr 0.9fr 0.8fr 0.6fr 0.7fr 1fr 0.8fr'
+    : '1.5fr 0.7fr 1fr 0.9fr 0.8fr 0.6fr 0.7fr 0.8fr'
 
   return (
-    <div className='ai-chat-overlay' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className='ai-chat-sheet nuvem-sheet refin-sheet'>
-        <div className='ai-chat-gradient' />
-
-        <div className='ai-chat-header'>
+    <div className='funil-overlay' onClick={onClose}>
+      <div className='funil-panel' onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1120 }}>
+        <div className='funil-header'>
           <div>
-            <div className='ai-chat-title'>
-              Presença — {geral ? 'esteira' : vendedor || 'minhas pendências'}
-            </div>
-            <div className='ai-chat-subtitle'>
+            <h2>Presença — {geral ? 'esteira' : 'minhas pendências'}</h2>
+            <span className='kpi-sub'>
               {geral
-                ? 'Operações que ainda não pagaram. Atribua uma responsável para que apareça no portal dela.'
+                ? 'Operações que ainda não pagaram. Atribua uma responsável para aparecer no portal dela.'
                 : 'Operações atribuídas a você que precisam de tratamento.'}
-            </div>
+            </span>
           </div>
-          <button className='ai-chat-close' onClick={onClose}>×</button>
+          <button className='funil-close' onClick={onClose}>&times;</button>
         </div>
 
-        <div className='refin-body'>
-          <div className='refin-kpis'>
-            <div className='ia-kpi'><span>Na esteira</span><strong>{kpis.total}</strong></div>
-            <div className='ia-kpi'><span>Tratáveis</span><strong>{kpis.trataveis}</strong></div>
-            {geral && <div className='ia-kpi'><span>Sem responsável</span><strong>{kpis.semDono}</strong></div>}
-            <div className='ia-kpi'><span>Valor tratável</span><strong>{brlP(kpis.valor)}</strong></div>
-          </div>
-
-          <div className='refin-toolbar'>
-            <input className='nuvem-busca' placeholder='nome, CPF ou adesão' value={busca}
-              onChange={(e) => setBusca(e.target.value)} />
-            <select className='nuvem-busca' style={{ maxWidth: 210 }} value={faixa}
-              onChange={(e) => setFaixa(e.target.value)}>
-              <option value='todas'>Todas as situações</option>
-              {Object.entries(FAIXAS_P).map(([k, v]) => (
-                <option key={k} value={k}>{v.rotulo}</option>
-              ))}
-            </select>
-            <label className='refin-toggle'>
-              <input type='checkbox' checked={soTrat} onChange={(e) => setSoTrat(e.target.checked)} />
-              <span>só tratáveis</span>
-            </label>
-            <button className='refresh-btn' onClick={carregar}>Atualizar</button>
-          </div>
-
-          {erro && <div className='state-msg error'>{erro}</div>}
-          {msg && <div className='state-msg'>{msg}</div>}
-          {loading && <div className='state-msg'>Carregando…</div>}
-          {!loading && !lista.length && <div className='ia-vazio'>Nada na esteira agora.</div>}
-
-          {!loading && !!lista.length && (
-            <div className='refin-tabela-wrap'>
-              <table className='ia-tabela refin-tabela'>
-                <thead>
-                  <tr>
-                    <th>Cliente</th><th>Adesão</th><th>Situação</th><th>Pendência</th>
-                    <th>Valor</th><th>Parada há</th><th>Data</th>
-                    {geral && <th>Responsável</th>}
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lista.map((i) => {
-                    const f = FAIXAS_P[i.faixa] || FAIXAS_P.outro
-                    return (
-                      <tr key={i.operacao_id}>
-                        <td>
-                          <div>{i.nome || '—'}</div>
-                          <div className='refin-dim refin-mono'>{i.cpf || ''}</div>
-                        </td>
-                        <td className='refin-mono'>{i.operacao_id}</td>
-                        <td><span className='ia-tag' style={{ borderColor: f.cor, color: f.cor }}>{f.rotulo}</span></td>
-                        <td>
-                          {i.pendencia_nome
-                            ? <span className='ia-tag' style={{ borderColor: '#ba7517', color: '#ba7517' }}>{i.pendencia_nome}</span>
-                            : <span className='refin-dim'>—</span>}
-                        </td>
-                        <td>{brlP(i.valor_liberado)}</td>
-                        <td className='refin-mono'>{tempoNaSituacao(i.minutos_na_situacao)}</td>
-                        <td>{dataBr(i.data_operacao)}</td>
-                        {geral && (
-                          <td>
-                            <select className='nuvem-busca' style={{ minWidth: 150 }}
-                              value={i.vendedor || ''}
-                              onChange={(e) => atribuir(i.operacao_id, e.target.value)}>
-                              <option value=''>— ninguém —</option>
-                              {vends.map((v) => <option key={v} value={v}>{v}</option>)}
-                              {i.vendedor && !vends.includes(i.vendedor) && (
-                                <option value={i.vendedor}>{i.vendedor}</option>
-                              )}
-                            </select>
-                          </td>
-                        )}
-                        <td className='ia-td-acao'>
-                          <div className='refin-acoes'>
-                            {i.pode_reapresentar && (
-                              <button className='reset-btn' title='corrigir dados bancários e reapresentar'
-                                onClick={() => abrirEm(i, 'conta')}>ajustar conta</button>
-                            )}
-                            {!i.pode_reapresentar && i.tratavel && (
-                              <button className='reset-btn' title='enviar documento para resolver a pendência'
-                                onClick={() => abrirEm(i, 'documento')}>enviar doc</button>
-                            )}
-                            <button className='reset-btn' onClick={() => abrirEm(i, null)}>abrir</button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <div className='template-row' style={{ gridTemplateColumns: 'repeat(4, 1fr)', border: 0 }}>
+          <span><span className='kpi-label'>Na esteira</span><span className='kpi-value'>{kpis.total}</span></span>
+          <span><span className='kpi-label'>Tratáveis</span><span className='kpi-value'>{kpis.trataveis}</span></span>
+          <span><span className='kpi-label'>Sem responsável</span><span className='kpi-value'>{kpis.semDono}</span></span>
+          <span><span className='kpi-label'>Valor tratável</span><span className='kpi-value'>{brlP(kpis.valor)}</span></span>
         </div>
+
+        <div className='add-venda-form' style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input placeholder='nome, CPF ou adesão' value={busca} style={{ maxWidth: 220 }}
+            onChange={(e) => setBusca(e.target.value)} />
+          <select value={faixa} onChange={(e) => setFaixa(e.target.value)} style={{ maxWidth: 200 }}>
+            <option value='todas'>Todas as situações</option>
+            {Object.entries(FAIXAS_P).map(([k, v]) => <option key={k} value={k}>{v.rotulo}</option>)}
+          </select>
+          <label className='kpi-sub' style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type='checkbox' checked={soTrat} onChange={(e) => setSoTrat(e.target.checked)} />
+            só tratáveis
+          </label>
+          <button type='button' className='refresh-btn' onClick={carregar}>Atualizar</button>
+        </div>
+
+        {erro && <div className='state-msg'>{erro}</div>}
+        {msg && <div className='state-msg'>{msg}</div>}
+        {loading && <div className='state-msg'>Carregando…</div>}
+        {!loading && !lista.length && <div className='state-msg'>Nada na esteira agora.</div>}
+
+        {!loading && !!lista.length && (
+          <div className='panel table-panel'>
+            <div className='template-row head' style={{ gridTemplateColumns: COLS }}>
+              <span>Cliente</span><span>Adesão</span><span>Situação</span><span>Pendência</span>
+              <span>Valor</span><span>Parada há</span><span>Conversa</span>
+              {geral && <span>Responsável</span>}
+              <span></span>
+            </div>
+            {lista.map((i) => {
+              const f = FAIXAS_P[i.faixa] || FAIXAS_P.outro
+              return (
+                <div className='template-row' key={i.operacao_id} style={{ gridTemplateColumns: COLS }}>
+                  <span className='campanha-nome' title={i.cpf || ''}>{i.nome || '—'}</span>
+                  <span>{i.operacao_id}</span>
+                  <span style={{ color: f.cor }}>{f.rotulo}</span>
+                  <span className='kpi-sub'>{i.pendencia_nome || '—'}</span>
+                  <span>{brlP(i.valor_liberado)}</span>
+                  <span>{tempoNaSituacao(i.minutos_na_situacao)}</span>
+                  <span><LinkConversa item={i} /></span>
+                  {geral && (
+                    <span>
+                      <select value={i.vendedor || ''} onChange={(e) => atribuir(i.operacao_id, e.target.value)}>
+                        <option value=''>ninguém</option>
+                        {vends.map((v) => <option key={v} value={v}>{v}</option>)}
+                        {i.vendedor && !vends.includes(i.vendedor) && <option value={i.vendedor}>{i.vendedor}</option>}
+                      </select>
+                    </span>
+                  )}
+                  <span>
+                    {i.tratavel && (
+                      <button type='button' className='reset-btn'
+                        onClick={() => { setAbaInicial(i.pode_reapresentar ? 'conta' : 'documento'); setSel(i) }}>
+                        {i.pode_reapresentar ? 'ajustar conta' : 'enviar doc'}
+                      </button>
+                    )}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {sel && (
           <PresencaDetalhe item={sel} cat={cat} geral={geral} vendedor={vendedor} modo={modo}
-            abaInicial={abaInicial}
-            onClose={() => setSel(null)}
+            abaInicial={abaInicial} onClose={() => setSel(null)}
             onFeito={(t) => { setMsg(t); setSel(null); carregar() }} />
         )}
       </div>
@@ -241,16 +225,13 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
 }
 
 function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose, onFeito }) {
-  const inicial = abaInicial || (item.pode_reapresentar ? 'conta' : 'documento')
-  const [aba, setAba] = useState(inicial)
+  const [aba, setAba] = useState(abaInicial || (item.pode_reapresentar ? 'conta' : 'documento'))
   const [erro, setErro] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [conta, setConta] = useState({ banco: '', agencia: '', conta: '', digitoConta: '', tipoConta: '' })
   const [docTipo, setDocTipo] = useState('')
   const [arquivo, setArquivo] = useState(null)
   const [motivo, setMotivo] = useState('')
-
-  const f = FAIXAS_P[item.faixa] || FAIXAS_P.outro
 
   async function enviar(corpo, confirmacao) {
     if (confirmacao && !window.confirm(confirmacao)) return
@@ -282,103 +263,78 @@ function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose
   }
 
   return (
-    <div className='ai-chat-overlay' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className='ai-chat-sheet nuvem-sheet' style={{ maxWidth: 680 }}>
-        <div className='ai-chat-gradient' />
-        <div className='ai-chat-header'>
+    <div className='funil-overlay' onClick={onClose}>
+      <div className='funil-panel' onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className='funil-header'>
           <div>
-            <div className='ai-chat-title'>{item.nome || 'adesão ' + item.operacao_id}</div>
-            <div className='ai-chat-subtitle'>
-              adesão {item.operacao_id} · {brlP(item.valor_liberado)} · parada há {tempoNaSituacao(item.minutos_na_situacao)}
-            </div>
+            <h2>{item.nome || 'adesão ' + item.operacao_id}</h2>
+            <span className='kpi-sub'>
+              adesão {item.operacao_id} · {brlP(item.valor_liberado)} · {item.status_nome}
+              {item.pendencia_nome ? ` · pendência: ${item.pendencia_nome}` : ''}
+              {' · parada há '}{tempoNaSituacao(item.minutos_na_situacao)}
+            </span>
           </div>
-          <button className='ai-chat-close' onClick={onClose}>×</button>
+          <button className='funil-close' onClick={onClose}>&times;</button>
         </div>
 
-        <div className='refin-body'>
-          <div className='refin-linha'>
-            <span className='ia-tag' style={{ borderColor: f.cor, color: f.cor }}>{item.status_nome}</span>
-            {item.pendencia_nome && (
-              <span className='ia-tag' style={{ borderColor: '#ba7517', color: '#ba7517', marginLeft: 8 }}>
-                pendência: {item.pendencia_nome}
-              </span>
-            )}
-          </div>
-
-          {item.link_formalizacao && (
-            <div className='refin-linha'>
-              <span className='refin-dim'>link de formalização</span>
-              <BotaoCopiar texto={item.link_formalizacao} />
-            </div>
-          )}
-
-          <div className='refin-status-btns'>
-            <button className={aba === 'conta' ? 'refin-pago' : 'reset-btn'} onClick={() => setAba('conta')}>Conta</button>
-            <button className={aba === 'documento' ? 'refin-pago' : 'reset-btn'} onClick={() => setAba('documento')}>Documento</button>
-            {geral && <button className={aba === 'cancelar' ? 'refin-pago' : 'reset-btn'} onClick={() => setAba('cancelar')}>Cancelar</button>}
-          </div>
-
-          {erro && <div className='state-msg error'>{erro}</div>}
-
-          {aba === 'conta' && (
-            <div className='refin-grid'>
-              <div className='refin-campo'><label>Banco</label>
-                <input value={conta.banco} onChange={(e) => setConta({ ...conta, banco: e.target.value })} placeholder='104' /></div>
-              <div className='refin-campo'><label>Agência</label>
-                <input value={conta.agencia} onChange={(e) => setConta({ ...conta, agencia: e.target.value })} placeholder='0809' /></div>
-              <div className='refin-campo'><label>Conta</label>
-                <input value={conta.conta} onChange={(e) => setConta({ ...conta, conta: e.target.value })} /></div>
-              <div className='refin-campo'><label>Dígito</label>
-                <input value={conta.digitoConta} onChange={(e) => setConta({ ...conta, digitoConta: e.target.value })} /></div>
-              <div className='refin-campo'><label>Tipo de conta</label>
-                <input value={conta.tipoConta} onChange={(e) => setConta({ ...conta, tipoConta: e.target.value })}
-                  placeholder='corrente / poupança' /></div>
-              <div className='refin-acoes-lead'>
-                <button className='reset-btn' disabled={ocupado}
-                  onClick={() => enviar({ acao: 'reapresentar', operacaoId: item.operacao_id, ...conta },
-                    'Reapresentar o pagamento com esta conta? Isso reenvia o desembolso no banco.')}>
-                  {ocupado ? 'enviando…' : 'reapresentar pagamento'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {aba === 'documento' && (
-            <div className='refin-grid'>
-              <div className='refin-campo'><label>Tipo do documento</label>
-                <select value={docTipo} onChange={(e) => setDocTipo(e.target.value)}>
-                  <option value=''>escolha…</option>
-                  {(cat.tipos || []).map((t) => <option key={t.tipo_id} value={t.tipo_id}>{t.nome}</option>)}
-                </select>
-              </div>
-              <div className='refin-campo'><label>Arquivo</label>
-                <input type='file' onChange={(e) => setArquivo(e.target.files ? e.target.files[0] : null)} /></div>
-              <div className='refin-acoes-lead'>
-                <button className='reset-btn' disabled={ocupado} onClick={enviarDoc}>
-                  {ocupado ? 'enviando…' : 'enviar documento'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {aba === 'cancelar' && geral && (
-            <div className='refin-grid'>
-              <div className='refin-campo'><label>Motivo</label>
-                <select value={motivo} onChange={(e) => setMotivo(e.target.value)}>
-                  <option value=''>escolha…</option>
-                  {(cat.motivos || []).map((m) => <option key={m.motivo_id} value={m.motivo_id}>{m.nome}</option>)}
-                </select>
-              </div>
-              <div className='refin-acoes-lead'>
-                <button className='reset-btn' disabled={ocupado || !motivo}
-                  onClick={() => enviar({ acao: 'cancelar', operacaoId: item.operacao_id, motivoId: Number(motivo) },
-                    'Cancelar esta operação no Presença? Não tem volta.')}>
-                  {ocupado ? 'enviando…' : 'cancelar operação'}
-                </button>
-              </div>
-            </div>
-          )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '0 4px 8px' }}>
+          <button type='button' className={aba === 'conta' ? 'refresh-btn' : 'reset-btn'} onClick={() => setAba('conta')}>Conta</button>
+          <button type='button' className={aba === 'documento' ? 'refresh-btn' : 'reset-btn'} onClick={() => setAba('documento')}>Documento</button>
+          {geral && <button type='button' className={aba === 'cancelar' ? 'refresh-btn' : 'reset-btn'} onClick={() => setAba('cancelar')}>Cancelar</button>}
+          <LinkConversa item={item} />
+          <BotaoCopiar texto={item.link_formalizacao} />
         </div>
+
+        {erro && <div className='state-msg'>{erro}</div>}
+
+        {aba === 'conta' && (
+          <form className='add-venda-form' onSubmit={(e) => { e.preventDefault()
+            enviar({ acao: 'reapresentar', operacaoId: item.operacao_id, ...conta },
+              'Reapresentar o pagamento com esta conta? Isso reenvia o desembolso no banco.') }}>
+            <label>Banco<input required value={conta.banco} placeholder='104'
+              onChange={(e) => setConta({ ...conta, banco: e.target.value })} /></label>
+            <label>Agência<input required value={conta.agencia} placeholder='0809'
+              onChange={(e) => setConta({ ...conta, agencia: e.target.value })} /></label>
+            <label>Conta<input required value={conta.conta}
+              onChange={(e) => setConta({ ...conta, conta: e.target.value })} /></label>
+            <label>Dígito<input required value={conta.digitoConta}
+              onChange={(e) => setConta({ ...conta, digitoConta: e.target.value })} /></label>
+            <label>Tipo de conta<input required value={conta.tipoConta} placeholder='corrente / poupança'
+              onChange={(e) => setConta({ ...conta, tipoConta: e.target.value })} /></label>
+            <button type='submit' className='refresh-btn' disabled={ocupado}>
+              {ocupado ? 'enviando…' : 'reapresentar pagamento'}</button>
+          </form>
+        )}
+
+        {aba === 'documento' && (
+          <form className='add-venda-form' onSubmit={(e) => { e.preventDefault(); enviarDoc() }}>
+            <label>Tipo do documento
+              <select value={docTipo} onChange={(e) => setDocTipo(e.target.value)}>
+                <option value=''>escolha…</option>
+                {(cat.tipos || []).map((t) => <option key={t.tipo_id} value={t.tipo_id}>{t.nome}</option>)}
+              </select>
+            </label>
+            <label>Arquivo
+              <input type='file' onChange={(e) => setArquivo(e.target.files ? e.target.files[0] : null)} /></label>
+            <button type='submit' className='refresh-btn' disabled={ocupado}>
+              {ocupado ? 'enviando…' : 'enviar documento'}</button>
+          </form>
+        )}
+
+        {aba === 'cancelar' && geral && (
+          <form className='add-venda-form' onSubmit={(e) => { e.preventDefault()
+            enviar({ acao: 'cancelar', operacaoId: item.operacao_id, motivoId: Number(motivo) },
+              'Cancelar esta operação no Presença? Não tem volta.') }}>
+            <label>Motivo
+              <select required value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+                <option value=''>escolha…</option>
+                {(cat.motivos || []).map((m) => <option key={m.motivo_id} value={m.motivo_id}>{m.nome}</option>)}
+              </select>
+            </label>
+            <button type='submit' className='refresh-btn' disabled={ocupado || !motivo}>
+              {ocupado ? 'enviando…' : 'cancelar operação'}</button>
+          </form>
+        )}
       </div>
     </div>
   )
