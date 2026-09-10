@@ -83,6 +83,7 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
   // Esteira do Presenca: so as tratáveis, com atalho para resolver sem sair daqui.
   const [esteira, setEsteira] = useState([])
   const [presencaAberta, setPresencaAberta] = useState(false)
+  const [presencaItem, setPresencaItem] = useState(null)
   useEffect(() => {
     let vivo = true
     const puxar = () => apiPresenca('esteira', null, '&tratavel=1')
@@ -269,7 +270,7 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
       {!!esteira.length && (
         <section className="home-painel" style={{ marginTop: 16 }}>
           <header className="home-painel-top">
-            <button className="home-painel-titulo" onClick={() => setPresencaAberta(true)} title="Abrir a esteira do Presença">
+            <button className="home-painel-titulo" onClick={() => { setPresencaItem(null); setPresencaAberta(true) }} title="Abrir a esteira do Presença">
               <span className="home-painel-marca" style={{ background: '#e24b4a' }} />
               Presença — a tratar
               <span className="home-painel-seta" aria-hidden="true">&rsaquo;</span>
@@ -300,7 +301,7 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
                   <span>{tempoNaSituacao(i.minutos_na_situacao)}</span>
                   <span className="kpi-sub">{i.vendedor || 'ninguém'}</span>
                   <span>
-                    <button type="button" className="reset-btn" onClick={() => setPresencaAberta(true)}>tratar</button>
+                    <button type="button" className="reset-btn" onClick={() => { setPresencaItem(i); setPresencaAberta(true) }}>tratar</button>
                   </span>
                 </div>
               )
@@ -315,7 +316,8 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
       )}
 
       {presencaAberta && (
-        <PresencaEsteiraModal vendedor={null} modo="geral" onClose={() => setPresencaAberta(false)} />
+        <PresencaEsteiraModal vendedor={null} modo="geral" itemInicial={presencaItem}
+          onClose={() => { setPresencaAberta(false); setPresencaItem(null) }} />
       )}
     </>
   )
