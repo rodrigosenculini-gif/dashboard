@@ -4903,52 +4903,12 @@ function VendedorasView() {
   const [modo, setModo] = useState('valor') // 'valor' | 'ponto'
   const fmtV = modo === 'ponto' ? ((v) => `${fmtInt(Math.round(v ?? 0))} pts`) : fmtMoeda
 
-  const [showMetaConfig, setShowMetaConfig] = useState(false)
-  const [metas, setMetas] = useState(null)
   const [metasV2, setMetasV2] = useState(null)
   useEffect(() => {
     callApi('metas_v2', { vendedor: '' })
       .then((r) => setMetasV2(r?.[0] ?? null))
       .catch(() => setMetasV2(null))
   }, [])
-  const [metaForm, setMetaForm] = useState(null)
-  const [salvandoMeta, setSalvandoMeta] = useState(false)
-
-  const loadMetas = useCallback(async () => {
-    try {
-      const m = await callApi('metas_progresso', { vendedor })
-      setMetas(m?.[0] ?? null)
-    } catch { /* silencioso */ }
-  }, [vendedor])
-
-  useEffect(() => { loadMetas() }, [loadMetas])
-
-  const abrirMetaConfig = () => {
-    setMetaForm({
-      valor_diaria: metas?.valor_diaria ?? 0,
-      valor_semanal: metas?.valor_semanal ?? 0,
-      valor_mensal: metas?.valor_mensal ?? 0,
-      ponto_diaria: metas?.ponto_diaria ?? 0,
-      ponto_semanal: metas?.ponto_semanal ?? 0,
-      ponto_mensal: metas?.ponto_mensal ?? 0,
-      tipo_ativo: metas?.tipo_ativo ?? 'valor',
-      periodo_ativo: metas?.periodo_ativo ?? 'semanal',
-    })
-    setShowMetaConfig(true)
-  }
-
-  const salvarMeta = async () => {
-    setSalvandoMeta(true)
-    try {
-      await postApi('metas_set', metaForm)
-      await loadMetas()
-      setShowMetaConfig(false)
-    } catch (e) {
-      alert('Erro ao salvar meta: ' + (e.message || ''))
-    } finally {
-      setSalvandoMeta(false)
-    }
-  }
 
   useEffect(() => {
     callApi('vendedoras_filtros', {})
@@ -5135,7 +5095,6 @@ function VendedorasView() {
           <MenuOpcoes
             title="Mais opções"
             itens={[
-              { label: '⚙ Configurar meta', onClick: abrirMetaConfig },
               { label: syncing ? 'Sincronizando...' : '↻ Sincronizar', onClick: handleSync, disabled: syncing },
               { label: loading ? 'Atualizando...' : '⟳ Atualizar agora', onClick: load, disabled: loading },
               { label: importing ? 'Importando...' : '↑ Importar CSV', onClick: handleImportClick, disabled: importing },
@@ -5160,29 +5119,6 @@ function VendedorasView() {
 
       <div className="panel chart-panel extra-tall">
         <p className="section-label">Vendas por dia</p>
-        {metas && (() => {
-          const ehPonto = modo === 'ponto'
-          const periodo = metas.periodo_ativo
-          const metaAtiva = ehPonto
-            ? (periodo === 'diario' ? metas.ponto_diaria : periodo === 'mensal' ? metas.ponto_mensal : metas.ponto_semanal)
-            : (periodo === 'diario' ? metas.valor_diaria : periodo === 'mensal' ? metas.valor_mensal : metas.valor_semanal)
-          const realizado = ehPonto
-            ? (periodo === 'diario' ? metas.realizado_dia_ponto : periodo === 'mensal' ? metas.realizado_mes_ponto : metas.realizado_semana_ponto)
-            : (periodo === 'diario' ? metas.realizado_dia_valor : periodo === 'mensal' ? metas.realizado_mes_valor : metas.realizado_semana_valor)
-          const pct = metaAtiva > 0 ? Math.min(100, (Number(realizado) / Number(metaAtiva)) * 100) : 0
-          const fmt = ehPonto ? (v) => `${fmtInt(Math.round(v ?? 0))} pts` : fmtMoeda
-          const periodoLabel = periodo === 'diario' ? 'diária' : periodo === 'mensal' ? 'mensal' : 'semanal'
-          return (
-            <div style={{ marginBottom: 10, width: '100%' }}>
-              <span style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Meta {periodoLabel}{vendedor ? ` · ${vendedor}` : ''}: {fmt(realizado)} / {fmt(metaAtiva)} ({pct.toFixed(0)}%)
-              </span>
-              <div style={{ width: '100%', background: 'var(--border)', borderRadius: 99, height: 4, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, background: pct >= 100 ? '#a9d97f' : '#d9b877', height: '100%' }} />
-              </div>
-            </div>
-          )
-        })()}
         <ResponsiveContainer width="100%" height="70%">
           <BarChart data={porDia.rows}>
             <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} tickFormatter={fmtDataBR} />
@@ -5379,69 +5315,6 @@ function VendedorasView() {
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
       {showPresenca && <PresencaEsteiraModal vendedor={null} modo="geral" onClose={() => setShowPresenca(false)} />}
 
-      {showMetaConfig && metaForm && (
-        <div className="funil-overlay" onClick={() => setShowMetaConfig(false)}>
-          <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
-            <div className="funil-header">
-              <div><h2>Configurar meta</h2></div>
-              <button className="funil-close" onClick={() => setShowMetaConfig(false)}>&times;</button>
-            </div>
-
-            <div className="card" style={{ marginBottom: 14 }}>
-              <p className="card-label">Qual meta acompanhar</p>
-              <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                  <input type="radio" checked={metaForm.tipo_ativo === 'valor'} onChange={() => setMetaForm({ ...metaForm, tipo_ativo: 'valor' })} /> Valor
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                  <input type="radio" checked={metaForm.tipo_ativo === 'ponto'} onChange={() => setMetaForm({ ...metaForm, tipo_ativo: 'ponto' })} /> Pontos
-                </label>
-              </div>
-              <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
-                {['diario', 'semanal', 'mensal'].map((p) => (
-                  <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, textTransform: 'capitalize' }}>
-                    <input type="radio" checked={metaForm.periodo_ativo === p} onChange={() => setMetaForm({ ...metaForm, periodo_ativo: p })} /> {p}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <p className="card-label">Metas em valor (R$)</p>
-              {['valor_diaria', 'valor_semanal', 'valor_mensal'].map((campo) => (
-                <div key={campo} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <label style={{ fontSize: 12.5, color: 'var(--muted)', width: 90, textTransform: 'capitalize' }}>{campo.split('_')[1]}</label>
-                  <input
-                    type="number"
-                    value={metaForm[campo]}
-                    onChange={(e) => setMetaForm({ ...metaForm, [campo]: e.target.value })}
-                    style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 10px', borderRadius: 7, fontFamily: 'var(--font-mono)' }}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="card" style={{ marginTop: 10 }}>
-              <p className="card-label">Metas em pontos</p>
-              {['ponto_diaria', 'ponto_semanal', 'ponto_mensal'].map((campo) => (
-                <div key={campo} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <label style={{ fontSize: 12.5, color: 'var(--muted)', width: 90, textTransform: 'capitalize' }}>{campo.split('_')[1]}</label>
-                  <input
-                    type="number"
-                    value={metaForm[campo]}
-                    onChange={(e) => setMetaForm({ ...metaForm, [campo]: e.target.value })}
-                    style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 10px', borderRadius: 7, fontFamily: 'var(--font-mono)' }}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <button className="refresh-btn" onClick={salvarMeta} disabled={salvandoMeta} style={{ marginTop: 14, width: '100%' }}>
-              {salvandoMeta ? 'Salvando...' : 'Salvar meta'}
-            </button>
-          </div>
-        </div>
-      )}
     </>
   )
 }
