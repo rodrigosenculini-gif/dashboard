@@ -5112,10 +5112,10 @@ function VendedorasView() {
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
+      <MetaColetiva dados={metasV2} />
+
       <div className="panel chart-panel extra-tall">
         <p className="section-label">Vendas por dia</p>
-        <MetaColetiva dados={metasV2} />
-
         {metas && (() => {
           const ehPonto = modo === 'ponto'
           const periodo = metas.periodo_ativo

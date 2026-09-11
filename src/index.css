@@ -2588,6 +2588,7 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .meta-col-bar-linha {
   display: flex;
   align-items: center;
+  gap: 10px;
 }
 
 .meta-col-pontas {

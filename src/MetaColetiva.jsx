@@ -5,11 +5,14 @@ import { useMemo } from 'react'
 // Consome UMA linha de dashboard_metas_v2 (os campos col_*). O pai faz o
 // callApi('metas_v2', { vendedor }) e passa a linha inteira aqui.
 //
+// NAO exibe numeros totais (pontuacao acumulada da empresa, pisos das faixas,
+// teto). So a faixa em que a empresa esta e o quanto ja andou DENTRO dela.
+//
 // Dois cuidados que vieram de ler a funcao:
 //  - os numericos chegam como STRING do Postgres ("5715755.8290"), entao tudo
 //    passa por num() antes de conta. Chamar .toFixed() direto estoura.
-//  - col_pct_proxima NAO serve para a barra: e pontos/proxima_min, que nasce
-//    em 83% no primeiro dia da faixa. A barra usa o trecho, calculado aqui.
+//  - col_pct_proxima NAO serve aqui: e pontos/proxima_min, que nasce em 83% no
+//    primeiro dia da faixa. O percentual mostrado e o trecho, calculado abaixo.
 
 // Congelamento da coletiva.
 // Do 5o dia antes do fim do mes ate o 2o dia util do mes seguinte a tela nao
@@ -19,7 +22,6 @@ import { useMemo } from 'react'
 //
 // Dia util = seg a sex (isodow < 6). E a mesma definicao que
 // dashboard_vendedoras_meta ja usa no banco — feriado nao conta.
-// Mantida igual de proposito, para nao existirem duas nocoes de dia util.
 export function coletivaCongelada(hoje = new Date()) {
   const d = hoje.getDate()
   const ano = hoje.getFullYear()
@@ -49,6 +51,8 @@ const fmtBRL = (v) =>
     maximumFractionDigits: 0,
   }).format(v || 0)
 
+const fmtPct = (v) => v.toFixed(1).replace('.', ',') + '%'
+
 export default function MetaColetiva({ dados, congelada }) {
   const travada = congelada ?? coletivaCongelada()
 
@@ -58,16 +62,14 @@ export default function MetaColetiva({ dados, congelada }) {
     const pontos = num(dados.col_pontos) ?? 0
     const faixa = num(dados.col_faixa) // null abaixo de 4 milhoes
     const premio = num(dados.col_premio) ?? 0
-    const faixaMin = num(dados.col_faixa_min) ?? 0 // null abaixo de 4 mi -> piso 0
+    const faixaMin = num(dados.col_faixa_min) ?? 0
     const proxFaixa = num(dados.col_proxima_faixa) // null no topo
     const proxMin = num(dados.col_proxima_min) // null no topo
     const premioProx = num(dados.col_premio_proximo)
-    const teto = num(dados.col_teto) ?? 0
-    const pctTeto = num(dados.col_pct_teto) ?? 0
 
     const noTopo = proxMin === null
 
-    // trecho entre a faixa atual e a proxima: vai de 0 a 100 DENTRO da faixa.
+    // trecho dentro da faixa atual: 0 a 100.
     let pctTrecho
     if (noTopo) {
       pctTrecho = 100
@@ -79,11 +81,7 @@ export default function MetaColetiva({ dados, congelada }) {
 
     const faltam = noTopo ? 0 : Math.max(0, proxMin - pontos)
 
-    return {
-      pontos, faixa, premio, faixaMin,
-      proxFaixa, proxMin, premioProx,
-      teto, pctTeto, noTopo, pctTrecho, faltam,
-    }
+    return { faixa, premio, proxFaixa, premioProx, noTopo, pctTrecho, faltam }
   }, [dados])
 
   if (!c) return null
@@ -95,29 +93,29 @@ export default function MetaColetiva({ dados, congelada }) {
           <span>Meta coletiva</span>
           <strong>Em conferência</strong>
           <span className="meta-col-faixa-atual">
-            A pontuação da empresa volta a aparecer após o fechamento do mês.
+            A meta coletiva volta a aparecer após o fechamento do mês.
           </span>
         </div>
       </div>
     )
   }
 
+  const semFaixa = c.faixa === null
+
   return (
     <div className="meta-col">
       <div className="meta-col-linha">
 
-        {/* esquerda — situacao atual */}
+        {/* esquerda — faixa atual, sem numero total */}
         <div className="ia-kpi meta-col-situacao">
-          <span>Pontuação da empresa</span>
-          <strong>{fmtPts(c.pontos)}</strong>
+          <span>Meta coletiva</span>
+          <strong>{semFaixa ? 'Faixa 1 ainda não' : `Faixa ${c.faixa}`}</strong>
           <span className="meta-col-faixa-atual">
-            {c.faixa === null
-              ? 'Abaixo da Faixa 1'
-              : `Faixa ${c.faixa} · ${fmtBRL(c.premio)}`}
+            {semFaixa ? 'sem prêmio ainda' : fmtBRL(c.premio)}
           </span>
         </div>
 
-        {/* centro — a barra */}
+        {/* centro — barra do trecho */}
         <div className="meta-col-progresso">
           <p className="meta-col-rotulo">
             {c.noTopo ? (
@@ -135,11 +133,7 @@ export default function MetaColetiva({ dados, congelada }) {
             <div className="bar-track">
               <div className="bar-fill" style={{ width: `${c.pctTrecho}%` }} />
             </div>
-          </div>
-
-          <div className="meta-col-pontas">
-            <span>{fmtPts(c.faixaMin)}</span>
-            <span>{c.noTopo ? '—' : fmtPts(c.proxMin)}</span>
+            <span className="bar-value">{fmtPct(c.pctTrecho)}</span>
           </div>
         </div>
 
@@ -150,8 +144,8 @@ export default function MetaColetiva({ dados, congelada }) {
         >
           {Array.from({ length: TOTAL_FAIXAS }, (_, i) => {
             const n = i + 1
-            const conquistada = c.faixa !== null && n <= c.faixa
-            const atual = c.faixa !== null && n === c.faixa
+            const conquistada = !semFaixa && n <= c.faixa
+            const atual = !semFaixa && n === c.faixa
             return (
               <span
                 key={n}
@@ -166,11 +160,6 @@ export default function MetaColetiva({ dados, congelada }) {
           })}
         </div>
       </div>
-
-      {/* rodape — teto */}
-      <p className="meta-col-teto">
-        {c.pctTeto.toFixed(1).replace('.', ',')}% dos {fmtPts(c.teto)}
-      </p>
     </div>
   )
 }
