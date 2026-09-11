@@ -10,6 +10,7 @@ import Trello from './Trello'
 import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
 import MetaComemoracao from './MetaComemoracao'
 import MetaJanelasModal from './MetaJanelasModal'
+import MetaJanela from './MetaJanela'
 import { callApi as callApiCache, useRevisaoCache, TTL_MS } from './dadosCache'
 import * as XLSX from 'xlsx'
 
@@ -1832,7 +1833,6 @@ function RankingOverlay({ onClose }) {
 }
 
 const AUTH_STORAGE_KEY = 'disparos_dashboard_auth'
-const META_SEMANA = 100000
 
 function LoginGate({ onLogin }) {
   const [senha, setSenha] = useState('')
@@ -4520,6 +4520,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const [meta, setMeta] = useState(null)
   const [metasV2, setMetasV2] = useState(null)
   const [comemoracao, setComemoracao] = useState(null)
+  const [marcos, setMarcos] = useState([])
 
   useEffect(() => {
     callApi('metas_comemorar', { vendedor })
@@ -4590,16 +4591,18 @@ function VendedoraPortal({ vendedor, onLogout }) {
     const date_from = dataInicio || ''
     const date_to = dataFim || ''
     try {
-      const [kv, mt, sm, tab, mv] = await Promise.all([
+      const [kv, mt, sm, tab, mv, mk] = await Promise.all([
         callApi('vendedoras_kpis_vendedor', { vendedor, date_from, date_to }),
         callApi('vendedoras_meta', { vendedor }),
         callApi('vendedoras_semanas_mes', { vendedor }),
         callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }),
         callApi('metas_v2', { vendedor }),
+        callApi('metas_marcos', { vendedor }),
       ])
       setKpis(kv?.[0] ?? null)
       setMeta(mt?.[0] ?? null)
       setMetasV2(mv?.[0] ?? null)
+      setMarcos(Array.isArray(mk) ? mk : [])
       setSemanas(sm ?? [])
       setTabela({ rows: tab ?? [], total: tab?.[0]?.total_count ? Number(tab[0].total_count) : 0 })
       setLastUpdate(new Date())
@@ -4638,7 +4641,9 @@ function VendedoraPortal({ vendedor, onLogout }) {
       if (iniciada) acumulado += valor
       const row = { semana: s.semana_label }
       let nivel = null
-      if (modo !== 'ponto' && valor >= META_SEMANA && s.passada && marcosBatidos < 4) {
+      // Marco vem de dashboard_metas_marcos: 1 por janela de periodo e 1 por
+      // semana que contenha dias de meta diaria. Antes era R$ 100 mil fixo.
+      if (marcos.some((mk) => mk.semana === s.semana && mk.batido)) {
         marcosBatidos += 1
         nivel = marcosBatidos
       }
@@ -4668,7 +4673,11 @@ function VendedoraPortal({ vendedor, onLogout }) {
     return soma
   }
 
-  const semanasBatidas = semanas.filter((s) => Number(s.valor_semana) >= META_SEMANA && s.passada)
+  // alvo do mes = soma dos marcos. Muda sozinho conforme as janelas que a
+  // IA gravar: janela de periodo entra com o alvo; janela por dia entra com
+  // alvo x dias uteis daquela semana.
+  const alvoMes = marcos.reduce((s, m) => s + (Number(m.alvo) || 0), 0)
+  const semanasBatidas = marcos.filter((m) => m.batido)
   const podeExpandir = page === 0 && tabela.total > 10
   const podeProximaPagina = page >= 1 && offset + limit < tabela.total
   const podePaginaAnterior = page >= 2
@@ -4739,9 +4748,14 @@ function VendedoraPortal({ vendedor, onLogout }) {
 
       <MetaColetiva dados={metasV2} />
 
-      <div ref={tourChartRef} className="panel chart-panel tall">
+      <div ref={tourChartRef} className="panel chart-panel tall com-meta">
         <p className="section-label">Vendas por semana &mdash; {modo === 'ponto' ? 'pontos' : 'meta'} e proje&ccedil;&atilde;o</p>
-        <p className="section-sub">{modo === 'ponto' ? 'exibindo em pontos' : `meta de ${fmtMoeda(META_SEMANA)}/semana`} &middot; linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s</p>
+        <p className="section-sub">
+          {metasV2?.janela_descricao || 'sem janela de meta vigente hoje'}
+          {alvoMes > 0 ? ` \u00b7 alvo do m\u00eas: ${fmtInt(alvoMes)} pts` : ''}
+          {' \u00b7 linha tracejada = proje\u00e7\u00e3o do m\u00eas'}
+        </p>
+        <MetaJanela dados={metasV2} />
         <ResponsiveContainer width="100%" height="65%">
           <ComposedChart data={chartData} margin={{ top: 26, right: 10, left: 0, bottom: 0 }}>
             <XAxis dataKey="semana" tick={{ fontSize: 10, fill: '#8a978f' }} />

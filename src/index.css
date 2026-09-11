@@ -2716,3 +2716,15 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+
+/* painel do grafico do portal quando leva a tira da meta individual dentro:
+   .chart-panel tem altura fixa (260px na variante tall) e o grafico usa
+   ResponsiveContainer a 100% dela. Sem folga aqui o grafico vaza para fora
+   do painel — foi o que quebrou a view geral antes. */
+.chart-panel.tall.com-meta { height: 296px; }
+
+/* "(hoje)" na tira da meta diaria */
+.meta-tira-hoje { font-style: normal; color: var(--muted); }
+
+/* barra da meta individual quando ja bateu */
+.meta-tira-bar .bar-fill.batida { background: var(--lime); }

@@ -1304,6 +1304,9 @@ export default async function handler(req, res) {
   } else if (type === 'metas_v2') {
     sql = 'select * from dashboard_metas_v2($1)';
     params = [req.query.vendedor || null];
+  } else if (type === 'metas_marcos') {
+    sql = 'select * from dashboard_metas_marcos($1)';
+    params = [req.query.vendedor || null];
   } else if (type === 'metas_comemorar') {
     sql = 'select * from metas_comemorar($1)';
     params = [req.query.vendedor || null];
