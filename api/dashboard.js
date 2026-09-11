@@ -209,6 +209,51 @@ export default async function handler(req, res) {
       }
     }
 
+    // marca os niveis ja comemorados, para nao repetir a animacao
+    if (type === 'metas_comemorado') {
+      try {
+        const b = req.body || {};
+        const vendedor = (b.vendedor || '').toString().trim();
+        const chaves = Array.isArray(b.chaves) ? b.chaves.map(String) : [];
+        if (!vendedor || !chaves.length) {
+          return res.status(400).json({ error: 'vendedor e chaves obrigatorios' });
+        }
+        const client = getPool();
+        const result = await client.query(
+          'select metas_marcar_comemorado_lote($1,$2) as marcados',
+          [vendedor, chaves]
+        );
+        return res.status(200).json(result.rows[0] || { marcados: 0 });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // grava as janelas de meta individual (usado pelo ajuste por IA, com previa)
+    if (type === 'metas_janelas_set') {
+      try {
+        const janelas = Array.isArray((req.body || {}).janelas) ? req.body.janelas : [];
+        if (!janelas.length) return res.status(400).json({ error: 'nenhuma janela enviada' });
+        for (const j of janelas) {
+          if (!j.data_ini || !j.data_fim) return res.status(400).json({ error: 'janela sem data' });
+          if (!['periodo', 'dia'].includes(j.base)) return res.status(400).json({ error: 'base invalida' });
+          if (!(Number(j.alvo_pontos) > 0)) return res.status(400).json({ error: 'alvo invalido' });
+        }
+        const client = getPool();
+        await client.query('update metas_periodos set ativo = false where ativo');
+        for (const j of janelas) {
+          await client.query(
+            'insert into metas_periodos (descricao, data_ini, data_fim, base, alvo_pontos) values ($1,$2,$3,$4,$5)',
+            [j.descricao || null, j.data_ini, j.data_fim, j.base, Number(j.alvo_pontos)]
+          );
+        }
+        const out = await client.query('select * from metas_periodos where ativo order by data_ini');
+        return res.status(200).json(out.rows);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     if (type === 'vendedoras_register') {
       try {
         const nome = (req.body?.nome || '').toString().trim();
@@ -1255,6 +1300,18 @@ export default async function handler(req, res) {
     params = [req.query.vendedor || null];
   } else if (type === 'debug_peso_nulo') {
     sql = 'select * from dashboard_debug_peso_nulo()';
+    params = [];
+  } else if (type === 'metas_v2') {
+    sql = 'select * from dashboard_metas_v2($1)';
+    params = [req.query.vendedor || null];
+  } else if (type === 'metas_comemorar') {
+    sql = 'select * from metas_comemorar($1)';
+    params = [req.query.vendedor || null];
+  } else if (type === 'metas_faixas') {
+    sql = 'select faixa, pontos_min, pontos_max, premio from metas_coletivas where ativo order by faixa';
+    params = [];
+  } else if (type === 'metas_janelas') {
+    sql = 'select id, descricao, data_ini, data_fim, base, alvo_pontos from metas_periodos where ativo order by data_ini';
     params = [];
   } else if (type === 'metas_progresso') {
     sql = 'select * from dashboard_metas_progresso($1)';
