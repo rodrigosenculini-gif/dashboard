@@ -7,7 +7,8 @@ import PresencaEsteiraModal from './PresencaEsteira'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
 import Trello from './Trello'
-import MetaColetiva from './MetaColetiva'
+import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
+import MetaComemoracao from './MetaComemoracao'
 import { callApi as callApiCache, useRevisaoCache, TTL_MS } from './dadosCache'
 import * as XLSX from 'xlsx'
 
@@ -4500,6 +4501,24 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const [kpis, setKpis] = useState(null)
   const [meta, setMeta] = useState(null)
   const [metasV2, setMetasV2] = useState(null)
+  const [comemoracao, setComemoracao] = useState(null)
+
+  useEffect(() => {
+    callApi('metas_comemorar', { vendedor })
+      .then((r) => setComemoracao(r?.[0] ?? null))
+      .catch(() => setComemoracao(null))
+  }, [vendedor])
+
+  // so marca no banco depois de exibir. se o post falhar, a comemoracao
+  // reaparece na proxima abertura — melhor repetir do que perder.
+  const fecharComemoracao = useCallback(async (chaves) => {
+    setComemoracao(null)
+    try {
+      await postApi('metas_comemorado', { vendedor, chaves })
+    } catch (e) {
+      console.warn('nao marcou comemoracao', e)
+    }
+  }, [vendedor])
   const [semanas, setSemanas] = useState([])
   const [tabela, setTabela] = useState({ rows: [], total: 0 })
   const [page, setPage] = useState(0)
@@ -4692,6 +4711,13 @@ function VendedoraPortal({ vendedor, onLogout }) {
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <MetaComemoracao
+        comemoracao={comemoracao}
+        mascotUrl={MASCOT_IMG_URL}
+        congelada={coletivaCongelada()}
+        onFechar={fecharComemoracao}
+      />
 
       <MetaColetiva dados={metasV2} />
 

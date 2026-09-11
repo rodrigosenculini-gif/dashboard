@@ -2539,109 +2539,129 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .kpi-grid-produtos .kpi-sub{ text-align:center; }
 
 
-/* ── Meta coletiva ──────────────────────────────────────────────
-   Usa so as variaveis que existem no :root do projeto:
-   --surface, --surface-2, --border, --text, --muted, --gold, --font-mono
-   A barra reaproveita .bar-track / .bar-fill, que ja existem.
+
+/* ── Meta: tira compacta ────────────────────────────────────────
+   Uma linha so. O grafico do dia e o destaque da tela; a meta e apoio.
+   Quando a meta individual entrar, cabe na mesma tira.
+   Reaproveita .bar-track / .bar-fill.
    ─────────────────────────────────────────────────────────────── */
 
-.meta-col { margin-bottom: 20px; }
-
-/* faixa horizontal: situacao | barra | trilha */
-.meta-col-linha {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-/* .ia-kpi ja da fundo, borda, radius e padding. So o extra aqui. */
-.meta-col-situacao { flex: 0 0 200px; }
-
-.meta-col-situacao .meta-col-faixa-atual {
-  display: block;
-  margin-top: 6px;
-  margin-bottom: 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.meta-col-progresso {
-  flex: 1;
-  min-width: 0;
-}
-
-.meta-col-rotulo {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* o numero que decide se vale empurrar mais uma venda hoje */
-.meta-col-rotulo strong {
-  font-family: var(--font-mono);
-  font-size: 15px;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-/* .bar-track e flex:1, entao precisa de pai flex */
-.meta-col-bar-linha {
+.meta-tira {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-wrap: wrap;
 }
 
-.meta-col-pontas {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 5px;
+.meta-tira-rot {
   font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   font-size: 10px;
-  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.meta-tira-sit {
+  color: var(--text);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* .bar-track e flex:1; aqui ela e o elemento elastico da linha */
+.meta-tira-bar {
+  height: 6px;
+  min-width: 80px;
+}
+
+.meta-tira-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.meta-tira-falta { flex-shrink: 0; }
+
+.meta-tira-falta strong {
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
-.meta-col-trilha {
-  display: flex;
+.meta-tira-trilha {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.meta-col-marco {
-  width: 9px;
-  height: 9px;
+.meta-tira-marco {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--surface-2);
   border: 1px solid var(--border);
   box-sizing: border-box;
 }
 
-.meta-col-marco.conquistada {
+.meta-tira-marco.conquistada {
   background: var(--gold);
   border-color: var(--gold);
 }
 
-.meta-col-marco.atual {
-  width: 13px;
-  height: 13px;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--gold);
+.meta-tira-marco.atual {
+  width: 9px;
+  height: 9px;
+  box-shadow: 0 0 0 1px var(--surface), 0 0 0 2px var(--gold);
 }
 
-.meta-col-teto {
-  margin: 8px 0 0;
-  font-size: 11px;
+/* ── Comemoracao ──────────────────────────────────────────────── */
+
+/* o overlay do onboarding e pointer-events:none; o balao dentro dele
+   ja repoe pointer-events:auto, entao o botao Fechar funciona. */
+.meta-comemora-overlay { z-index: 900; }
+
+.meta-comemora-detalhe {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
 }
 
-/* periodo de conferencia: bloco reduzido, so o aviso */
-.meta-col-congelada .ia-kpi { display: block; }
+.meta-confete {
+  position: fixed;
+  inset: 0;
+  z-index: 880;
+  pointer-events: none;
+  overflow: hidden;
+}
 
-/* compacto: nao pode gerar rolagem horizontal */
-@media (max-width: 900px) {
-  .meta-col-linha { flex-wrap: wrap; }
-  .meta-col-situacao { flex: 1 1 100%; }
-  .meta-col-progresso { flex: 1 1 100%; }
-  .meta-col-trilha { flex: 1 1 100%; justify-content: flex-start; }
+.meta-confete-p {
+  position: absolute;
+  top: -14px;
+  width: 7px;
+  height: 11px;
+  border-radius: 1px;
+  animation-name: meta-confete-cai;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+.meta-confete-p.c0 { background: var(--gold); }
+.meta-confete-p.c1 { background: var(--lime); }
+.meta-confete-p.c2 { background: var(--rose); }
+
+@keyframes meta-confete-cai {
+  from { transform: translateY(0) rotate(0deg); opacity: 1; }
+  to   { transform: translateY(105vh) rotate(540deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meta-confete-p { animation: none; opacity: 0; }
 }
