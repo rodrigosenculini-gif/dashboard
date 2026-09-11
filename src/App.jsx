@@ -2612,6 +2612,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
   const [buscando, setBuscando] = useState(false)
   const [buscaResultado, setBuscaResultado] = useState(null)
   const [manualApesarDeApi, setManualApesarDeApi] = useState(false)
+  const [adesaoInexistente, setAdesaoInexistente] = useState(false)
 
   const ehBancoComApi = BANCOS_COM_API.includes(addForm.banco) && !manualApesarDeApi
 
@@ -2674,11 +2675,23 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
       setBuscaResultado(d)
 
       if (!d.encontrado) {
-        // Nao achou no banco: abre o formulario completo direto
-        setManualApesarDeApi(true)
-        setAddMsg(d.mensagem || 'Proposta não encontrada na API do banco. Preencha os dados manualmente.')
+        // Nao achou no banco. Duas situacoes bem diferentes:
+        //  - a consulta falhou (token expirado, API fora): da pra tentar de novo
+        //  - o banco respondeu que a proposta nao existe: a adesao esta errada
+        // No segundo caso nao abrimos o formulario manual. Era assim que
+        // entravam vendas com o codigo do corretor, o CPF ou um contador
+        // no lugar da adesao.
+        const falhaTecnica = /token|unauthor|expired|timeout|502|503|504|indispon/i
+          .test(String(d.mensagem || '') + JSON.stringify(d.bruto || ''))
+        if (falhaTecnica) {
+          setAddMsg('A consulta ao banco falhou (não foi possível verificar a adesão). Tente de novo em instantes.')
+          return
+        }
+        setAdesaoInexistente(true)
+        setAddMsg(`O banco não encontrou a adesão ${addForm.adesao}. Confira o número no portal — não dá pra gravar uma venda que o banco não reconhece.`)
         return
       }
+      setAdesaoInexistente(false)
 
       const preenchido = {
         ...addForm,
@@ -2743,6 +2756,13 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
     }
     if (ehBancoComApi && (!addForm.cpf || !addForm.nome || !addForm.valor)) {
       setAddMsg('Busque a adesão antes de adicionar.')
+      return
+    }
+    // Trava final: banco com API que respondeu "nao existe" nao grava, nem
+    // pelo formulario manual. Sem isto, o numero errado (corretor, CPF,
+    // contador) virava venda e depois aparecia como duplicata.
+    if (adesaoInexistente && BANCOS_COM_API.includes(addForm.banco)) {
+      setAddMsg(`A adesão ${addForm.adesao} não existe no ${addForm.banco}. Corrija o número e busque de novo.`)
       return
     }
     // C6: trava a combinacao impossivel antes de gravar. Sem isso a venda entra
@@ -2845,7 +2865,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
             <>
               <label>Ades&atilde;o
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <input required value={addForm.adesao} onChange={(e) => { setAddForm({ ...addForm, adesao: e.target.value }); setBuscaResultado(null) }} style={{ flex: 1 }} />
+                  <input required value={addForm.adesao} onChange={(e) => { setAddForm({ ...addForm, adesao: e.target.value }); setBuscaResultado(null); setAdesaoInexistente(false) }} style={{ flex: 1 }} />
                   <button type="button" className="refresh-btn" onClick={buscarNaApi} disabled={buscando}>
                     {buscando ? 'Buscando...' : 'Buscar'}
                   </button>
