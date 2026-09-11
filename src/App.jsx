@@ -7,6 +7,7 @@ import PresencaEsteiraModal from './PresencaEsteira'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
 import Trello from './Trello'
+import MetaColetiva from './MetaColetiva'
 import { callApi as callApiCache, useRevisaoCache, TTL_MS } from './dadosCache'
 import * as XLSX from 'xlsx'
 
@@ -4498,6 +4499,7 @@ function VendedoraPortal({ vendedor, onLogout }) {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [kpis, setKpis] = useState(null)
   const [meta, setMeta] = useState(null)
+  const [metasV2, setMetasV2] = useState(null)
   const [semanas, setSemanas] = useState([])
   const [tabela, setTabela] = useState({ rows: [], total: 0 })
   const [page, setPage] = useState(0)
@@ -4551,14 +4553,16 @@ function VendedoraPortal({ vendedor, onLogout }) {
     const date_from = dataInicio || ''
     const date_to = dataFim || ''
     try {
-      const [kv, mt, sm, tab] = await Promise.all([
+      const [kv, mt, sm, tab, mv] = await Promise.all([
         callApi('vendedoras_kpis_vendedor', { vendedor, date_from, date_to }),
         callApi('vendedoras_meta', { vendedor }),
         callApi('vendedoras_semanas_mes', { vendedor }),
         callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }),
+        callApi('metas_v2', { vendedor }),
       ])
       setKpis(kv?.[0] ?? null)
       setMeta(mt?.[0] ?? null)
+      setMetasV2(mv?.[0] ?? null)
       setSemanas(sm ?? [])
       setTabela({ rows: tab ?? [], total: tab?.[0]?.total_count ? Number(tab[0].total_count) : 0 })
       setLastUpdate(new Date())
@@ -4688,6 +4692,8 @@ function VendedoraPortal({ vendedor, onLogout }) {
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
       {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <MetaColetiva dados={metasV2} />
 
       <div ref={tourChartRef} className="panel chart-panel tall">
         <p className="section-label">Vendas por semana &mdash; {modo === 'ponto' ? 'pontos' : 'meta'} e proje&ccedil;&atilde;o</p>
@@ -4855,6 +4861,12 @@ function VendedorasView() {
 
   const [showMetaConfig, setShowMetaConfig] = useState(false)
   const [metas, setMetas] = useState(null)
+  const [metasV2, setMetasV2] = useState(null)
+  useEffect(() => {
+    callApi('metas_v2', { vendedor: '' })
+      .then((r) => setMetasV2(r?.[0] ?? null))
+      .catch(() => setMetasV2(null))
+  }, [])
   const [metaForm, setMetaForm] = useState(null)
   const [salvandoMeta, setSalvandoMeta] = useState(false)
 
@@ -5102,6 +5114,8 @@ function VendedorasView() {
 
       <div className="panel chart-panel extra-tall">
         <p className="section-label">Vendas por dia</p>
+        <MetaColetiva dados={metasV2} />
+
         {metas && (() => {
           const ehPonto = modo === 'ponto'
           const periodo = metas.periodo_ativo
