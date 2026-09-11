@@ -2665,3 +2665,54 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 @media (prefers-reduced-motion: reduce) {
   .meta-confete-p { animation: none; opacity: 0; }
 }
+
+/* ── Ajustar meta por texto (modal da IA, view geral) ──────────── */
+
+.meta-jan-panel { max-width: 860px; width: 100%; }
+
+.meta-jan-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+
+.meta-jan-texto {
+  width: 100%;
+  resize: vertical;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.meta-jan-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meta-jan-confirmar { margin-top: 4px; }
+
+.meta-jan-dica { font-size: 11px; color: var(--muted); }
+.meta-jan-dica strong { color: var(--text); font-weight: 600; }
+
+/* BASE e o campo onde o erro da IA e mais provavel e mais caro:
+   trocar "por dia" por "no periodo" muda o alvo varias vezes.
+   Por isso ele tem peso visual proprio na previa. */
+.meta-jan-base {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.meta-jan-base.dia {
+  color: var(--gold);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}

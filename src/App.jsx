@@ -9,6 +9,7 @@ import Chips from './Chips'
 import Trello from './Trello'
 import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
 import MetaComemoracao from './MetaComemoracao'
+import MetaJanelasModal from './MetaJanelasModal'
 import { callApi as callApiCache, useRevisaoCache, TTL_MS } from './dadosCache'
 import * as XLSX from 'xlsx'
 
@@ -4112,6 +4113,14 @@ const ASK_MODOS = [
   { id: 'treinamento', label: 'Treinamento', sub: 'Pratique e melhore seu atendimento' },
 ]
 
+// so aparece na view geral (onde AIChatButton recebe vendedor undefined).
+// no portal da vendedora o menu continua com tres opcoes.
+const MODO_META = {
+  id: 'meta_janelas',
+  label: 'Ajustar meta',
+  sub: 'Descreva as janelas em texto e revise antes de gravar',
+}
+
 function AIChatButton({ vendedor }) {
   const [open, setOpen] = useState(false)
   const [minimizado, setMinimizado] = useState(false)
@@ -4133,7 +4142,8 @@ function AIChatButton({ vendedor }) {
   const inputRef = useRef(null)
   const menuRef = useRef(null)
 
-  const modoAtual = ASK_MODOS.find((m) => m.id === modo) || ASK_MODOS[0]
+  const modos = vendedor ? ASK_MODOS : [...ASK_MODOS, MODO_META]
+  const modoAtual = modos.find((m) => m.id === modo) || modos[0]
 
   const irAoFim = () => {
     const el = listRef.current
@@ -4272,7 +4282,15 @@ function AIChatButton({ vendedor }) {
         </button>
       )}
 
-      {open && !minimizado && (
+      {open && !minimizado && modo === 'meta_janelas' && (
+        <MetaJanelasModal
+          callApi={callApi}
+          postApi={postApi}
+          onClose={() => { setModo('consulta'); setOpen(false) }}
+        />
+      )}
+
+      {open && !minimizado && modo !== 'meta_janelas' && (
         <div className="askia-camada">
           <div className="askia-painel" role="dialog" aria-label="Consulta com a IA">
             <div className="askia-brilho" aria-hidden="true" />
@@ -4286,7 +4304,7 @@ function AIChatButton({ vendedor }) {
                 </button>
                 {menuAberto && (
                   <div className="askia-menu">
-                    {ASK_MODOS.map((m) => (
+                    {modos.map((m) => (
                       <button key={m.id} className={`askia-menu-item ${m.id === modo ? 'on' : ''}`}
                               onClick={() => { setModo(m.id); setMenuAberto(false); setMemoriaMsg('') }}>
                         <strong>{m.label}</strong>
