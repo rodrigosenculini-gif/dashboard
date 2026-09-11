@@ -9,8 +9,8 @@ import { useEffect, useState } from 'react'
 // Como funciona agora:
 //  1. Todo resultado é guardado (memória + localStorage). Ao voltar numa
 //     view, o valor guardado é devolvido NA HORA — a tela nunca abre vazia.
-//  2. Período fechado (date_to anterior a hoje) fica CONGELADO: nunca é
-//     refeito sozinho, só no botão Atualizar. Dado de ontem não muda.
+//  2. Período fechado (date_to anterior a hoje) só é refeito quando o
+//     carimbo do Supabase muda — dado de ontem MUDA (inserção retroativa).
 //  3. Período que inclui hoje revalida em segundo plano, no máximo a cada
 //     3 minutos, e só se o Supabase realmente mudou (dashboard_versao).
 //  4. Quando a revalidação traz dado novo, a revisão global muda e as
@@ -148,8 +148,15 @@ export async function callApi(type, params = {}, opts = {}) {
     return buscarNaRede(type, params, chave, carimbo(type, await buscarVersao()))
   }
 
-  // Período fechado: se já temos, é definitivo.
-  if (cache && congelado(params)) return cache.dados
+  // Período fechado: o dado de ontem PODE mudar (a varredura da Facta insere
+  // retroativamente de 2 em 2 horas e as rotinas de data remanejam vendas de
+  // dias anteriores). Por isso não devolvemos o cache direto: confirmamos
+  // antes que o carimbo do Supabase não mudou. Se mudou, refaz.
+  if (cache && congelado(params)) {
+    const v = carimbo(type, await buscarVersao())
+    if (!v || !cache.versao || v === cache.versao) return cache.dados
+    return buscarNaRede(type, params, chave, v)
+  }
 
   if (cache) {
     const velho = Date.now() - cache.quando > TTL_MS

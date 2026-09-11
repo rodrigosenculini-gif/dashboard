@@ -5701,17 +5701,17 @@ function VendasView() {
         <div className="kpi">
           <p className="kpi-label">M&eacute;dia di&aacute;ria &mdash; pontos | valor</p>
           <p className="kpi-value kpi-split">
-            <span>{fmtInt(Math.round(kpis?.dias_uteis_periodo > 0 ? kpis.pontos_total / kpis.dias_uteis_periodo : 0))}</span>
+            <span>{fmtInt(Math.round(kpis?.dias_uteis_periodo > 0 ? kpis.pontos_uteis_periodo / kpis.dias_uteis_periodo : 0))}</span>
             <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_periodo > 0 ? kpis.valor_total / kpis.dias_uteis_periodo : 0)}</span>
+            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_periodo > 0 ? kpis.valor_uteis_periodo / kpis.dias_uteis_periodo : 0)}</span>
           </p>
         </div>
         <div className="kpi">
           <p className="kpi-label">M&eacute;dia semanal &mdash; pontos | valor</p>
           <p className="kpi-value kpi-split">
-            <span>{fmtInt(Math.round(kpis?.dias_uteis_periodo > 0 ? (kpis.pontos_total / kpis.dias_uteis_periodo) * 5 : 0))}</span>
+            <span>{fmtInt(Math.round(kpis?.dias_uteis_periodo > 0 ? (kpis.pontos_uteis_periodo / kpis.dias_uteis_periodo) * 5 : 0))}</span>
             <span className="kpi-split-bar">|</span>
-            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_periodo > 0 ? (kpis.valor_total / kpis.dias_uteis_periodo) * 5 : 0)}</span>
+            <span className="kpi-split-proj">{fmtMoeda(kpis?.dias_uteis_periodo > 0 ? (kpis.valor_uteis_periodo / kpis.dias_uteis_periodo) * 5 : 0)}</span>
           </p>
         </div>
         <div className="kpi">
