@@ -1991,6 +1991,14 @@ const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA'
 const BANCOS_COM_API = ['FACTA', 'SOMA', 'PRESENÇA', 'C6', 'PAN']
 
 const FACTA_CODIGOS = [
+  // Tabela nova (valida a partir de 14/09/2026) -- pesos variam por prazo
+  { codigo: '69604', label: '69604 — Novo Smart, Acima de 10 anos (24/36/48/60x)' },
+  { codigo: '69612', label: '69612 — Novo Smart, 61 a 120 meses (24/36/48/60x)' },
+  { codigo: '69620', label: '69620 — Novo Smart, 36 a 60 meses (24/36/48x)' },
+  { codigo: '69639', label: '69639 — Novo Smart, 24 a 35 meses (24/36/48x)' },
+  { codigo: '69647', label: '69647 — Novo Smart, Abaixo de 24 meses (24/36/48x)' },
+  { codigo: '69655', label: '69655 — Refin (36/48/60x)' },
+  // Tabela anterior (pagas ate 13/09 mantem estes pesos)
   { codigo: '69205', label: '69205 — Novo Gold, 60x (1,45)' },
   { codigo: '69191', label: '69191 — Novo Gold, 36/48x (1,35)' },
   { codigo: '69183', label: '69183 — Novo Gold, 36/48x (1,35)' },
