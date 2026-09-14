@@ -287,10 +287,17 @@ export default async function handler(req, res) {
     if (type === 'vendedoras_add_venda') {
       try {
         const { vendedor, adesao, cpf, nome, valor, banco, tabela, data_pagamento, parcelas, seguro } = req.body || {};
+        // Soma usa o Public ID (UUID) como identificador; nao cabe no bigint.
+        // Vai no parametro proprio e a funcao resolve o numero da proposta
+        // (proNumBancarizadora) pela consulta que a vendedora acabou de fazer.
+        const adesaoTxt = (adesao == null ? '' : String(adesao)).trim();
+        const ehNumerica = /^\d+$/.test(adesaoTxt);
+        const adesaoNum = ehNumerica ? adesaoTxt : null;
+        const idRaw = !ehNumerica && adesaoTxt ? adesaoTxt : null;
         const client = getPool();
         const result = await client.query(
-          'select * from dashboard_vendedoras_add_venda($1::text,$2::bigint,$3::text,$4::text,$5::numeric,$6::text,$7::text,$8::date,$9::int,$10::text)',
-          [vendedor || null, adesao || null, cpf || null, nome || null, valor || null, banco || null, tabela || null, data_pagamento || null, parcelas || null, seguro || null]
+          'select * from dashboard_vendedoras_add_venda($1::text,$2::bigint,$3::text,$4::text,$5::numeric,$6::text,$7::text,$8::date,$9::int,$10::text,$11::text)',
+          [vendedor || null, adesaoNum, cpf || null, nome || null, valor || null, banco || null, tabela || null, data_pagamento || null, parcelas || null, seguro || null, idRaw]
         );
         return res.status(200).json(result.rows);
       } catch (e) {
