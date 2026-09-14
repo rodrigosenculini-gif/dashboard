@@ -368,6 +368,24 @@ export default async function handler(req, res) {
         const texto = await resp.text();
         let dados;
         try { dados = JSON.parse(texto); } catch { dados = { sucesso: false, mensagem: texto?.slice(0, 300) }; }
+        // O endpoint de proposta do Soma nao devolve dados do cliente. Quando a
+        // proposta nasceu no VendeAI (99% delas), cpf e nome ja estao em
+        // propostas_bancos -- completa por la, pela chave que a vendedora
+        // digitou (o Public ID). Proposta feita direto no portal segue manual.
+        if (String(banco).toUpperCase().startsWith('SOMA') && dados && dados.encontrado && (!dados.cpf_banco || !dados.nome_banco)) {
+          try {
+            const client = getPool();
+            const pr = await client.query(
+              'select cpf, nome, proposal_number from propostas_bancos where proposal_id = $1 limit 1',
+              [String(adesao).trim()]
+            );
+            if (pr.rows[0]) {
+              dados.cpf_banco = dados.cpf_banco || pr.rows[0].cpf;
+              dados.nome_banco = dados.nome_banco || pr.rows[0].nome;
+              dados.adesao_numero = dados.adesao_numero || pr.rows[0].proposal_number;
+            }
+          } catch { /* enriquecimento e melhor-esforco */ }
+        }
         return res.status(200).json(dados);
       } catch (e) {
         const timeoutMsg = e.name === 'AbortError' ? 'A consulta demorou demais. Tente novamente.' : e.message;

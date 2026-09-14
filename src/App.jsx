@@ -2613,6 +2613,12 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
   const [buscaResultado, setBuscaResultado] = useState(null)
   const [manualApesarDeApi, setManualApesarDeApi] = useState(false)
   const [adesaoInexistente, setAdesaoInexistente] = useState(false)
+  // modoCompletar: a API achou a proposta mas faltou algo -- mostramos SO os
+  // campos faltantes (congelados em `faltantes` no momento da busca, senao o
+  // campo sumiria da tela assim que a vendedora comecasse a digitar nele)
+  const [modoCompletar, setModoCompletar] = useState(false)
+  const [faltantes, setFaltantes] = useState(null)
+  const [c6DropOpen, setC6DropOpen] = useState(false)
 
   const ehBancoComApi = BANCOS_COM_API.includes(addForm.banco) && !manualApesarDeApi
 
@@ -2713,7 +2719,9 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         cpf: d.cpf_banco || addForm.cpf,
         nome: d.nome_banco || addForm.nome,
         valor: d.valor_banco != null ? String(d.valor_banco) : addForm.valor,
-        tabelaNome: d.tabela_banco || addForm.tabelaNome,
+        // C6: o nome que a API devolve ("ESTEIRA CONSIG...") nao e a tabela
+        // comercial -- vinha preenchido e a vendedora tinha que apagar. Vazio.
+        tabelaNome: addForm.banco === 'C6' ? '' : (d.tabela_banco || addForm.tabelaNome),
         parcelas: d.parcelas_banco != null ? String(d.parcelas_banco) : addForm.parcelas,
       }
       setAddForm(preenchido)
@@ -2729,7 +2737,11 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
           const o = await postApi('c6_tabelas_opcoes', { parcelas: preenchido.parcelas || null })
           setC6Opcoes(o?.opcoes || [])
         } catch { setC6Opcoes([]) }
-        setManualApesarDeApi(true)
+        setFaltantes({
+          cpf: !preenchido.cpf, nome: !preenchido.nome, valor: !preenchido.valor,
+          parcelas: !preenchido.parcelas, tabela: true,
+        })
+        setModoCompletar(true)
         setAddMsg(pago
           ? 'Proposta paga encontrada. Escolha a tabela e confirme.'
           : `Proposta encontrada com status "${d.status_banco || '?'}" (ainda não paga). Escolha a tabela e confirme se quiser gravar.`)
@@ -2750,17 +2762,39 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         return
       }
 
-      // Achou mas nao esta paga, ou faltou algum dado: abre os campos
+      // Achou mas faltou dado: pede SO o que falta. Nao-paga continua no
+      // formulario aberto, porque ai a vendedora precisa ver tudo pra decidir.
+      if (pago) {
+        setFaltantes({
+          cpf: !preenchido.cpf, nome: !preenchido.nome, valor: !preenchido.valor,
+          parcelas: false, tabela: !preenchido.tabelaNome,
+        })
+        setModoCompletar(true)
+        setAddMsg('Proposta paga encontrada. Complete o que falta e confirme.')
+        return
+      }
       setManualApesarDeApi(true)
-      setAddMsg(!pago
-        ? `Proposta encontrada com status "${d.status_banco || '?'}" — ainda não consta como paga. Confira os dados e confirme se quiser gravar.`
-        : 'Proposta encontrada, mas faltou algum dado. Complete e confirme.')
+      setAddMsg(`Proposta encontrada com status "${d.status_banco || '?'}" — ainda não consta como paga. Confira os dados e confirme se quiser gravar.`)
     } catch (e2) {
       setAddMsg('Erro na busca: ' + (e2.message || ''))
     } finally {
       setBuscando(false)
     }
   }
+
+  // Busca automatica: quando a adesao parece completa (UUID no Soma, 6+
+  // digitos nos demais), consulta sozinha apos pausa na digitacao -- sem
+  // precisar do botao Buscar.
+  useEffect(() => {
+    if (!BANCOS_COM_API.includes(addForm.banco) || manualApesarDeApi || modoCompletar) return
+    if (buscando || buscaResultado) return
+    if (!(vendedorFixo || addForm.vendedorSel)) return
+    const a = (addForm.adesao || '').trim()
+    const pronto = addForm.banco === 'SOMA' ? UUID_RE.test(a) : /^\d{6,}$/.test(a)
+    if (!pronto) return
+    const t = setTimeout(() => { buscarNaApi() }, 700)
+    return () => clearTimeout(t)
+  }, [addForm.adesao, addForm.banco, addForm.vendedorSel, buscando, buscaResultado, manualApesarDeApi, modoCompletar])
 
   const handleAdd = async (e) => {
     e.preventDefault()
@@ -2823,6 +2857,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         setAddMsg('Venda adicionada. Sincronizando...')
         setAddForm({ vendedorSel: vendedorFixo || '', banco: '', adesao: '', cpf: '', nome: '', valor: '', codigo: '', tabelaNome: '', dataPagamento: '', parcelas: '', seguro: '' })
         setBuscaResultado(null)
+        setModoCompletar(false); setFaltantes(null)
         if (onAdded) await onAdded()
         setAddMsg('Concluído!')
         setTimeout(() => { onClose(); setAddMsg('') }, 1500)
@@ -2847,6 +2882,48 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
     : addForm.banco === 'C6' ? []  // C6 usa o datalist de codigos (c6Opcoes), nao este select
     : NOVO_SAQUE_TABELAS
 
+  // Campo de tabela do C6 com o dropdown do projeto (campanha-search), no
+  // lugar do <datalist> nativo que fugia da estetica. Digitar filtra; clicar
+  // escolhe. Usado tanto no modo completar quanto no formulario manual.
+  const renderCampoTabelaC6 = () => {
+    const temParcelas = parseInt(addForm.parcelas, 10) > 0
+    const filtro = String(addForm.tabelaNome || '').toLowerCase()
+    const filtroCod = filtro.replace(/\D/g, '')
+    const opcoesFiltradas = c6Opcoes.filter((o) =>
+      !filtro || (filtroCod && o.codigo.includes(filtroCod)) || (o.descricao || '').toLowerCase().includes(filtro))
+    const cod = String(addForm.tabelaNome || '').replace(/\D/g, '')
+    const escolhida = c6Opcoes.find((x) => x.codigo === cod)
+    return (
+      <label>C&oacute;digo da tabela {temParcelas ? `(${addForm.parcelas}x)` : ''}
+        <div className="campanha-search">
+          <input
+            required
+            className="campanha-search-input"
+            value={addForm.tabelaNome}
+            onFocus={() => setC6DropOpen(true)}
+            onBlur={() => setTimeout(() => setC6DropOpen(false), 150)}
+            onChange={(e) => { setAddForm({ ...addForm, tabelaNome: e.target.value }); setC6DropOpen(true) }}
+            placeholder={temParcelas ? 'escolha ou digite o c\u00f3digo' : 'informe as parcelas primeiro'}
+            disabled={!temParcelas}
+          />
+          {c6DropOpen && temParcelas && opcoesFiltradas.length > 0 && (
+            <div className="campanha-search-menu">
+              {opcoesFiltradas.map((o) => (
+                <button type="button" key={o.codigo} className="campanha-search-item"
+                  onMouseDown={() => { setAddForm({ ...addForm, tabelaNome: o.codigo }); setC6DropOpen(false) }}>
+                  {o.codigo} &middot; {o.descricao || ''} &middot; peso {o.pontos}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {cod ? (escolhida
+          ? <span className="kpi-sub">{escolhida.descricao || escolhida.codigo} &middot; peso {escolhida.pontos}</span>
+          : <span className="kpi-sub" style={{ color: 'var(--red, #e88)' }}>c&oacute;digo n&atilde;o existe para {addForm.parcelas}x</span>) : null}
+      </label>
+    )
+  }
+
   return (
     <div className="funil-overlay" onClick={onClose}>
       <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
@@ -2870,6 +2947,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
               setAddForm({ ...addForm, banco: e.target.value, codigo: '', tabelaNome: '', parcelas: '', seguro: '', adesao: '', valor: '', cpf: '', nome: '' })
               setBuscaResultado(null)
               setManualApesarDeApi(false)
+              setModoCompletar(false); setFaltantes(null); setAdesaoInexistente(false)
             }}>
               <option value="">selecione o banco</option>
               {BANCOS_VENDA.map((b) => <option key={b} value={b}>{b}{BANCOS_COM_API.includes(b) ? ' (busca automática)' : ''}</option>)}
@@ -2882,7 +2960,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input required value={addForm.adesao}
                     placeholder={addForm.banco === 'SOMA' ? 'Public ID (ex.: 0a7d1521-a027-4b7c-...)' : ''}
-                    onChange={(e) => { setAddForm({ ...addForm, adesao: e.target.value }); setBuscaResultado(null); setAdesaoInexistente(false) }} style={{ flex: 1 }} />
+                    onChange={(e) => { setAddForm({ ...addForm, adesao: e.target.value }); setBuscaResultado(null); setAdesaoInexistente(false); setModoCompletar(false); setFaltantes(null) }} style={{ flex: 1 }} />
                   <button type="button" className="refresh-btn" onClick={buscarNaApi} disabled={buscando}>
                     {buscando ? 'Buscando...' : 'Buscar'}
                   </button>
@@ -2896,9 +2974,25 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
                     {buscaResultado.parcelas_banco != null ? ` · ${buscaResultado.parcelas_banco}x` : ''}
                     {buscaResultado.status_banco ? ` · ${buscaResultado.status_banco}` : ''}
                   </p>
-                  <button type="button" className="refresh-btn" style={{ fontSize: 12, padding: '4px 8px' }} onClick={() => setManualApesarDeApi(true)}>
+                  <button type="button" className="refresh-btn" style={{ fontSize: 12, padding: '4px 8px' }} onClick={() => { setManualApesarDeApi(true); setModoCompletar(false); setFaltantes(null) }}>
                     N&atilde;o &eacute; essa proposta? Preencher manualmente
                   </button>
+                </>
+              )}
+
+              {/* So o que faltou: a API preencheu o resto */}
+              {modoCompletar && faltantes && (
+                <>
+                  {faltantes.cpf && <label>CPF<input required value={addForm.cpf} onChange={(e) => setAddForm({ ...addForm, cpf: e.target.value })} /></label>}
+                  {faltantes.nome && <label>Nome<input required value={addForm.nome} onChange={(e) => setAddForm({ ...addForm, nome: e.target.value })} /></label>}
+                  {faltantes.valor && <label>Valor<input required value={addForm.valor} onChange={(e) => setAddForm({ ...addForm, valor: e.target.value })} placeholder="0,00" /></label>}
+                  {faltantes.parcelas && <label>Parcelas<input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 18" /></label>}
+                  {faltantes.tabela && addForm.banco === 'C6' && renderCampoTabelaC6()}
+                  {faltantes.tabela && addForm.banco !== 'C6' && (
+                    <label>Tabela <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(copie o nome/c&oacute;digo da tabela do portal do banco)</span>
+                      <input required value={addForm.tabelaNome} onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })} />
+                    </label>
+                  )}
                 </>
               )}
             </>
@@ -2933,29 +3027,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
                   </select>
                 </label>
               )}
-              {addForm.banco === 'C6' && (
-                <label>C&oacute;digo da tabela {parseInt(addForm.parcelas, 10) > 0 ? `(${addForm.parcelas}x)` : ''}
-                  <input
-                    required
-                    list="c6-codigos"
-                    value={addForm.tabelaNome}
-                    onChange={(e) => setAddForm({ ...addForm, tabelaNome: e.target.value })}
-                    placeholder={parseInt(addForm.parcelas, 10) > 0 ? 'ex.: 800188 — escolha ou digite' : 'informe as parcelas primeiro'}
-                    disabled={!(parseInt(addForm.parcelas, 10) > 0)}
-                  />
-                  <datalist id="c6-codigos">
-                    {c6Opcoes.map((o) => <option key={o.codigo} value={o.codigo}>{`${o.descricao || ''} · peso ${o.pontos}`}</option>)}
-                  </datalist>
-                  {(() => {
-                    const cod = String(addForm.tabelaNome || '').replace(/\D/g, '')
-                    const o = c6Opcoes.find((x) => x.codigo === cod)
-                    if (!cod) return null
-                    return o
-                      ? <span className="kpi-sub">{o.descricao || o.codigo} &middot; peso {o.pontos}</span>
-                      : <span className="kpi-sub" style={{ color: 'var(--red, #e88)' }}>c&oacute;digo n&atilde;o existe para {addForm.parcelas}x</span>
-                  })()}
-                </label>
-              )}
+              {addForm.banco === 'C6' && renderCampoTabelaC6()}
               {BANCOS_TABELA_NOME_COM_PARCELAS.includes(addForm.banco) && (
                 <label>Parcelas
                   <input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 48" />
