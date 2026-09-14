@@ -4623,7 +4623,7 @@ function OnboardingTour({ step, onNext, targets }) {
   )
 }
 
-function VendedoraPortal({ vendedor, onLogout }) {
+function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [kpis, setKpis] = useState(null)
   const [meta, setMeta] = useState(null)
@@ -4848,14 +4848,18 @@ function VendedoraPortal({ vendedor, onLogout }) {
 
       {error && <div className="state-msg error">Erro: {error}</div>}
 
-      <MetaComemoracao
-        comemoracao={comemoracao}
-        mascotUrl={MASCOT_IMG_URL}
-        congelada={coletivaCongelada()}
-        onFechar={fecharComemoracao}
-      />
+      {/* Vendedora nova so passa a ver a meta coletiva (e a comemoracao
+          dela) 30 dias apos o primeiro cadastro */}
+      {veMetaColetiva && (
+        <MetaComemoracao
+          comemoracao={comemoracao}
+          mascotUrl={MASCOT_IMG_URL}
+          congelada={coletivaCongelada()}
+          onFechar={fecharComemoracao}
+        />
+      )}
 
-      <MetaColetiva dados={metasV2} />
+      {veMetaColetiva && <MetaColetiva dados={metasV2} />}
 
       <div ref={tourChartRef} className="panel chart-panel tall com-meta">
         <p className="section-label">Vendas por semana &mdash; {modo === 'ponto' ? 'pontos' : 'meta'} e proje&ccedil;&atilde;o</p>
@@ -6432,13 +6436,27 @@ export default function App() {
     })()
   }, [])
 
+  // Sessoes gravadas antes do gate da meta coletiva nao tem o campo
+  // ve_meta_coletiva: busca uma vez e persiste, sem forcar novo login.
+  useEffect(() => {
+    if (!auth || auth.role !== 'vendedora' || auth.ve_meta_coletiva !== undefined) return
+    ;(async () => {
+      try {
+        const f = await postApi('auth_flags', { vendedor: auth.vendedor })
+        const novo = { ...auth, ve_meta_coletiva: f?.ve_meta_coletiva !== false }
+        try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(novo)) } catch { /* ignora */ }
+        setAuth(novo)
+      } catch { /* sem resposta: mantem como esta */ }
+    })()
+  }, [auth])
+
   const logout = () => {
     try { localStorage.removeItem(AUTH_STORAGE_KEY) } catch { /* ignora */ }
     setAuth(null)
   }
 
   if (!auth) return <LoginGate onLogin={setAuth} />
-  if (auth.role === 'vendedora') return <VendedoraPortal vendedor={auth.vendedor} onLogout={logout} />
+  if (auth.role === 'vendedora') return <VendedoraPortal vendedor={auth.vendedor} veMetaColetiva={auth.ve_meta_coletiva !== false} onLogout={logout} />
   if (auth.role === 'entradas_lp') return <SingleViewPortal onLogout={logout}><EntradasLP /></SingleViewPortal>
   return <Dashboard />
 }

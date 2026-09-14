@@ -175,7 +175,7 @@ export default async function handler(req, res) {
       // precisar ser lida pela aplicacao nem voltar numa consulta.
       try {
         const client = getPool();
-        const result = await client.query('select role, vendedor from login_verifica($1)', [senha]);
+        const result = await client.query('select role, vendedor, ve_meta_coletiva from login_verifica($1)', [senha]);
         if (result.rows[0]) {
           // cadastros antigos ainda guardam texto plano: troca por hash agora
           client.query('select login_promove_hash($1)', [senha]).catch(() => {});
@@ -345,6 +345,24 @@ export default async function handler(req, res) {
       } catch (e) {
         const timeoutMsg = e.name === 'AbortError' ? 'A consulta demorou demais. Tente novamente.' : e.message;
         return res.status(500).json({ error: timeoutMsg });
+      }
+    }
+
+    // Sessao salva antes do gate da meta coletiva nao tem o flag: o front
+    // pergunta aqui uma vez e persiste. Vendedora fora da tabela ve normal.
+    if (type === 'auth_flags') {
+      try {
+        const nome = (req.body?.vendedor || '').toString().trim();
+        if (!nome) return res.status(400).json({ error: 'Informe o vendedor.' });
+        const client = getPool();
+        const r = await client.query(
+          `select (criado_em is null or criado_em <= now() - interval '30 days') as ve_meta_coletiva
+           from vendedoras_login where lower(btrim(nome_completo)) = lower(btrim($1)) limit 1`,
+          [nome]
+        );
+        return res.status(200).json({ ve_meta_coletiva: r.rows[0] ? r.rows[0].ve_meta_coletiva : true });
+      } catch (e) {
+        return res.status(200).json({ ve_meta_coletiva: true });
       }
     }
 
