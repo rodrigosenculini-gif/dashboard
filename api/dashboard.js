@@ -47,14 +47,10 @@ function setCors(res) {
 
 // Senhas ficam só aqui no servidor — nunca são enviadas ao navegador.
 // "geral" enxerga o dashboard inteiro; as outras só a própria aba de vendas.
-const SENHAS = {
-  '654321': { role: 'geral', vendedor: null },
-  '123456': { role: 'vendedora', vendedor: 'JEANNE BARBOZA' },
-  '123567': { role: 'vendedora', vendedor: 'KAYANE BASQUE' },
-  '123789': { role: 'vendedora', vendedor: 'Leticia.Splendore' },
-  '123908': { role: 'vendedora', vendedor: 'Rafaela Ferreira' },
-  '345612': { role: 'entradas_lp', vendedor: null },
-};
+// As credenciais ficavam aqui, em texto puro e versionadas no Git. Foram
+// migradas para a tabela vendedoras_login com hash bcrypt; a verificacao
+// acontece no banco, em login_verifica(). Trocar as senhas continua
+// necessario: o historico de commits ainda guarda as antigas.
 
 
 // ---------------------------------------------------------------------
@@ -172,21 +168,21 @@ export default async function handler(req, res) {
 
     if (type === 'auth_login') {
       const senha = (req.body?.senha || '').toString().trim();
-      const found = SENHAS[senha];
-      if (found) return res.status(200).json(found);
-      // Nao esta nas senhas fixas: tenta as vendedoras cadastradas dinamicamente
-      // (primeiro acesso feito pela Trilha do Especialista)
+      // Fonte unica: vendedoras_login. As credenciais que viviam no mapa
+      // SENHAS foram migradas para la com hash bcrypt -- ficavam versionadas
+      // no Git, entao qualquer clone do repositorio as continha.
+      // A comparacao acontece no banco (login_verifica), para a senha nao
+      // precisar ser lida pela aplicacao nem voltar numa consulta.
       try {
         const client = getPool();
-        const result = await client.query(
-          'select nome_completo from vendedoras_login where senha = $1 limit 1',
-          [senha]
-        );
+        const result = await client.query('select role, vendedor from login_verifica($1)', [senha]);
         if (result.rows[0]) {
-          return res.status(200).json({ role: 'vendedora', vendedor: result.rows[0].nome_completo });
+          // cadastros antigos ainda guardam texto plano: troca por hash agora
+          client.query('select login_promove_hash($1)', [senha]).catch(() => {});
+          return res.status(200).json(result.rows[0]);
         }
       } catch (e) {
-        // tabela pode nao existir ainda; ignora e cai no erro padrao abaixo
+        return res.status(500).json({ error: 'Nao foi possivel validar o acesso agora.' });
       }
       return res.status(401).json({ error: 'Senha incorreta.' });
     }
@@ -265,14 +261,21 @@ export default async function handler(req, res) {
         if (senha.length < 4) {
           return res.status(400).json({ error: 'A senha precisa ter pelo menos 4 caracteres.' });
         }
-        if (SENHAS[senha]) {
+        const client = getPool();
+        // a senha so pode estar em uso por outra pessoa; conferimos pela
+        // mesma funcao do login, sem ler senha nenhuma
+        const emUso = await client.query('select role, vendedor from login_verifica($1)', [senha]);
+        if (emUso.rows[0] && emUso.rows[0].vendedor !== nome) {
           return res.status(400).json({ error: 'Essa senha já está em uso. Escolha outra.' });
         }
-        const client = getPool();
+        // grava so o hash: a senha em claro nao fica no banco
         await client.query(
-          `insert into vendedoras_login (nome_completo, senha)
-           values ($1, $2)
-           on conflict (nome_completo) do update set senha = excluded.senha`,
+          `insert into vendedoras_login (nome_completo, role, senha_hash, senha)
+           values ($1, 'vendedora', extensions.crypt($2, extensions.gen_salt('bf', 10)), null)
+           on conflict (lower(btrim(nome_completo))) do update
+             set senha_hash = excluded.senha_hash,
+                 senha = null,
+                 senha_alterada_em = now()`,
           [nome, senha]
         );
         return res.status(200).json({ ok: true, vendedor: nome });
