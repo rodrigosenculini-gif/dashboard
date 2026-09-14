@@ -2664,8 +2664,17 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
     return r
   }
 
+  // O Soma identifica a proposta pelo Public ID (UUID) -- o numero curto que
+  // aparece como "Num. Proposta" nao serve pra consulta e sempre volta como
+  // nao encontrada. Pedimos o UUID direto pra vendedora nao perder tempo.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
   const buscarNaApi = async () => {
     if (!addForm.adesao) { setAddMsg('Informe a adesão pra buscar.'); return }
+    if (addForm.banco === 'SOMA' && !UUID_RE.test(addForm.adesao.trim())) {
+      setAddMsg('Pro Soma, use o Public ID da proposta (o código longo com hífens, no portal). O "Num. Proposta" curto não funciona na consulta.')
+      return
+    }
     const vendedorAlvo = vendedorFixo || addForm.vendedorSel
     if (!vendedorAlvo) { setAddMsg('Selecione a vendedora antes de buscar.'); return }
     setBuscando(true); setAddMsg(''); setBuscaResultado(null)
@@ -2681,10 +2690,16 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         // No segundo caso nao abrimos o formulario manual. Era assim que
         // entravam vendas com o codigo do corretor, o CPF ou um contador
         // no lugar da adesao.
-        const falhaTecnica = /token|unauthor|expired|timeout|502|503|504|indispon/i
-          .test(String(d.mensagem || '') + JSON.stringify(d.bruto || ''))
-        if (falhaTecnica) {
-          setAddMsg('A consulta ao banco falhou (não foi possível verificar a adesão). Tente de novo em instantes.')
+        // So tratamos como "adesao errada" quando o banco confirma que a
+        // proposta nao existe. Qualquer outra coisa (token expirado, API
+        // fora, timeout) e falha nossa, nao do numero digitado -- antes
+        // isso aparecia pro vendedor como "o banco nao encontrou", o que
+        // e mentira e faz ele conferir um numero que esta certo.
+        const txt = JSON.stringify(d || '')
+        const bancoNegou = /n[ãa]o encontrad|nenhuma proposta|not found|inexistent|NOT_FOUND/i.test(txt)
+        const falhaTecnica = /unauthor|token|expired|invalid|timeout|50[234]|indispon|ECONN/i.test(txt)
+        if (falhaTecnica || !bancoNegou) {
+          setAddMsg('Não foi possível consultar o banco agora (a conexão falhou, não é problema no número). Tente de novo em instantes.')
           return
         }
         setAdesaoInexistente(true)
@@ -2865,7 +2880,9 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
             <>
               <label>Ades&atilde;o
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <input required value={addForm.adesao} onChange={(e) => { setAddForm({ ...addForm, adesao: e.target.value }); setBuscaResultado(null); setAdesaoInexistente(false) }} style={{ flex: 1 }} />
+                  <input required value={addForm.adesao}
+                    placeholder={addForm.banco === 'SOMA' ? 'Public ID (ex.: 0a7d1521-a027-4b7c-...)' : ''}
+                    onChange={(e) => { setAddForm({ ...addForm, adesao: e.target.value }); setBuscaResultado(null); setAdesaoInexistente(false) }} style={{ flex: 1 }} />
                   <button type="button" className="refresh-btn" onClick={buscarNaApi} disabled={buscando}>
                     {buscando ? 'Buscando...' : 'Buscar'}
                   </button>
