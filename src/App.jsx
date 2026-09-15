@@ -755,10 +755,12 @@ function CampanhaDetalhadoList({ items, loading }) {
   )
 }
 
-function ViewSwitcher({ view, setView }) {
+function ViewSwitcher({ view, setView, permitidas }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
-  const current = VIEWS.find((v) => v.id === view)
+  // permitidas = undefined -> acesso completo (gestao)
+  const lista = permitidas ? VIEWS.filter((v) => permitidas.includes(v.id)) : VIEWS
+  const current = lista.find((v) => v.id === view)
 
   useEffect(() => {
     function onClickOutside(e) {
@@ -776,7 +778,7 @@ function ViewSwitcher({ view, setView }) {
       </button>
       {open && (
         <div className="view-menu">
-          {VIEWS.map((v) => (
+          {lista.map((v) => (
             <button
               key={v.id}
               className={`view-menu-item ${v.id === view ? 'active' : ''}`}
@@ -6334,9 +6336,19 @@ const VIEW_STORAGE_KEY = 'disparos_dashboard_view'
 // Views que aparecem como atalho na tela Geral (a própria Geral fica de fora)
 const VIEWS_ATALHO = VIEWS.filter((v) => v.id !== 'inicio')
 
-function Dashboard() {
-  // Na primeira visita cai na Geral; depois disso a sessão lembra onde parou.
+// permitidas = lista de ids de view. undefined -> tudo (gestao).
+// Acesso restrito nao passa pela tela Geral: ela resume areas que o perfil
+// nao pode abrir. Cai direto na primeira view liberada.
+function Dashboard({ permitidas, onLogout }) {
+  const podeVer = (v) => !permitidas || permitidas.includes(v)
+  const viewInicial = permitidas ? permitidas[0] : 'inicio'
   const [view, setView] = useState(() => {
+    if (permitidas) {
+      try {
+        const salvo = localStorage.getItem(VIEW_STORAGE_KEY)
+        return salvo && permitidas.includes(salvo) ? salvo : viewInicial
+      } catch { return viewInicial }
+    }
     try {
       const salvo = localStorage.getItem(VIEW_STORAGE_KEY)
       if (!salvo) return 'inicio'
@@ -6365,19 +6377,23 @@ function Dashboard() {
     <div className="app">
       <div className="app-header">
         <img src="/tiger-icon.png" alt="" className="app-logo" />
-        {view !== 'inicio' && (
+        {view !== 'inicio' && podeVer('inicio') && (
           <button className="voltar-inicio" onClick={() => changeView('inicio')} title="Voltar para a tela Geral">
             <span aria-hidden="true">&#8962;</span> Início
           </button>
         )}
-        <ViewSwitcher view={view} setView={changeView} />
+        <ViewSwitcher view={view} setView={changeView} permitidas={permitidas} />
         {view === 'vendedoras' && (
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             {acoesVendedoras}
           </div>
         )}
+        {onLogout && (
+          <button className="reset-btn" onClick={onLogout} title="Sair"
+            style={view === 'vendedoras' ? undefined : { marginLeft: 'auto' }}>Sair</button>
+        )}
       </div>
-      {view === 'inicio' && (
+      {view === 'inicio' && podeVer('inicio') && (
         <VisaoInicial
           views={VIEWS_ATALHO}
           onIrPara={changeView}
@@ -6385,15 +6401,15 @@ function Dashboard() {
           onAbrirChips={() => changeView('chips')}
         />
       )}
-      {view === 'disparos' && <VisaoGeral />}
-      {view === 'leilao' && <LeilaoDetalhado />}
-      {view === 'produtos' && <EntradasLP />}
-      {view === 'n8n' && <N8nExecucoes />}
-      {view === 'vendedoras' && <VendedorasView />}
-      {view === 'vendas' && <VendasView />}
-      {view === 'ia' && <IATreinamento />}
-      {view === 'trello' && <Trello onVoltar={() => changeView('inicio')} />}
-      {view === 'chips' && <Chips onVoltar={() => changeView('inicio')} />}
+      {view === 'disparos' && podeVer('disparos') && <VisaoGeral />}
+      {view === 'leilao' && podeVer('leilao') && <LeilaoDetalhado />}
+      {view === 'produtos' && podeVer('produtos') && <EntradasLP />}
+      {view === 'n8n' && podeVer('n8n') && <N8nExecucoes />}
+      {view === 'vendedoras' && podeVer('vendedoras') && <VendedorasView />}
+      {view === 'vendas' && podeVer('vendas') && <VendasView />}
+      {view === 'ia' && podeVer('ia') && <IATreinamento />}
+      {view === 'trello' && podeVer('trello') && <Trello onVoltar={() => changeView('inicio')} />}
+      {view === 'chips' && podeVer('chips') && <Chips onVoltar={() => changeView('inicio')} />}
     </div>
   )
 }
@@ -6466,5 +6482,7 @@ export default function App() {
   if (!auth) return <LoginGate onLogin={setAuth} />
   if (auth.role === 'vendedora') return <VendedoraPortal vendedor={auth.vendedor} veMetaColetiva={auth.ve_meta_coletiva !== false} onLogout={logout} />
   if (auth.role === 'entradas_lp') return <SingleViewPortal onLogout={logout}><EntradasLP /></SingleViewPortal>
+  // acesso restrito: so Vendas e Vendedoras
+  if (auth.role === 'vendas_vendedoras') return <Dashboard permitidas={['vendas', 'vendedoras']} onLogout={logout} />
   return <Dashboard />
 }
