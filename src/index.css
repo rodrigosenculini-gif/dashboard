@@ -81,18 +81,9 @@ body {
 
 .filters {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  align-items: center;
   margin-bottom: 20px;
-}
-
-/* toggles de atribuicao: um clique alterna, sem abrir menu. Menores que os
-   filtros de selecao para os cinco caberem na mesma linha. */
-.filters .filtro-toggle {
-  font-size: 11.5px;
-  padding: 6px 10px;
-  white-space: nowrap;
 }
 
 .filters select, .filters input[type="date"] {
