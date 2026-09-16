@@ -829,10 +829,6 @@ function LeilaoDetalhado() {
   const [horaInicio, setHoraInicio] = useState('')
   const [horaFim, setHoraFim] = useState('')
   const [campanhaSel, setCampanhaSel] = useState([])
-  // Filtros de atribuicao (modelo de fatos). Default = visao completa.
-  const [soDisparadas, setSoDisparadas] = useState(false)
-  const [pagoDoPeriodo, setPagoDoPeriodo] = useState(false)
-  const [incluirTardias, setIncluirTardias] = useState(true)
   const campanha = campanhaSel.join(',')
 
   useEffect(() => {
@@ -866,7 +862,7 @@ function LeilaoDetalhado() {
     } finally {
       setLoading(false)
     }
-  }, [dataInicio, dataFim, campanha, horaInicio, horaFim, revisaoCache, soDisparadas, pagoDoPeriodo, incluirTardias])
+  }, [dataInicio, dataFim, campanha, horaInicio, horaFim, revisaoCache])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -892,7 +888,7 @@ function LeilaoDetalhado() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim(''); setSoDisparadas(false); setPagoDoPeriodo(false); setIncluirTardias(true) }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -906,21 +902,6 @@ function LeilaoDetalhado() {
 
       <div className="filters">
         <CampanhaSearch value={campanhaSel} onChange={setCampanhaSel} options={campanhas} />
-        <select value={soDisparadas ? '1' : '0'} onChange={(e) => setSoDisparadas(e.target.value === '1')}
-          title="Esconde campanha que nao disparou no periodo (aparece so pelo pagamento)">
-          <option value="0">campanhas &mdash; todas</option>
-          <option value="1">campanhas &mdash; s&oacute; as disparadas</option>
-        </select>
-        <select value={pagoDoPeriodo ? '1' : '0'} onChange={(e) => setPagoDoPeriodo(e.target.value === '1')}
-          title="Conta so pagamento cujo disparo tambem esta no periodo">
-          <option value="0">pagas &mdash; todas do per&iacute;odo</option>
-          <option value="1">pagas &mdash; s&oacute; de disparo do per&iacute;odo</option>
-        </select>
-        <select value={incluirTardias ? '1' : '0'} onChange={(e) => setIncluirTardias(e.target.value === '1')}
-          title="Pagamento com mais de 72h do disparo">
-          <option value="1">tardias &mdash; incluir (+72h)</option>
-          <option value="0">tardias &mdash; excluir</option>
-        </select>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
@@ -1133,7 +1114,7 @@ function EntradasLP() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim(''); setSoDisparadas(false); setPagoDoPeriodo(false); setIncluirTardias(true) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -6192,6 +6173,10 @@ function VisaoGeral() {
   const [horaFim, setHoraFim] = useState('')
   const [showFunil, setShowFunil] = useState(false)
   const [showLeilao, setShowLeilao] = useState(false)
+  // Filtros de atribuicao (modelo de fatos). Default = visao completa.
+  const [soDisparadas, setSoDisparadas] = useState(false)
+  const [pagoDoPeriodo, setPagoDoPeriodo] = useState(false)
+  const [incluirTardias, setIncluirTardias] = useState(true)
 
   const [kpis, setKpis] = useState(null)
   const [envios, setEnvios] = useState([])
@@ -6276,7 +6261,7 @@ function VisaoGeral() {
     } finally {
       setLoading(false)
     }
-  }, [apiArgsBase, revisaoCache])
+  }, [apiArgsBase, revisaoCache, soDisparadas, pagoDoPeriodo, incluirTardias])
 
   useEffect(() => { loadFiltros() }, [loadFiltros])
   useEffect(() => { loadDados() }, [loadDados])
@@ -6324,6 +6309,21 @@ function VisaoGeral() {
         <MultiSelect value={metaSel} onChange={setMetaSel} options={filtros.metas} label="meta" />
         <MultiSelect value={tipoEnvioSel} onChange={setTipoEnvioSel} options={filtros.tiposEnvio} label="tipo de envio" />
         <MultiSelect value={mensagemFiltroSel} onChange={setMensagemFiltroSel} options={filtros.mensagens} label="mensagem" />
+        <select value={soDisparadas ? '1' : '0'} onChange={(e) => setSoDisparadas(e.target.value === '1')}
+          title="Esconde campanha que nao disparou no periodo (aparece so pelo pagamento atribuido a ela)">
+          <option value="0">campanhas &mdash; todas</option>
+          <option value="1">campanhas &mdash; s&oacute; as disparadas</option>
+        </select>
+        <select value={pagoDoPeriodo ? '1' : '0'} onChange={(e) => setPagoDoPeriodo(e.target.value === '1')}
+          title="Conta so pagamento cujo disparo tambem esta no periodo">
+          <option value="0">pagas &mdash; todas do per&iacute;odo</option>
+          <option value="1">pagas &mdash; s&oacute; de disparo do per&iacute;odo</option>
+        </select>
+        <select value={incluirTardias ? '1' : '0'} onChange={(e) => setIncluirTardias(e.target.value === '1')}
+          title="Pagamento com mais de 72h do disparo">
+          <option value="1">tardias &mdash; incluir (+72h)</option>
+          <option value="0">tardias &mdash; excluir</option>
+        </select>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
