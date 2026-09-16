@@ -190,6 +190,8 @@ function normalizarBanco(raw) {
   if (v.includes('crefaz')) return 'CREFAZ'
   if (v.includes('presen')) return 'PRESENÇA'
   if (v.includes('mercantil')) return 'MERCANTIL'
+  // 'SempreFacil', 'Sempre Fácil', 'sempre-facil' -> SEMPRE FACIL
+  if (/sempre[\s_-]*f[áa]cil/.test(v)) return 'SEMPRE FACIL'
   if (v.includes('pan')) return 'PAN'
   // desconhecido: devolve em maiúsculo, com _ virando espaço, pra pelo
   // menos ficar legível e não quebrar nada
@@ -1985,7 +1987,9 @@ const FGTSV8_TABELAS = [
 // sem filtro deixava gravar nome e prazo incompativeis (peso null = 0 ponto).
 
 // Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
-const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE', 'C6']
+const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE', 'C6', 'SEMPRE FACIL']
+// Sem pontuação por enquanto: calc_peso_vendas devolve 0 para este banco.
+const BANCOS_SEM_PONTUACAO = ['SEMPRE FACIL']
 
 // Bancos com API instalada pra consulta de adesão (webhook n8n
 // consulta-adesao-banco): pra esses, o formulário não pede tabela/parcelas
@@ -2963,6 +2967,13 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
               {BANCOS_VENDA.map((b) => <option key={b} value={b}>{b}{BANCOS_COM_API.includes(b) ? ' (busca automática)' : ''}</option>)}
             </select>
           </label>
+
+          {BANCOS_SEM_PONTUACAO.includes(addForm.banco) && (
+            <div className="kpi-sub" style={{ marginTop: -4 }}>
+              Este banco ainda n&atilde;o tem tabela de pontua&ccedil;&atilde;o: a venda ser&aacute;
+              registrada normalmente, mas com 0 pontos at&eacute; a tabela ser definida.
+            </div>
+          )}
 
           {addForm.banco && ehBancoComApi && (
             <>
