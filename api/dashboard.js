@@ -1246,8 +1246,15 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_envios_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int,$8::text,$9::text)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_hora_inicio, p_hora_fim, p_tipo_envio, p_mensagem];
   } else if (type === 'campanhas') {
-    sql = 'select * from dashboard_campanhas($1::text,$2::text,$3::timestamptz,$4::timestamptz,$5::text,$6::text,$7::text)';
-    params = [p_origem, p_meta, p_date_from, p_date_to, p_tipo_envio, p_mensagem, p_campanha];
+    // Modelo de fatos: campanha vem do disparo, e interacao/pagamento entram
+    // pela atribuicao (ultimo disparo antes do evento), nao pela coluna do lead
+    // -- que era sobrescrita a cada novo disparo. Os 4 ultimos parametros sao
+    // os filtros de visualizacao, com default no comportamento completo.
+    sql = 'select * from dashboard_campanhas_v2($1::text,$2::text,$3::timestamptz,$4::timestamptz,$5::int,$6::int,$7::text,$8::text,$9::text,$10::boolean,$11::boolean,$12::boolean,$13::boolean)';
+    params = [p_origem, p_meta, p_date_from, p_date_to, p_hora_inicio, p_hora_fim,
+              p_tipo_envio, p_mensagem, p_campanha,
+              req.body?.so_disparadas === true, req.body?.pago_do_periodo === true,
+              req.body?.incluir_tardias !== false, req.body?.incluir_sem_campanha !== false];
   } else if (type === 'por_conversa') {
     sql = 'select * from dashboard_por_conversa($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::text,$7::text)';
     params = [p_campanha, p_origem, p_meta, p_date_from, p_date_to, p_tipo_envio, p_mensagem];

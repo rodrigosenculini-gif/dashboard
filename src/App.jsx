@@ -743,7 +743,17 @@ function CampanhaDetalhadoList({ items, loading }) {
       <div className="scroll-table">
         {items.map((c) => (
           <div className="template-row" key={c.campanha} style={{ gridTemplateColumns: cols }}>
-            <span className="campanha-nome">{c.campanha}</span>
+            <span className="campanha-nome">
+              {c.campanha}
+              {/* campanha que nao disparou no periodo: so aparece por causa do
+                  pagamento atribuido a ela */}
+              {Number(c.leads_totais) === 0 && Number(c.pagas) > 0 && (
+                <span className="kpi-sub"> &middot; pagas de disparo anterior</span>
+              )}
+              {Number(c.pagas_tardias) > 0 && (
+                <span className="kpi-sub"> &middot; {fmtInt(c.pagas_tardias)} +72h</span>
+              )}
+            </span>
             <span>{fmtInt(c.leads_totais)}</span>
             <span>{fmtInt(c.envios)} / {fmtInt(c.reenvios)}</span>
             <span>{c.tempo_resposta_min != null ? `${fmtInt(Math.round(c.tempo_resposta_min))} min` : '-'}</span>
@@ -819,6 +829,10 @@ function LeilaoDetalhado() {
   const [horaInicio, setHoraInicio] = useState('')
   const [horaFim, setHoraFim] = useState('')
   const [campanhaSel, setCampanhaSel] = useState([])
+  // Filtros de atribuicao (modelo de fatos). Default = visao completa.
+  const [soDisparadas, setSoDisparadas] = useState(false)
+  const [pagoDoPeriodo, setPagoDoPeriodo] = useState(false)
+  const [incluirTardias, setIncluirTardias] = useState(true)
   const campanha = campanhaSel.join(',')
 
   useEffect(() => {
@@ -852,7 +866,7 @@ function LeilaoDetalhado() {
     } finally {
       setLoading(false)
     }
-  }, [dataInicio, dataFim, campanha, horaInicio, horaFim, revisaoCache])
+  }, [dataInicio, dataFim, campanha, horaInicio, horaFim, revisaoCache, soDisparadas, pagoDoPeriodo, incluirTardias])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -878,7 +892,7 @@ function LeilaoDetalhado() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim(''); setSoDisparadas(false); setPagoDoPeriodo(false); setIncluirTardias(true) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -892,6 +906,21 @@ function LeilaoDetalhado() {
 
       <div className="filters">
         <CampanhaSearch value={campanhaSel} onChange={setCampanhaSel} options={campanhas} />
+        <select value={soDisparadas ? '1' : '0'} onChange={(e) => setSoDisparadas(e.target.value === '1')}
+          title="Esconde campanha que nao disparou no periodo (aparece so pelo pagamento)">
+          <option value="0">campanhas &mdash; todas</option>
+          <option value="1">campanhas &mdash; s&oacute; as disparadas</option>
+        </select>
+        <select value={pagoDoPeriodo ? '1' : '0'} onChange={(e) => setPagoDoPeriodo(e.target.value === '1')}
+          title="Conta so pagamento cujo disparo tambem esta no periodo">
+          <option value="0">pagas &mdash; todas do per&iacute;odo</option>
+          <option value="1">pagas &mdash; s&oacute; de disparo do per&iacute;odo</option>
+        </select>
+        <select value={incluirTardias ? '1' : '0'} onChange={(e) => setIncluirTardias(e.target.value === '1')}
+          title="Pagamento com mais de 72h do disparo">
+          <option value="1">tardias &mdash; incluir (+72h)</option>
+          <option value="0">tardias &mdash; excluir</option>
+        </select>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />
@@ -6226,6 +6255,9 @@ function VisaoGeral() {
           mensagem: apiArgsBase.mensagem,
           date_from: apiArgsBase.date_from,
           date_to: apiArgsBase.date_to,
+          so_disparadas: soDisparadas,
+          pago_do_periodo: pagoDoPeriodo,
+          incluir_tardias: incluirTardias,
         }, opts),
         callApi('por_conversa', apiArgsBase, opts),
         callApi('por_meta', apiArgsBase, opts),
