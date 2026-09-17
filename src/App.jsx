@@ -1022,6 +1022,9 @@ function EntradasLP() {
   const [filtros, setFiltros] = useState({ campanhas: [], produtos: [], origens: [] })
   const [campanhaSel, setCampanhaSel] = useState([])
   const campanha = campanhaSel.join(',')
+  // 'ultimo' = canal que fechou a venda; 'primeiro' = canal que trouxe o lead.
+  // A LP costuma ser o primeiro toque e perde o credito pro disparo posterior.
+  const [atribuicao, setAtribuicao] = useState('ultimo')
   const [produtoSel, setProdutoSel] = useState([])
   const [origemSel, setOrigemSel] = useState([])
   const produto = produtoSel.join(',')
@@ -1061,10 +1064,10 @@ function EntradasLP() {
     setError(null)
     try {
       const [kpiData, entradasData, aprovadasData, campanhasData] = await Promise.all([
-        callApi('produtos_kpis', args),
+        callApi('produtos_kpis', { ...args, atribuicao }),
         callApi('produtos_entradas_por_dia', args),
         callApi('produtos_aprovadas_por_dia', args),
-        callApi('produtos_campanhas', { campanha: args.campanha, produto: args.produto, origem: args.origem, date_from: args.date_from, date_to: args.date_to }, opts),
+        callApi('produtos_campanhas', { campanha: args.campanha, produto: args.produto, origem: args.origem, date_from: args.date_from, date_to: args.date_to, atribuicao }, opts),
       ])
       setKpis(kpiData?.[0] ?? null)
 
@@ -1090,7 +1093,7 @@ function EntradasLP() {
     } finally {
       setLoading(false)
     }
-  }, [args, revisaoCache])
+  }, [args, revisaoCache, atribuicao])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -1133,6 +1136,11 @@ function EntradasLP() {
         <CampanhaSearch value={campanhaSel} onChange={setCampanhaSel} options={filtros.campanhas} />
         <MultiSelect value={produtoSel} onChange={setProdutoSel} options={filtros.produtos} label="produto" />
         <MultiSelect value={origemSel} onChange={setOrigemSel} options={filtros.origens} label="origem" />
+        <button type="button" className="refresh-btn filtro-toggle"
+          onClick={() => setAtribuicao(atribuicao === 'ultimo' ? 'primeiro' : 'ultimo')}
+          title="Alternar: creditar a venda ao canal que trouxe o lead (primeiro) ou ao que fechou (ultimo)">
+          &#8644; {atribuicao === 'ultimo' ? 'quem fechou' : 'quem trouxe'}
+        </button>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
       <HourFilter horaInicio={horaInicio} setHoraInicio={setHoraInicio} horaFim={horaFim} setHoraFim={setHoraFim} />

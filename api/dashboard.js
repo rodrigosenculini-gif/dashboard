@@ -1278,8 +1278,9 @@ export default async function handler(req, res) {
     // modelo de fatos: conversao por atribuicao (ultima entrada antes da venda),
     // nao por CPF casado em total_produtos -- que marcava varias entradas por
     // venda e casava CPF vazio com CPF vazio
-    sql = 'select * from dashboard_produtos_kpis_v2($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int)';
-    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to, p_hora_inicio, p_hora_fim];
+    sql = 'select * from dashboard_produtos_kpis_v2($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int,$8::text)';
+    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to, p_hora_inicio, p_hora_fim,
+              req.body?.atribuicao === 'primeiro' ? 'primeiro' : 'ultimo'];
   } else if (type === 'produtos_entradas_por_dia') {
     sql = 'select * from dashboard_produtos_entradas_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::int,$7::int)';
     params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to, p_hora_inicio, p_hora_fim];
@@ -1287,8 +1288,9 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_produtos_aprovadas_por_dia($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
     params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
   } else if (type === 'produtos_campanhas') {
-    sql = 'select * from dashboard_produtos_campanhas_v2($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz)';
-    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to];
+    sql = 'select * from dashboard_produtos_campanhas_v2($1::text,$2::text,$3::text,$4::timestamptz,$5::timestamptz,$6::text)';
+    params = [p_campanha, req.query.produto || null, p_origem, p_date_from, p_date_to,
+              req.body?.atribuicao === 'primeiro' ? 'primeiro' : 'ultimo'];
   } else if (type === 'produtos_filtros') {
     sql = 'select * from dashboard_produtos_filtros()';
     params = [];
