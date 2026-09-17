@@ -1117,7 +1117,7 @@ function EntradasLP() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim(''); setSoDisparadas(false); setPagoDoPeriodo(false); setIncluirTardias(true) }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim(''); setAtribuicao('ultimo') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -6185,6 +6185,8 @@ function VisaoGeral() {
   const [soDisparadas, setSoDisparadas] = useState(false)
   const [pagoDoPeriodo, setPagoDoPeriodo] = useState(false)
   const [incluirTardias, setIncluirTardias] = useState(true)
+  // 'ultimo' = canal que fechou a venda; 'primeiro' = canal que trouxe o lead
+  const [atribuicao, setAtribuicao] = useState('ultimo')
 
   const [kpis, setKpis] = useState(null)
   const [envios, setEnvios] = useState([])
@@ -6251,6 +6253,7 @@ function VisaoGeral() {
           so_disparadas: soDisparadas,
           pago_do_periodo: pagoDoPeriodo,
           incluir_tardias: incluirTardias,
+          atribuicao,
         }, opts),
         callApi('por_conversa', apiArgsBase, opts),
         callApi('por_meta', apiArgsBase, opts),
@@ -6269,7 +6272,7 @@ function VisaoGeral() {
     } finally {
       setLoading(false)
     }
-  }, [apiArgsBase, revisaoCache, soDisparadas, pagoDoPeriodo, incluirTardias])
+  }, [apiArgsBase, revisaoCache, soDisparadas, pagoDoPeriodo, incluirTardias, atribuicao])
 
   useEffect(() => { loadFiltros() }, [loadFiltros])
   useEffect(() => { loadDados() }, [loadDados])
@@ -6293,7 +6296,7 @@ function VisaoGeral() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
-          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setOrigemSel([]); setMetaSel([]); setTipoEnvioSel([]); setMensagemFiltroSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
+          <button className="reset-btn" onClick={() => { setCampanhaSel([]); setOrigemSel([]); setMetaSel([]); setTipoEnvioSel([]); setMensagemFiltroSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim(''); setSoDisparadas(false); setPagoDoPeriodo(false); setIncluirTardias(true); setAtribuicao('ultimo') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
@@ -6331,6 +6334,11 @@ function VisaoGeral() {
           title="Pagamento com mais de 72h do disparo">
           <option value="1">tardias &mdash; incluir (+72h)</option>
           <option value="0">tardias &mdash; excluir</option>
+        </select>
+        <select value={atribuicao} onChange={(e) => setAtribuicao(e.target.value)}
+          title="Creditar a venda ao canal que trouxe o lead ou ao que fechou">
+          <option value="ultimo">atribui&ccedil;&atilde;o &mdash; quem fechou</option>
+          <option value="primeiro">atribui&ccedil;&atilde;o &mdash; quem trouxe</option>
         </select>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
