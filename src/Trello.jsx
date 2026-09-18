@@ -21,10 +21,13 @@ const PRIORIDADES = [
 const fmtData = (d) => (d ? String(d).split('-').reverse().join('/') : '')
 const hojeISO = () => new Date().toISOString().slice(0, 10)
 
-function CardEditor({ card, listas, onFechar, onSalvo }) {
+function CardEditor({ card, listas, responsaveis = [], onFechar, onSalvo }) {
   const [f, setF] = useState({
-    id: null, lista_id: listas[0]?.id, titulo: '', descricao: '', responsavel: '',
+    id: null, titulo: '', descricao: '', responsavel: '',
     prazo: '', prioridade: 'media', etiquetas: [], checklist: [], concluido: false, ...card,
+    // depois do spread: card.lista_id undefined sobrescrevia o default e a
+    // tarefa voltava pra primeira lista (Backlog) a cada edicao
+    lista_id: card?.lista_id ?? listas[0]?.id,
   })
   const [novoItem, setNovoItem] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -86,8 +89,21 @@ function CardEditor({ card, listas, onFechar, onSalvo }) {
             </div>
             <div className="chip-campo">
               <label>Responsável</label>
-              <input className="chip-input" value={f.responsavel || ''}
-                     onChange={(e) => set('responsavel', e.target.value)} placeholder="Quem toca" />
+              {/* datalist: os nomes ja usados aparecem como sugestao, e o
+                  campo continua livre pra um nome novo */}
+              <input className="chip-input" value={f.responsavel || ''} list="trello-responsaveis"
+                     onChange={(e) => set('responsavel', e.target.value)}
+                     onBlur={(e) => {
+                       // "rodirgo" / "rodrigo" -> usa o nome ja cadastrado
+                       const v = e.target.value.trim()
+                       if (!v) return
+                       const igual = responsaveis.find((r) => r.toLowerCase() === v.toLowerCase())
+                       if (igual && igual !== v) set('responsavel', igual)
+                     }}
+                     placeholder="Quem toca" />
+              <datalist id="trello-responsaveis">
+                {responsaveis.map((r) => <option key={r} value={r} />)}
+              </datalist>
             </div>
             <div className="chip-campo">
               <label>Prazo</label>
@@ -145,6 +161,9 @@ export default function Trello({ onVoltar }) {
   const [editando, setEditando] = useState(null)
   const [arrastando, setArrastando] = useState(null)
   const [alvo, setAlvo] = useState(null)
+  // quadro (padrao) | agenda (por prazo) | documento (tudo aberto com checklist)
+  const [visao, setVisao] = useState('quadro')
+  const [tagSel, setTagSel] = useState([])
 
   const revisaoCache = useRevisaoCache()
 
@@ -158,6 +177,10 @@ export default function Trello({ onVoltar }) {
 
   const listas = dados?.listas || []
   const total = listas.reduce((s, l) => s + l.cards.length, 0)
+  // nomes ja usados, pra nao redigitar a cada tarefa
+  const responsaveis = [...new Set(
+    listas.flatMap((l) => l.cards.map((c) => (c.responsavel || '').trim())).filter(Boolean),
+  )].sort((a, b) => a.localeCompare(b))
 
   async function soltar(listaId, indice) {
     if (!arrastando) return
@@ -166,6 +189,22 @@ export default function Trello({ onVoltar }) {
     setArrastando(null)
     await postJson('trello_card_mover', { id, lista_id: listaId, ordem: indice })
     carregar({ forcar: true })
+  }
+
+  // marcar item do checklist sem abrir o card
+  async function marcarItem(itemId, feito) {
+    setDados((d) => !d ? d : ({ ...d, listas: d.listas.map((l) => ({
+      ...l,
+      cards: l.cards.map((c) => ({
+        ...c,
+        checklist: (c.checklist || []).map((k) => (k.id === itemId ? { ...k, feito } : k)),
+        checklist_feito: (c.checklist || []).some((k) => k.id === itemId)
+          ? (c.checklist || []).filter((k) => (k.id === itemId ? feito : k.feito)).length
+          : c.checklist_feito,
+      })),
+    })) }))
+    try { await postJson('trello_check_marcar', { id: itemId, feito }) }
+    catch { carregar({ forcar: true }) }
   }
 
   async function novaLista() {
@@ -211,6 +250,21 @@ export default function Trello({ onVoltar }) {
                            onClick={() => setEditando(c)}>
                     <h3>{c.titulo}</h3>
                     {c.descricao && <p className="trello-card-desc">{c.descricao}</p>}
+                    {/* checklist direto no card: da pra marcar sem abrir, e
+                        rola quando a lista e longa */}
+                    {(c.checklist || []).length > 0 && (
+                      <ul className="trello-card-check" onClick={(e) => e.stopPropagation()}>
+                        {c.checklist.map((k) => (
+                          <li key={k.id} className={k.feito ? 'feito' : ''}>
+                            <label>
+                              <input type="checkbox" checked={!!k.feito}
+                                onChange={() => marcarItem(k.id, !k.feito)} />
+                              <span>{k.texto}</span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     <div className="trello-card-pe">
                       {c.responsavel && <span className="trello-pessoa">{c.responsavel}</span>}
                       {c.prazo && <span className={`trello-prazo ${atrasado ? 'atrasado' : ''}`}>{fmtData(c.prazo)}</span>}
@@ -235,7 +289,7 @@ export default function Trello({ onVoltar }) {
       </div>
 
       {editando && (
-        <CardEditor card={editando} listas={listas}
+        <CardEditor card={editando} listas={listas} responsaveis={responsaveis}
                     onFechar={() => setEditando(null)}
                     onSalvo={() => { setEditando(null); carregar({ forcar: true }) }} />
       )}
