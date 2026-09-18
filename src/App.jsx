@@ -1875,9 +1875,12 @@ function RankingOverlay({ onClose }) {
           {aba === 'meta' && periodos.length > 0 && (
             <select value={periodoSel ?? ''} onChange={(e) => setPeriodoSel(e.target.value ? Number(e.target.value) : null)}
               title="Per&iacute;odo da meta">
-              <option value="">meta atual</option>
+              {/* o periodo atual JA e a opcao padrao: marca ele em vez de
+                  repetir "meta atual" + a mesma janela logo abaixo */}
               {periodos.map((p) => (
-                <option key={p.id} value={p.id}>{p.descricao}</option>
+                <option key={p.id} value={p.atual ? '' : p.id}>
+                  {p.descricao}{p.atual ? ' (atual)' : ''}
+                </option>
               ))}
             </select>
           )}
@@ -2740,6 +2743,63 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
   const [adding, setAdding] = useState(false)
   const [buscando, setBuscando] = useState(false)
   const [buscaResultado, setBuscaResultado] = useState(null)
+  // aba "ajustar": busca uma adesao ja cadastrada e edita os campos.
+  // So devolve adesao que esteja no nome da propria vendedora.
+  const [abaModal, setAbaModal] = useState('add')
+  const [ajBusca, setAjBusca] = useState({ adesao: '', cpf: '' })
+  const [ajVenda, setAjVenda] = useState(null)
+  const [ajForm, setAjForm] = useState(null)
+  const [ajMsg, setAjMsg] = useState('')
+  const [ajBuscando, setAjBuscando] = useState(false)
+  const [ajSalvando, setAjSalvando] = useState(false)
+
+  const handleAjBuscar = async (e) => {
+    e.preventDefault()
+    setAjBuscando(true); setAjMsg(''); setAjVenda(null); setAjForm(null)
+    try {
+      const r = await postApi('vendedoras_buscar_venda', {
+        vendedor: vendedorFixo || addForm.vendedorSel || null,
+        adesao: ajBusca.adesao || null,
+        cpf: ajBusca.cpf || null,
+      })
+      const d = Array.isArray(r) ? r[0] : r
+      if (!d?.ok) { setAjMsg(d?.mensagem || 'Não encontrado.'); return }
+      setAjVenda(d)
+      setAjForm({
+        valor: d.valor ?? '', tabela: d.tabela ?? '', parcelas: d.parcelas ?? '',
+        seguro: d.seguro ?? '', data_pagamento: d.data_pagamento ?? '',
+        nome: d.nome ?? '', cpf: d.cpf ?? '', banco: d.banco ?? '',
+      })
+      setAjMsg('')
+    } catch (err) { setAjMsg('Erro ao buscar: ' + (err.message || '')) }
+    finally { setAjBuscando(false) }
+  }
+
+  const handleAjSalvar = async (e) => {
+    e.preventDefault()
+    if (!ajVenda || !ajForm) return
+    setAjSalvando(true); setAjMsg('')
+    try {
+      // manda so o que mudou: o backend trata null como "mantem"
+      const dif = (campo, orig) => (String(ajForm[campo] ?? '') !== String(orig ?? '') ? ajForm[campo] : null)
+      const r = await postApi('vendedoras_atualizar_venda', {
+        vendedor: vendedorFixo || addForm.vendedorSel || null,
+        va_id: ajVenda.va_id,
+        valor: dif('valor', ajVenda.valor) === null ? null : Number(ajForm.valor),
+        tabela: dif('tabela', ajVenda.tabela),
+        parcelas: dif('parcelas', ajVenda.parcelas) === null ? null : Number(ajForm.parcelas),
+        seguro: dif('seguro', ajVenda.seguro),
+        data_pagamento: dif('data_pagamento', ajVenda.data_pagamento),
+        cpf: dif('cpf', ajVenda.cpf),
+        nome: dif('nome', ajVenda.nome),
+        banco: dif('banco', ajVenda.banco),
+      })
+      const d = Array.isArray(r) ? r[0] : r
+      setAjMsg(d?.mensagem || 'Atualizado.')
+      if (d?.ok) { setAjVenda(null); setAjForm(null); setAjBusca({ adesao: '', cpf: '' }); onAdded?.() }
+    } catch (err) { setAjMsg('Erro ao atualizar: ' + (err.message || '')) }
+    finally { setAjSalvando(false) }
+  }
   const [manualApesarDeApi, setManualApesarDeApi] = useState(false)
   const [adesaoInexistente, setAdesaoInexistente] = useState(false)
   // modoCompletar: a API achou a proposta mas faltou algo -- mostramos SO os
@@ -3057,9 +3117,84 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
     <div className="funil-overlay" onClick={onClose}>
       <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
         <div className="funil-header">
-          <div><h2>Adicionar ades&atilde;o</h2></div>
+          <div><h2>{abaModal === 'add' ? 'Adicionar ades\u00e3o' : 'Ajustar ades\u00e3o'}</h2></div>
           <button className="funil-close" onClick={onClose}>&times;</button>
         </div>
+
+        {/* mesmo seletor de abas do resto do projeto */}
+        <div className="home-toggle" style={{ marginBottom: 10 }}>
+          <button type="button" className={abaModal === 'add' ? 'on' : ''}
+            onClick={() => setAbaModal('add')}>Adicionar</button>
+          <button type="button" className={abaModal === 'ajustar' ? 'on' : ''}
+            onClick={() => setAbaModal('ajustar')}>Ajustar</button>
+        </div>
+
+        {abaModal === 'ajustar' && (
+          <>
+            {!vendedorFixo && (
+              <label className="add-venda-form">Vendedora
+                <select value={addForm.vendedorSel} onChange={(e) => setAddForm({ ...addForm, vendedorSel: e.target.value })}>
+                  <option value="">selecione a vendedora</option>
+                  {(vendedoresDisponiveis || []).map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </label>
+            )}
+            <form className="add-venda-form" onSubmit={handleAjBuscar}>
+              <label>Ades&atilde;o
+                <input value={ajBusca.adesao} onChange={(e) => setAjBusca({ ...ajBusca, adesao: e.target.value })}
+                  placeholder="n&uacute;mero da ades&atilde;o" />
+              </label>
+              <label>CPF
+                <input value={ajBusca.cpf} onChange={(e) => setAjBusca({ ...ajBusca, cpf: e.target.value })}
+                  placeholder="somente n&uacute;meros" />
+              </label>
+              <button className="refresh-btn" type="submit" disabled={ajBuscando}>
+                {ajBuscando ? 'Buscando...' : 'Buscar ades\u00e3o'}
+              </button>
+            </form>
+
+            {ajMsg && <div className="state-msg">{ajMsg}</div>}
+
+            {ajVenda && ajForm && (
+              <form className="add-venda-form" onSubmit={handleAjSalvar}>
+                <p className="section-sub" style={{ margin: '4px 0 8px' }}>
+                  {ajVenda.vendedor} &middot; {ajVenda.banco} &middot; ades&atilde;o {ajVenda.adesao}
+                  {ajVenda.peso != null && <> &middot; peso {ajVenda.peso}</>}
+                </p>
+                <label>Valor
+                  <input type="number" step="0.01" value={ajForm.valor}
+                    onChange={(e) => setAjForm({ ...ajForm, valor: e.target.value })} />
+                </label>
+                <label>Tabela
+                  <input value={ajForm.tabela} onChange={(e) => setAjForm({ ...ajForm, tabela: e.target.value })} />
+                </label>
+                <label>Parcelas
+                  <input type="number" value={ajForm.parcelas}
+                    onChange={(e) => setAjForm({ ...ajForm, parcelas: e.target.value })} />
+                </label>
+                <label>Seguro
+                  <select value={ajForm.seguro || ''} onChange={(e) => setAjForm({ ...ajForm, seguro: e.target.value })}>
+                    <option value="">-</option>
+                    <option value="SIM">SIM</option>
+                    <option value="NAO">N&Atilde;O</option>
+                  </select>
+                </label>
+                <label>Data do pagamento
+                  <input type="date" value={ajForm.data_pagamento || ''}
+                    onChange={(e) => setAjForm({ ...ajForm, data_pagamento: e.target.value })} />
+                </label>
+                <label>Nome
+                  <input value={ajForm.nome} onChange={(e) => setAjForm({ ...ajForm, nome: e.target.value })} />
+                </label>
+                <button className="refresh-btn" type="submit" disabled={ajSalvando}>
+                  {ajSalvando ? 'Atualizando...' : 'Atualizar'}
+                </button>
+              </form>
+            )}
+          </>
+        )}
+
+        {abaModal === 'add' && (
         <form className="add-venda-form" onSubmit={handleAdd}>
           {!vendedorFixo && (
             <label>Vendedora
@@ -3205,6 +3340,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
           {addMsg && <p className="state-msg" style={{ margin: '4px 0' }}>{addMsg}</p>}
           <button type="submit" className="refresh-btn" disabled={adding}>{adding ? 'Enviando...' : 'Adicionar'}</button>
         </form>
+        )}
       </div>
     </div>
   )
@@ -5383,8 +5519,10 @@ function VendedorasView() {
 
       <div className="panel chart-panel extra-tall">
         <p className="section-label">Vendas por dia</p>
-        <ResponsiveContainer width="100%" height="70%">
-          <BarChart data={porDia.rows}>
+        {/* 70% deixava ~96px vazios embaixo do painel e ainda cortava o rotulo
+            de total no topo da pilha. Ocupa a altura util e reserva margem. */}
+        <ResponsiveContainer width="100%" height="calc(100% - 26px)">
+          <BarChart data={porDia.rows} margin={{ top: 18, right: 6, left: 0, bottom: 0 }}>
             <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} tickFormatter={fmtDataBR} />
             <Tooltip
               contentStyle={{ background: '#1b2620', border: '1px solid #263029', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 12 }}

@@ -1343,6 +1343,16 @@ export default async function handler(req, res) {
   } else if (type === 'vendedoras_filtros') {
     sql = 'select * from dashboard_vendedoras_filtros()';
     params = [];
+  } else if (type === 'vendedoras_buscar_venda') {
+    sql = 'select * from dashboard_vendedoras_buscar_venda($1::text,$2::text,$3::text)';
+    params = [req.body?.vendedor || null, req.body?.adesao || null, req.body?.cpf || null];
+  } else if (type === 'vendedoras_atualizar_venda') {
+    sql = `select * from dashboard_vendedoras_atualizar_venda(
+             $1::text,$2::bigint,$3::numeric,$4::text,$5::int,$6::text,$7::date,$8::text,$9::text,$10::text)`;
+    params = [req.body?.vendedor || null, req.body?.va_id || null,
+              req.body?.valor ?? null, req.body?.tabela || null, req.body?.parcelas ?? null,
+              req.body?.seguro || null, req.body?.data_pagamento || null,
+              req.body?.cpf || null, req.body?.nome || null, req.body?.banco || null];
   } else if (type === 'meta_vendedoras') {
     // callApi manda por query string (GET), nao no body
     sql = 'select * from dashboard_meta_vendedoras($1::int)';
