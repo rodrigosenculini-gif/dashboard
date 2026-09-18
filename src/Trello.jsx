@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { useDialogo } from './Dialogo'
 import TrelloDocs from './TrelloDocs'
 
 import { callApi, useRevisaoCache } from './dadosCache'
@@ -23,6 +24,7 @@ const fmtData = (d) => (d ? String(d).split('-').reverse().join('/') : '')
 const hojeISO = () => new Date().toISOString().slice(0, 10)
 
 function CardEditor({ card, listas, responsaveis = [], tags = [], onFechar, onSalvo }) {
+  const dialogo = useDialogo()
   const [f, setF] = useState({
     id: null, titulo: '', descricao: '', responsavel: '',
     prazo: '', prioridade: 'media', etiquetas: [], checklist: [], concluido: false, ...card,
@@ -59,7 +61,8 @@ function CardEditor({ card, listas, responsaveis = [], tags = [], onFechar, onSa
     }
   }
   async function excluir() {
-    if (!f.id || !window.confirm('Excluir esta tarefa?')) return
+    if (!f.id) return
+    if (!await dialogo.confirmar({ titulo: 'Excluir esta tarefa?', texto: f.titulo, perigo: true })) return
     await postJson('trello_card_excluir', { id: f.id })
     onSalvo()
   }
@@ -212,6 +215,7 @@ function CardEditor({ card, listas, responsaveis = [], tags = [], onFechar, onSa
 }
 
 export default function Trello({ onVoltar }) {
+  const dialogo = useDialogo()
   const [dados, setDados] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
@@ -296,7 +300,7 @@ export default function Trello({ onVoltar }) {
   }
 
   async function novaLista() {
-    const nome = window.prompt('Nome da nova lista')
+    const nome = await dialogo.perguntar({ titulo: 'Nova lista', placeholder: 'Nome da lista', rotuloOk: 'Criar' })
     if (!nome?.trim()) return
     await postJson('trello_lista_salvar', { quadro_id: dados.quadro.id, nome: nome.trim() })
     carregar({ forcar: true })

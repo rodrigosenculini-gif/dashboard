@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useDialogo } from './Dialogo'
 
 // Esteira do Presenca. Usa a casca dos modais de banco (funil-overlay /
 // funil-panel / funil-header), nao a do Refin.
@@ -348,6 +349,7 @@ export default function PresencaEsteiraModal({ vendedor = null, modo = 'vendedor
 }
 
 function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose, onFeito }) {
+  const dialogo = useDialogo()
   const [aba, setAba] = useState(abaInicial || (item.pode_reapresentar ? 'conta' : 'documento'))
   const [erro, setErro] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -380,7 +382,7 @@ function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose
   const [motivo, setMotivo] = useState('')
 
   async function enviar(corpo, confirmacao) {
-    if (confirmacao && !window.confirm(confirmacao)) return
+    if (confirmacao && !await dialogo.confirmar({ titulo: confirmacao, perigo: true })) return
     setErro(''); setOcupado(true)
     try {
       const r = await apiPresenca('acao', Object.assign({ modo, solicitante: vendedor || 'geral' }, corpo))

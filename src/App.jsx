@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useDialogo } from './Dialogo'
 import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, LabelList } from 'recharts'
 import IATreinamento from './IATreinamento'
 import ArquivosButton from './ArquivosNuvem'
@@ -3411,6 +3412,7 @@ function PanTabela({ titulo, linhas, mostrarVendedor, onSimular }) {
 const PAN_INTERVALO_MS = 5 * 60 * 1000 // atualiza sozinho a cada 5 min
 
 function PanModal({ vendedorFixo, onClose }) {
+  const dialogo = useDialogo()
   const [busca, setBusca] = useState('')
   const [achado, setAchado] = useState(null)
   const [listas, setListas] = useState(null)
@@ -3428,8 +3430,16 @@ function PanModal({ vendedorFixo, onClose }) {
   const [esteira, setEsteira] = useState({})     // { [proposta]: { acao, ok, ... } }
   const [esteiraBusy, setEsteiraBusy] = useState('')
   const acaoEsteira = async (linha, acao) => {
-    if (acao === 'aprovar' && !window.confirm(`Aprovar a proposta ${linha.adesao} de ${linha.nome || 'cliente'} no PAN?`)) return
-    if (acao === 'cancelar' && !window.confirm(`CANCELAR a proposta ${linha.adesao} no PAN? Isso não tem volta.`)) return
+    if (acao === 'aprovar' && !await dialogo.confirmar({
+      titulo: 'Aprovar no PAN?',
+      texto: `Proposta ${linha.adesao} de ${linha.nome || 'cliente'}.`,
+      rotuloOk: 'Aprovar',
+    })) return
+    if (acao === 'cancelar' && !await dialogo.confirmar({
+      titulo: 'Cancelar no PAN?',
+      texto: `Proposta ${linha.adesao}. Isso não tem volta.`,
+      perigo: true, rotuloOk: 'Cancelar proposta', rotuloCancelar: 'Voltar',
+    })) return
     setEsteiraBusy(`${linha.adesao}:${acao}`); setErro('')
     try {
       const d = await postApi('pan_esteira', { acao, proposta: linha.adesao, cpf: linha.cpf, geral: !vendedorFixo })

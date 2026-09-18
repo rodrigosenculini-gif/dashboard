@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useDialogo } from './Dialogo'
 
 
 import { callApi, useRevisaoCache } from './dadosCache'
@@ -167,6 +168,7 @@ function Editor({ chip, opcoes, onFechar, onSalvo }) {
 }
 
 export default function Chips({ onVoltar }) {
+  const dialogo = useDialogo()
   const [dados, setDados] = useState(null)
   const [opcoes, setOpcoes] = useState({})
   const [busca, setBusca] = useState('')
@@ -232,7 +234,7 @@ export default function Chips({ onVoltar }) {
   }
 
   async function excluir(id) {
-    if (!window.confirm('Remover este chip do controle?')) return
+    if (!await dialogo.confirmar({ titulo: 'Remover este chip?', texto: 'Ele sai do controle de chips.', perigo: true, rotuloOk: 'Remover' })) return
     await postJson('chips_excluir', { id })
     carregar({ forcar: true })
   }

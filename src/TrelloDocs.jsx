@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useDialogo } from './Dialogo'
 
 async function postJson(type, body) {
   const res = await fetch(`/api/dashboard?type=${type}`, {
@@ -71,6 +72,7 @@ function Bloco({ b, onMudar, onEnter, onRemover, autoFocus }) {
 }
 
 export default function TrelloDocs({ quadroId, cards = [], onVoltar }) {
+  const dialogo = useDialogo()
   const [docs, setDocs] = useState([])
   const [sel, setSel] = useState(null)
   const [carregando, setCarregando] = useState(true)
@@ -115,7 +117,8 @@ export default function TrelloDocs({ quadroId, cards = [], onVoltar }) {
   }
 
   async function excluirDoc() {
-    if (!sel?.id || !window.confirm(`Excluir "${sel.titulo}"?`)) return
+    if (!sel?.id) return
+    if (!await dialogo.confirmar({ titulo: 'Excluir documento?', texto: sel.titulo, perigo: true })) return
     await postJson('trello_doc_excluir', { id: sel.id })
     setSel(null)
     await carregar()

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useDialogo } from './Dialogo'
 
 // Nuvem de arquivos de ajuda das vendedoras.
 // - Bytes: Supabase Storage (bucket publico "arquivos-vendedoras"), upload e
@@ -245,6 +246,7 @@ export default function ArquivosButton({ dono = null, className = 'reset-btn' })
 }
 
 function ArquivosModal({ dono, onClose }) {
+  const dialogo = useDialogo()
   const donoNorm = dono && dono !== 'geral' ? dono : null
   const [pastas, setPastas] = useState([])
   const [arquivos, setArquivos] = useState([])
@@ -307,7 +309,7 @@ function ArquivosModal({ dono, onClose }) {
 
   // ---- pastas ----
   async function novaPasta() {
-    const nome = window.prompt('Nome da nova pasta:')
+    const nome = await dialogo.perguntar({ titulo: 'Nova pasta', placeholder: 'Nome da pasta', rotuloOk: 'Criar' })
     if (!nome?.trim()) return
     try {
       const r = await api('criar_pasta', { nome: nome.trim(), dono: donoNorm })
@@ -317,7 +319,7 @@ function ArquivosModal({ dono, onClose }) {
   }
 
   async function renomearPasta(p) {
-    const nome = window.prompt('Novo nome da pasta:', p.nome)
+    const nome = await dialogo.perguntar({ titulo: 'Renomear pasta', valorInicial: p.nome, rotuloOk: 'Renomear' })
     if (!nome?.trim() || nome.trim() === p.nome) return
     try {
       await api('renomear_pasta', { id: p.id, nome: nome.trim() })
@@ -327,7 +329,7 @@ function ArquivosModal({ dono, onClose }) {
 
   async function excluirPasta(p) {
     const n = contagem[p.id] || 0
-    if (!window.confirm(`Excluir a pasta "${p.nome}"${n ? ` e os ${n} arquivo(s) dentro dela` : ''}?`)) return
+    if (!await dialogo.confirmar({ titulo: 'Excluir pasta?', texto: `${p.nome}${n ? ` e os ${n} arquivo(s) dentro dela` : ''}`, perigo: true })) return
     try {
       const r = await api('excluir_pasta', { id: p.id })
       await deleteFromStorage(r.storage_paths)
@@ -367,7 +369,7 @@ function ArquivosModal({ dono, onClose }) {
   }
 
   async function renomearArquivo(a) {
-    const nome = window.prompt('Novo nome do arquivo:', a.nome)
+    const nome = await dialogo.perguntar({ titulo: 'Renomear arquivo', valorInicial: a.nome, rotuloOk: 'Renomear' })
     if (!nome?.trim() || nome.trim() === a.nome) return
     try {
       await api('renomear_arquivo', { id: a.id, nome: nome.trim() })
@@ -383,7 +385,7 @@ function ArquivosModal({ dono, onClose }) {
   }
 
   async function excluirArquivo(a) {
-    if (!window.confirm(`Excluir "${a.nome}"?`)) return
+    if (!await dialogo.confirmar({ titulo: 'Excluir arquivo?', texto: a.nome, perigo: true })) return
     try {
       const r = await api('excluir_arquivo', { id: a.id })
       await deleteFromStorage([r.storage_path || a.storage_path])
