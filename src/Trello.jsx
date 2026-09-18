@@ -33,10 +33,6 @@ function CardEditor({ card, listas, responsaveis = [], tags = [], onFechar, onSa
     lista_id: card?.lista_id ?? listas[0]?.id,
   })
   const [novoItem, setNovoItem] = useState('')
-  // comeca em checklist se a tarefa ja tem itens e nao tem descricao
-  const [descComoCheck, setDescComoCheck] = useState(
-    (card?.checklist?.length || 0) > 0 && !card?.descricao,
-  )
   const [salvando, setSalvando] = useState(false)
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
 
@@ -84,39 +80,23 @@ function CardEditor({ card, listas, responsaveis = [], tags = [], onFechar, onSa
 
           <div className="chip-campo">
             <label>Descrição</label>
-            {/* a descricao pode virar checklist: cada linha do texto vira um
-                item, e voltando pra texto os itens viram linhas de novo --
-                assim nada se perde na troca */}
-            <div className="home-toggle" style={{ marginBottom: 6 }}>
-              <button type="button" className={!descComoCheck ? 'on' : ''}
+            {/* descricao e checklist convivem: a tarefa pode ter texto, lista
+                de itens, ou os dois. Nao ha conversao entre eles -- o toggle
+                anterior apagava o checklist ao voltar pra texto. */}
+            <textarea className="chip-input" rows={3} value={f.descricao || ''}
+                      onChange={(e) => set('descricao', e.target.value)}
+                      placeholder="Contexto, links, critério de pronto" />
+            {(f.checklist || []).length === 0 && (
+              <button type="button" className="reset-btn" style={{ marginTop: 6, alignSelf: 'flex-start' }}
                 onClick={() => {
-                  if (!descComoCheck) return
-                  // checklist -> texto: cada item vira uma linha
-                  const linhas = (f.checklist || []).map((c) => c.texto).filter(Boolean)
-                  if (linhas.length) set('descricao', [f.descricao, ...linhas].filter(Boolean).join('\n'))
-                  set('checklist', [])
-                  setDescComoCheck(false)
-                }}>Texto</button>
-              <button type="button" className={descComoCheck ? 'on' : ''}
-                onClick={() => {
-                  if (descComoCheck) return
-                  // texto -> checklist: cada linha vira um item
+                  // aproveita as linhas do texto como primeiros itens, SEM apagar a descricao
                   const linhas = (f.descricao || '').split('\n').map((x) => x.trim()).filter(Boolean)
-                  if (linhas.length) {
-                    set('checklist', [...(f.checklist || []), ...linhas.map((t) => ({ texto: t, feito: false }))])
-                    set('descricao', '')
-                  }
-                  setDescComoCheck(true)
-                }}>Checklist</button>
-            </div>
-            {!descComoCheck && (
-              <textarea className="chip-input" rows={3} value={f.descricao || ''}
-                        onChange={(e) => set('descricao', e.target.value)} placeholder="Contexto, links, critério de pronto" />
-            )}
-            {descComoCheck && (
-              <p className="section-sub" style={{ margin: 0 }}>
-                Os itens ficam no Checklist abaixo.
-              </p>
+                  set('checklist', linhas.length
+                    ? linhas.map((t) => ({ texto: t, feito: false }))
+                    : [{ texto: '', feito: false }])
+                }}>
+                + Transformar em checklist
+              </button>
             )}
           </div>
 
