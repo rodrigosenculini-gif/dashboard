@@ -5521,7 +5521,7 @@ function VendedorasView() {
         <p className="section-label">Vendas por dia</p>
         {/* 70% deixava ~96px vazios embaixo do painel e ainda cortava o rotulo
             de total no topo da pilha. Ocupa a altura util e reserva margem. */}
-        <ResponsiveContainer width="100%" height="calc(100% - 26px)">
+        <ResponsiveContainer width="100%" height="88%">
           <BarChart data={porDia.rows} margin={{ top: 18, right: 6, left: 0, bottom: 0 }}>
             <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#8a978f' }} tickFormatter={fmtDataBR} />
             <Tooltip
