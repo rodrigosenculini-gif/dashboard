@@ -1828,7 +1828,7 @@ function RankingOverlay({ onClose }) {
     if (aba !== 'meta') return
     setLoadingMeta(true)
     Promise.all([
-      callApi('meta_vendedoras', { periodo_id: periodoSel }),
+      callApi('meta_vendedoras', periodoSel ? { periodo_id: periodoSel } : {}),
       periodos.length ? Promise.resolve(periodos) : callApi('meta_periodos', {}),
     ])
       .then(([m, p]) => { setMetas(m ?? []); if (!periodos.length) setPeriodos(p ?? []) })

@@ -1344,8 +1344,9 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_vendedoras_filtros()';
     params = [];
   } else if (type === 'meta_vendedoras') {
+    // callApi manda por query string (GET), nao no body
     sql = 'select * from dashboard_meta_vendedoras($1::int)';
-    params = [req.body?.periodo_id ?? null];
+    params = [req.query.periodo_id ? Number(req.query.periodo_id) : null];
   } else if (type === 'meta_periodos') {
     sql = 'select * from dashboard_meta_periodos()';
     params = [];
