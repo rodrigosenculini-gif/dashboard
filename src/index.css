@@ -2227,18 +2227,24 @@ body {
 .chip-salvar:disabled{ opacity:.45; cursor:default; }
 
 /* ================= TRELLO ================= */
+/* A tela do Trello ocupa exatamente a altura da janela: o quadro rola em si
+   (horizontal e vertical) e a pagina nao ganha rolagem propria. Sem isso a
+   soma padding do .app + cabecalho + altura das listas passava de 100vh e
+   sobrava aquela rolagem a toa. */
+.app:has(.trello-quadro){ padding-bottom:14px; height:100dvh; display:flex; flex-direction:column; }
+.app:has(.trello-quadro) > *{ flex:0 0 auto; }
+.app:has(.trello-quadro) .trello-quadro{ flex:1 1 auto; min-height:0; }
+
 .trello-quadro{
   display:flex; gap:13px; align-items:flex-start;
-  /* a rolagem horizontal e DO QUADRO, nao da pagina: sem o max-width as
-     listas esticavam o .app e a barra ia parar no rodape da janela,
-     levando o cabecalho junto */
+  /* a rolagem horizontal e DO QUADRO, nao da pagina */
   overflow-x:auto; overflow-y:hidden;
   max-width:100%; min-width:0; padding-bottom:10px;
 }
 .trello-lista{
   flex:0 0 268px; background:var(--surface); border:1px solid var(--border);
   border-radius:14px; padding:13px; display:flex; flex-direction:column; gap:10px;
-  max-height:calc(100vh - 230px); min-height:0;
+  max-height:100%; min-height:0;
 }
 .trello-lista-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .trello-lista-top h2{ margin:0; font-size:12.5px; font-weight:600; color:var(--text); }
