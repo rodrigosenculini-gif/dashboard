@@ -21,7 +21,7 @@ const PRIORIDADES = [
 const fmtData = (d) => (d ? String(d).split('-').reverse().join('/') : '')
 const hojeISO = () => new Date().toISOString().slice(0, 10)
 
-function CardEditor({ card, listas, responsaveis = [], onFechar, onSalvo }) {
+function CardEditor({ card, listas, responsaveis = [], tags = [], onFechar, onSalvo }) {
   const [f, setF] = useState({
     id: null, titulo: '', descricao: '', responsavel: '',
     prazo: '', prioridade: 'media', etiquetas: [], checklist: [], concluido: false, ...card,
@@ -111,6 +111,26 @@ function CardEditor({ card, listas, responsaveis = [], onFechar, onSalvo }) {
             </div>
           </div>
 
+          {tags.length > 0 && (
+            <div className="chip-campo">
+              <label>Tags</label>
+              <div className="chip-opcoes">
+                {tags.map((t) => {
+                  const on = (f.etiquetas || []).includes(t.nome)
+                  return (
+                    <button key={t.id} type="button"
+                      className={`trello-tag cor-${t.cor} ${on ? 'on' : ''}`}
+                      onClick={() => set('etiquetas', on
+                        ? f.etiquetas.filter((x) => x !== t.nome)
+                        : [...(f.etiquetas || []), t.nome])}>
+                      {t.nome}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="chip-campo">
             <label>Prioridade</label>
             <div className="chip-opcoes">
@@ -178,6 +198,12 @@ export default function Trello({ onVoltar }) {
   const listas = dados?.listas || []
   const total = listas.reduce((s, l) => s + l.cards.length, 0)
   // nomes ja usados, pra nao redigitar a cada tarefa
+  const tags = dados?.tags || []
+  // filtro por tag: card entra se tiver QUALQUER uma das tags marcadas
+  const listasFiltradas = !tagSel.length ? listas : listas.map((l) => ({
+    ...l,
+    cards: l.cards.filter((c) => (c.etiquetas || []).some((e) => tagSel.includes(e))),
+  }))
   const responsaveis = [...new Set(
     listas.flatMap((l) => l.cards.map((c) => (c.responsavel || '').trim())).filter(Boolean),
   )].sort((a, b) => a.localeCompare(b))
@@ -228,8 +254,24 @@ export default function Trello({ onVoltar }) {
 
       {erro && <div className="state-msg error">Erro: {erro}</div>}
 
+      {/* filtro por tag: clica pra ligar/desligar, vazio = todas */}
+      {tags.length > 0 && (
+        <div className="filters trello-tags-filtro">
+          {tags.map((t) => (
+            <button key={t.id} type="button"
+              className={`trello-tag cor-${t.cor} ${tagSel.includes(t.nome) ? 'on' : ''}`}
+              onClick={() => setTagSel((s) => s.includes(t.nome) ? s.filter((x) => x !== t.nome) : [...s, t.nome])}>
+              {t.nome}
+            </button>
+          ))}
+          {tagSel.length > 0 && (
+            <button type="button" className="reset-btn" onClick={() => setTagSel([])}>limpar</button>
+          )}
+        </div>
+      )}
+
       <div className="trello-quadro">
-        {listas.map((l) => (
+        {listasFiltradas.map((l) => (
           <section key={l.id} className={`trello-lista cor-${l.cor || 'muted'}`}
                    onDragOver={(e) => { e.preventDefault(); setAlvo(l.id) }}
                    onDragLeave={() => setAlvo((a) => (a === l.id ? null : a))}
@@ -265,6 +307,14 @@ export default function Trello({ onVoltar }) {
                         ))}
                       </ul>
                     )}
+                    {(c.etiquetas || []).length > 0 && (
+                      <div className="trello-card-tags">
+                        {c.etiquetas.map((e) => {
+                          const t = tags.find((x) => x.nome === e)
+                          return <span key={e} className={`trello-tag cor-${t?.cor || 'muted'}`}>{e}</span>
+                        })}
+                      </div>
+                    )}
                     <div className="trello-card-pe">
                       {c.responsavel && <span className="trello-pessoa">{c.responsavel}</span>}
                       {c.prazo && <span className={`trello-prazo ${atrasado ? 'atrasado' : ''}`}>{fmtData(c.prazo)}</span>}
@@ -289,7 +339,7 @@ export default function Trello({ onVoltar }) {
       </div>
 
       {editando && (
-        <CardEditor card={editando} listas={listas} responsaveis={responsaveis}
+        <CardEditor card={editando} listas={listas} responsaveis={responsaveis} tags={tags}
                     onFechar={() => setEditando(null)}
                     onSalvo={() => { setEditando(null); carregar({ forcar: true }) }} />
       )}

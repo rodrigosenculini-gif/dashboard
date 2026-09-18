@@ -988,6 +988,8 @@ export default async function handler(req, res) {
       trello_lista_salvar: { sql: 'select dashboard_trello_lista_salvar($1::jsonb) as r',                args: (b) => [JSON.stringify(b)] },
       trello_lista_excluir:{ sql: 'select dashboard_trello_lista_excluir($1::bigint) as r',              args: (b) => [b.id] },
       trello_check_marcar: { sql: 'select dashboard_trello_check_marcar($1::bigint,$2::boolean) as r',   args: (b) => [b.id, !!b.feito] },
+      trello_tag_salvar:   { sql: 'select dashboard_trello_tag_salvar($1::jsonb) as r',                  args: (b) => [JSON.stringify(b)] },
+      trello_tag_excluir:  { sql: 'select dashboard_trello_tag_excluir($1::bigint) as r',                args: (b) => [b.id] },
     };
     if (RPC_POST[type]) {
       try {
