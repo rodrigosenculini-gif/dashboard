@@ -2266,6 +2266,15 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .trello-card.prio-media{ border-left-color:var(--lime); }
 .trello-card.prio-baixa{ border-left-color:var(--muted); }
 
+/* visao de agenda: tarefas em aberto por faixa de prazo */
+.trello-agenda{ display:flex; flex-direction:column; gap:16px; margin-bottom:18px; }
+.trello-agenda-grupo{ display:flex; flex-direction:column; gap:7px; }
+.trello-agenda-grupo header{ display:flex; align-items:center; gap:8px; }
+.trello-agenda-grupo h2{ margin:0; font-size:12px; font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.trello-agenda-grupo.atrasado h2{ color:var(--rose); }
+.trello-agenda-grupo.hoje h2{ color:var(--gold); }
+.trello-agenda-grupo .trello-card{ cursor:pointer; }
+
 /* tags: mesma pastilha no filtro, no card e no editor */
 .trello-tag{
   display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px;

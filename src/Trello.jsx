@@ -204,6 +204,31 @@ export default function Trello({ onVoltar }) {
     ...l,
     cards: l.cards.filter((c) => (c.etiquetas || []).some((e) => tagSel.includes(e))),
   }))
+  // agenda: agrupa por prazo em faixas, atrasado primeiro
+  const agenda = (() => {
+    const hoje = hojeISO()
+    const emDias = (n) => { const d = new Date(hoje); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+    const fim7 = emDias(7)
+    const grupos = [
+      { id: 'atrasado', titulo: 'Atrasadas', cards: [] },
+      { id: 'hoje', titulo: 'Hoje', cards: [] },
+      { id: 'semana', titulo: 'Próximos 7 dias', cards: [] },
+      { id: 'depois', titulo: 'Mais adiante', cards: [] },
+      { id: 'sem', titulo: 'Sem prazo', cards: [] },
+    ]
+    listasFiltradas.forEach((l) => l.cards.forEach((c) => {
+      const item = { ...c, listaNome: l.nome }
+      if (c.concluido) return
+      if (!c.prazo) grupos[4].cards.push(item)
+      else if (c.prazo < hoje) grupos[0].cards.push(item)
+      else if (c.prazo === hoje) grupos[1].cards.push(item)
+      else if (c.prazo <= fim7) grupos[2].cards.push(item)
+      else grupos[3].cards.push(item)
+    }))
+    grupos.forEach((g) => g.cards.sort((a, b) => (a.prazo || '9999').localeCompare(b.prazo || '9999')))
+    return grupos.filter((g) => g.cards.length)
+  })()
+
   const responsaveis = [...new Set(
     listas.flatMap((l) => l.cards.map((c) => (c.responsavel || '').trim())).filter(Boolean),
   )].sort((a, b) => a.localeCompare(b))
@@ -248,7 +273,11 @@ export default function Trello({ onVoltar }) {
           <span className="status-line">{carregando ? 'carregando...' : `${total} tarefa(s)`}</span>
           <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>
           <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando}>&#8635; Atualizar</button>
-          <button className="reset-btn" onClick={novaLista}>+ Lista</button>
+          <div className="home-toggle">
+            <button type="button" className={visao === 'quadro' ? 'on' : ''} onClick={() => setVisao('quadro')}>Quadro</button>
+            <button type="button" className={visao === 'agenda' ? 'on' : ''} onClick={() => setVisao('agenda')}>Agenda</button>
+          </div>
+          {visao === 'quadro' && <button className="reset-btn" onClick={novaLista}>+ Lista</button>}
         </div>
       </div>
 
@@ -270,6 +299,29 @@ export default function Trello({ onVoltar }) {
         </div>
       )}
 
+      {visao === 'agenda' && (
+        <div className="trello-agenda">
+          {agenda.map((g) => (
+            <section key={g.id} className={`trello-agenda-grupo ${g.id}`}>
+              <header><h2>{g.titulo}</h2><span className="trello-contador">{g.cards.length}</span></header>
+              {g.cards.map((c) => (
+                <article key={c.id} className={`trello-card prio-${c.prioridade}`} onClick={() => setEditando(c)}>
+                  <h3>{c.titulo}</h3>
+                  <div className="trello-card-pe">
+                    <span className="trello-pessoa">{c.listaNome}</span>
+                    {c.responsavel && <span className="trello-pessoa">{c.responsavel}</span>}
+                    {c.prazo && <span className={`trello-prazo ${g.id === 'atrasado' ? 'atrasado' : ''}`}>{fmtData(c.prazo)}</span>}
+                    {c.checklist_total > 0 && <span className="trello-checkcount">{c.checklist_feito}/{c.checklist_total}</span>}
+                  </div>
+                </article>
+              ))}
+            </section>
+          ))}
+          {!agenda.length && <p className="home-vazio">Nenhuma tarefa em aberto.</p>}
+        </div>
+      )}
+
+      {visao === 'quadro' && (
       <div className="trello-quadro">
         {listasFiltradas.map((l) => (
           <section key={l.id} className={`trello-lista cor-${l.cor || 'muted'}`}
@@ -337,6 +389,7 @@ export default function Trello({ onVoltar }) {
           <p className="home-vazio">Nenhuma lista ainda. Crie a primeira em &ldquo;+ Lista&rdquo;.</p>
         )}
       </div>
+      )}
 
       {editando && (
         <CardEditor card={editando} listas={listas} responsaveis={responsaveis} tags={tags}
