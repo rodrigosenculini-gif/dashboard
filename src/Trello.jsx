@@ -58,7 +58,7 @@ function CardEditor({ card, listas, responsaveis = [], tags = [], onFechar, onSa
   }
   async function excluir() {
     if (!f.id) return
-    if (!await dialogo.confirmar({ titulo: 'Excluir esta tarefa?', texto: f.titulo, perigo: true })) return
+    if (!await dialogo.confirmar({ titulo: 'Excluir esta tarefa?', texto: f.titulo, perigo: true, rotuloOk: 'Excluir' })) return
     await postJson('trello_card_excluir', { id: f.id })
     onSalvo()
   }

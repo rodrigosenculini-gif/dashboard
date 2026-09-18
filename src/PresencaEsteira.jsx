@@ -381,8 +381,11 @@ function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose
   const [arquivo, setArquivo] = useState(null)
   const [motivo, setMotivo] = useState('')
 
-  async function enviar(corpo, confirmacao) {
-    if (confirmacao && !await dialogo.confirmar({ titulo: confirmacao, perigo: true })) return
+  async function enviar(corpo, confirmacao, rotuloOk) {
+    // 'perigo' e so a cor do botao; o rotulo descreve a acao real
+    if (confirmacao && !await dialogo.confirmar({
+      titulo: confirmacao, perigo: true, rotuloOk: rotuloOk || 'Confirmar',
+    })) return
     setErro(''); setOcupado(true)
     try {
       const r = await apiPresenca('acao', Object.assign({ modo, solicitante: vendedor || 'geral' }, corpo))
@@ -439,7 +442,8 @@ function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose
         {aba === 'conta' && (
           <form className='add-venda-form' onSubmit={(e) => { e.preventDefault()
             enviar({ acao: 'reapresentar', operacaoId: item.operacao_id, ...conta },
-              'Reapresentar o pagamento com esta conta? Isso reenvia o desembolso no banco.') }}>
+              'Reapresentar o pagamento com esta conta? Isso reenvia o desembolso no banco.',
+              'Reapresentar') }}>
             <label>Banco<input required value={conta.banco} placeholder='104'
               onChange={(e) => setConta({ ...conta, banco: e.target.value })} /></label>
             <label>Agência<input required value={conta.agencia} placeholder='0809'
@@ -479,7 +483,8 @@ function PresencaDetalhe({ item, cat, geral, vendedor, modo, abaInicial, onClose
         {aba === 'cancelar' && geral && (
           <form className='add-venda-form' onSubmit={(e) => { e.preventDefault()
             enviar({ acao: 'cancelar', operacaoId: item.operacao_id, motivoId: Number(motivo) },
-              'Cancelar esta operação no Presença? Não tem volta.') }}>
+              'Cancelar esta operação no Presença? Não tem volta.',
+              'Cancelar operação') }}>
             <label>Motivo
               <select required value={motivo} onChange={(e) => setMotivo(e.target.value)}>
                 <option value=''>escolha…</option>

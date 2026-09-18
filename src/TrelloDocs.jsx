@@ -118,7 +118,7 @@ export default function TrelloDocs({ quadroId, cards = [], onVoltar }) {
 
   async function excluirDoc() {
     if (!sel?.id) return
-    if (!await dialogo.confirmar({ titulo: 'Excluir documento?', texto: sel.titulo, perigo: true })) return
+    if (!await dialogo.confirmar({ titulo: 'Excluir documento?', texto: sel.titulo, perigo: true, rotuloOk: 'Excluir' })) return
     await postJson('trello_doc_excluir', { id: sel.id })
     setSel(null)
     await carregar()

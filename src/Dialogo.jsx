@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
  *
  * Uso:
  *   const dialogo = useDialogo()
- *   if (!await dialogo.confirmar({ titulo: 'Excluir?', perigo: true })) return
+ *   if (!await dialogo.confirmar({ titulo: 'Excluir?', perigo: true, rotuloOk: 'Excluir' })) return
  *   const nome = await dialogo.perguntar({ titulo: 'Nome da lista' })
  */
 const DialogoCtx = createContext(null)
@@ -67,7 +67,9 @@ function Caixa({ pedido, onResolver }) {
             onClick={confirmar}
             disabled={pedido.tipo === 'perguntar' && !valor.trim()}
           >
-            {pedido.rotuloOk || (pedido.perigo ? 'Excluir' : 'Confirmar')}
+            {/* 'perigo' e so a cor: a acao pode ser cancelar, reenviar,
+                reapresentar... quem exclui passa rotuloOk explicito */}
+            {pedido.rotuloOk || 'Confirmar'}
           </button>
           <button
             type="button"

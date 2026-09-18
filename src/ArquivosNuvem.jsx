@@ -329,7 +329,7 @@ function ArquivosModal({ dono, onClose }) {
 
   async function excluirPasta(p) {
     const n = contagem[p.id] || 0
-    if (!await dialogo.confirmar({ titulo: 'Excluir pasta?', texto: `${p.nome}${n ? ` e os ${n} arquivo(s) dentro dela` : ''}`, perigo: true })) return
+    if (!await dialogo.confirmar({ titulo: 'Excluir pasta?', texto: `${p.nome}${n ? ` e os ${n} arquivo(s) dentro dela` : ''}`, perigo: true, rotuloOk: 'Excluir' })) return
     try {
       const r = await api('excluir_pasta', { id: p.id })
       await deleteFromStorage(r.storage_paths)
@@ -385,7 +385,7 @@ function ArquivosModal({ dono, onClose }) {
   }
 
   async function excluirArquivo(a) {
-    if (!await dialogo.confirmar({ titulo: 'Excluir arquivo?', texto: a.nome, perigo: true })) return
+    if (!await dialogo.confirmar({ titulo: 'Excluir arquivo?', texto: a.nome, perigo: true, rotuloOk: 'Excluir' })) return
     try {
       const r = await api('excluir_arquivo', { id: a.id })
       await deleteFromStorage([r.storage_path || a.storage_path])
