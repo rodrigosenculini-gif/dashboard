@@ -1192,18 +1192,33 @@ export default async function handler(req, res) {
     try {
       const p_vendedor = req.query.vendedor || null;
       const client = getPool();
+      // modo=ponto: a coluna valor sai em PONTOS (valor x peso), como a tela
+      // mostra quando o usuario esta em "Ver em pontos". Antes o download
+      // vinha sempre em valor, independente do modo.
+      const emPontos = req.query.modo === 'ponto';
       const result = await client.query(
-        `select data_status, vendedor, banco, tabela, adesao, cpf, nome, valor, parcelas, seguro, data_pagamento
-         from vendedoras_analise
-         where ($1::text is null or vendedor = $1::text)
-           and ($2::date is null or data_status >= $2::date)
-           and ($3::date is null or data_status <= $3::date)
-         order by data_status desc nulls last
+        `select va.data_status, va.vendedor, va.banco, va.tabela, va.adesao, va.cpf, va.nome,
+                case when $4::boolean then
+                  round(coalesce(vg.ponto,
+                        coalesce(va.valor,0) * coalesce(calc_peso_vendas(va.banco, va.tabela, va.parcelas::int, va.seguro, va.data_status),0)), 2)
+                  else va.valor end as valor,
+                va.parcelas, va.seguro, va.data_pagamento
+         from vendedoras_analise va
+         left join lateral (
+           select v.ponto from vendas_gerais v
+           where norm_cpf(v.cpf) = norm_cpf(va.cpf)
+             and (va.adesao is null or v.adesao = va.adesao)
+           order by v.id limit 1
+         ) vg on true
+         where ($1::text is null or va.vendedor = $1::text)
+           and ($2::date is null or va.data_status >= $2::date)
+           and ($3::date is null or va.data_status <= $3::date)
+         order by va.data_status desc nulls last
          limit 20000`,
-        [p_vendedor, p_date_from, p_date_to]
+        [p_vendedor, p_date_from, p_date_to, emPontos]
       );
       const cols = ['data_status', 'vendedor', 'banco', 'tabela', 'adesao', 'cpf', 'nome', 'valor', 'parcelas', 'seguro', 'data_pagamento'];
-      return sendCsv(res, cols, result.rows, `vendedoras_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
+      return sendCsv(res, cols, result.rows, `vendedoras_${emPontos ? 'pontos' : 'valor'}_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
@@ -1327,6 +1342,12 @@ export default async function handler(req, res) {
     params = [];
   } else if (type === 'vendedoras_filtros') {
     sql = 'select * from dashboard_vendedoras_filtros()';
+    params = [];
+  } else if (type === 'meta_vendedoras') {
+    sql = 'select * from dashboard_meta_vendedoras($1::int)';
+    params = [req.body?.periodo_id ?? null];
+  } else if (type === 'meta_periodos') {
+    sql = 'select * from dashboard_meta_periodos()';
     params = [];
   } else if (type === 'vendedoras_sync') {
     sql = 'select * from dashboard_vendedoras_sync()';

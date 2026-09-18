@@ -64,6 +64,20 @@ async function parseArquivoCru(file) {
   })
 }
 
+// O relatorio de consultas do Soma traz na coluna Banco a BANCARIZADORA
+// (UY3, CELCOIN), nao o nome do banco -- entao a importacao ignorava tudo como
+// "banco sem importacao". O cabecalho desse relatorio e inconfundivel
+// (Parceiro + Possui Proposta + Autocontratacao), entao marcamos o banco.
+function marcarBancoSoma(rows) {
+  if (!rows.length) return rows
+  const cab = Object.keys(rows[0] || {}).map((k) => k.toLowerCase())
+  const ehRelatorioSoma = cab.some((c) => c.includes('parceiro'))
+    && cab.some((c) => c.includes('possui proposta'))
+    && cab.some((c) => c.includes('autocontrata'))
+  if (!ehRelatorioSoma) return rows
+  return rows.map((r) => ({ ...r, Banco: 'SOMA ' + (r.Banco || '') }))
+}
+
 const REFRESH_MS = TTL_MS // atualiza sozinho a cada 3 min
 // altura de uma linha do breakdown (padding 7+7, conteúdo ~18, borda 1)
 const BREAKDOWN_ROW_H = 33
@@ -1803,6 +1817,24 @@ function RankingOverlay({ onClose }) {
   const [ranking, setRanking] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // duas telas no mesmo overlay: ranking (por valor) e meta por vendedora
+  const [aba, setAba] = useState('ranking')
+  const [metas, setMetas] = useState([])
+  const [periodos, setPeriodos] = useState([])
+  const [periodoSel, setPeriodoSel] = useState(null)   // null = meta atual
+  const [loadingMeta, setLoadingMeta] = useState(false)
+
+  useEffect(() => {
+    if (aba !== 'meta') return
+    setLoadingMeta(true)
+    Promise.all([
+      callApi('meta_vendedoras', { periodo_id: periodoSel }),
+      periodos.length ? Promise.resolve(periodos) : callApi('meta_periodos', {}),
+    ])
+      .then(([m, p]) => { setMetas(m ?? []); if (!periodos.length) setPeriodos(p ?? []) })
+      .catch((e) => setError(e.message || 'Erro ao carregar metas.'))
+      .finally(() => setLoadingMeta(false))
+  }, [aba, periodoSel])
 
   useEffect(() => {
     setLoading(true)
@@ -1820,35 +1852,98 @@ function RankingOverlay({ onClose }) {
       <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
         <div className="funil-header">
           <div>
-            <h2>Ranking de Vendedoras</h2>
-            <p className="subtitle">Ordenado por valor total &middot; somente leitura</p>
+            <h2>{aba === 'ranking' ? 'Ranking de Vendedoras' : 'Meta por Vendedora'}</h2>
+            <p className="subtitle">
+              {aba === 'ranking'
+                ? 'Ordenado por valor total \u00b7 somente leitura'
+                : 'Atingimento da meta \u00b7 do maior para o menor'}
+            </p>
           </div>
           <button className="funil-close" onClick={onClose}>&times;</button>
         </div>
 
-        <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+        <div className="filters">
+          {/* mesmo seletor de abas usado na tela Geral (home-toggle) */}
+          <div className="home-toggle">
+            <button type="button" className={aba === 'ranking' ? 'on' : ''}
+              onClick={() => setAba('ranking')}>Ranking</button>
+            <button type="button" className={aba === 'meta' ? 'on' : ''}
+              onClick={() => setAba('meta')}>Meta vendedoras</button>
+          </div>
+          {aba === 'meta' && periodos.length > 0 && (
+            <select value={periodoSel ?? ''} onChange={(e) => setPeriodoSel(e.target.value ? Number(e.target.value) : null)}
+              title="Per&iacute;odo da meta">
+              <option value="">meta atual</option>
+              {periodos.map((p) => (
+                <option key={p.id} value={p.id}>{p.descricao}</option>
+              ))}
+            </select>
+          )}
+        </div>
 
-        {error && <div className="state-msg error">Erro: {error}</div>}
-        {loading && ranking.length === 0 && <div className="state-msg">Carregando...</div>}
-        {!loading && ranking.length === 0 && !error && (
-          <div className="state-msg">Nenhuma venda no per&iacute;odo selecionado.</div>
+        {aba === 'ranking' && (
+          <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
         )}
 
-        <div className="ranking-list">
-          {ranking.map((r, i) => (
-            <div className="ranking-card" key={r.vendedor}>
-              <span className="ranking-pos">{i + 1}&ordm;</span>
-              <div className="ranking-info">
-                <p className="ranking-nome">{r.vendedor}</p>
-                <div className="ranking-stats">
-                  <span><strong>{fmtMoeda(r.valor_total)}</strong> total</span>
-                  <span>{fmtInt(r.qtd_total)} propostas</span>
-                  <span>{r.banco_top || '-'} (banco mais usado)</span>
+        {error && <div className="state-msg error">Erro: {error}</div>}
+
+        {aba === 'ranking' && (
+          <>
+            {loading && ranking.length === 0 && <div className="state-msg">Carregando...</div>}
+            {!loading && ranking.length === 0 && !error && (
+              <div className="state-msg">Nenhuma venda no per&iacute;odo selecionado.</div>
+            )}
+            <div className="ranking-list">
+              {ranking.map((r, i) => (
+                <div className="ranking-card" key={r.vendedor}>
+                  <span className="ranking-pos">{i + 1}&ordm;</span>
+                  <div className="ranking-info">
+                    <p className="ranking-nome">{r.vendedor}</p>
+                    <div className="ranking-stats">
+                      <span><strong>{fmtMoeda(r.valor_total)}</strong> total</span>
+                      <span>{fmtInt(r.qtd_total)} propostas</span>
+                      <span>{r.banco_top || '-'} (banco mais usado)</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
+
+        {aba === 'meta' && (
+          <>
+            {loadingMeta && metas.length === 0 && <div className="state-msg">Carregando...</div>}
+            {!loadingMeta && metas.length === 0 && !error && (
+              <div className="state-msg">Nenhuma venda no per&iacute;odo da meta.</div>
+            )}
+            {metas.length > 0 && (
+              <p className="subtitle" style={{ margin: '0 0 8px' }}>
+                {metas[0].periodo_descricao} &middot; alvo {fmtInt(metas[0].alvo_pontos)} pontos
+              </p>
+            )}
+            <div className="ranking-list">
+              {metas.map((m) => (
+                <div className="ranking-card" key={m.vendedor}>
+                  <span className="ranking-pos">{m.posicao}&ordm;</span>
+                  <div className="ranking-info">
+                    <p className="ranking-nome">{m.vendedor}</p>
+                    <div className="ranking-stats">
+                      <span><strong>{Number(m.pct_meta).toFixed(1)}%</strong> da meta</span>
+                      <span>{fmtInt(m.pontos)} pontos</span>
+                      <span>{fmtInt(m.qtd)} vendas</span>
+                    </div>
+                    {/* mesma barra da meta coletiva (bar-track/bar-fill) */}
+                    <div className="bar-track" style={{ marginTop: 6 }}>
+                      <div className="bar-fill"
+                        style={{ width: `${Math.min(100, Number(m.pct_meta) || 0)}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -5209,7 +5304,8 @@ function VendedorasView() {
   const podePaginaAnterior = page >= 2
 
   const handleDownload = () => {
-    const qs = new URLSearchParams({ type: 'vendedoras_export', vendedor, date_from: dataInicio || '', date_to: dataFim || '' })
+    // leva o modo atual: em "Ver em pontos", o CSV sai em pontos
+    const qs = new URLSearchParams({ type: 'vendedoras_export', vendedor, date_from: dataInicio || '', date_to: dataFim || '', modo })
     window.open(`/api/dashboard?${qs.toString()}`, '_blank')
   }
 
@@ -5638,7 +5734,7 @@ function VendasView() {
     if (!file) return
     setAjustando(true); setImportMsg('')
     try {
-      const rows = await parseArquivoCru(file)
+      const rows = marcarBancoSoma(await parseArquivoCru(file))
       if (!rows.length) { setImportMsg('Nenhuma linha encontrada no arquivo.'); return }
       const previa = await postApi('vendas_import_v3', { rows, aplicar: false })
       if (previa?.error) { setImportMsg(previa.error); return }
