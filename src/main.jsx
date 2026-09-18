@@ -47,18 +47,24 @@ class LimiteDeErro extends React.Component {
   }
 }
 
-// Barra de rolagem: só fica visível enquanto a página está rolando de
-// verdade. `capture: true` no document pega o evento de qualquer área
-// rolável (não só a janela), sem precisar de um listener por elemento.
-let scrollHideTimer
+// Barra de rolagem: só fica visível enquanto AQUELA área está rolando.
+// Antes a classe ia no <html> e o seletor `html.is-scrolling *` acendia a
+// barra de tudo que fosse rolável na tela ao mesmo tempo -- parecia que as
+// barras estavam conectadas. Agora a marca vai no proprio elemento que
+// rolou, e cada um tem seu timer.
+const timersDeScroll = new WeakMap()
 document.addEventListener(
   'scroll',
-  () => {
-    document.documentElement.classList.add('is-scrolling')
-    clearTimeout(scrollHideTimer)
-    scrollHideTimer = setTimeout(() => {
-      document.documentElement.classList.remove('is-scrolling')
-    }, 1100)
+  (e) => {
+    const alvo = e.target === document || e.target === document.documentElement
+      ? document.documentElement
+      : e.target
+    if (!alvo?.classList) return
+    alvo.classList.add('is-scrolling')
+    clearTimeout(timersDeScroll.get(alvo))
+    timersDeScroll.set(alvo, setTimeout(() => {
+      alvo.classList.remove('is-scrolling')
+    }, 1100))
   },
   { capture: true, passive: true }
 )
