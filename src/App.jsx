@@ -1828,8 +1828,10 @@ function RankingOverlay({ onClose }) {
     if (aba !== 'meta') return
     setLoadingMeta(true)
     Promise.all([
-      callApi('meta_vendedoras', periodoSel ? { periodo_id: periodoSel } : {}),
-      periodos.length ? Promise.resolve(periodos) : callApi('meta_periodos', {}),
+      // forcar: o periodo muda a leitura inteira e o usuario espera ver a
+      // troca na hora -- cache aqui so confunde
+      callApi('meta_vendedoras', periodoSel ? { periodo_id: periodoSel } : {}, { forcar: true }),
+      periodos.length ? Promise.resolve(periodos) : callApi('meta_periodos', {}, { forcar: true }),
     ])
       .then(([m, p]) => { setMetas(m ?? []); if (!periodos.length) setPeriodos(p ?? []) })
       .catch((e) => setError(e.message || 'Erro ao carregar metas.'))
