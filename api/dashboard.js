@@ -990,6 +990,8 @@ export default async function handler(req, res) {
       trello_check_marcar: { sql: 'select dashboard_trello_check_marcar($1::bigint,$2::boolean) as r',   args: (b) => [b.id, !!b.feito] },
       trello_tag_salvar:   { sql: 'select dashboard_trello_tag_salvar($1::jsonb) as r',                  args: (b) => [JSON.stringify(b)] },
       trello_tag_excluir:  { sql: 'select dashboard_trello_tag_excluir($1::bigint) as r',                args: (b) => [b.id] },
+      trello_doc_salvar:   { sql: 'select dashboard_trello_doc_salvar($1::jsonb) as r',                  args: (b) => [JSON.stringify(b)] },
+      trello_doc_excluir:  { sql: 'select dashboard_trello_doc_excluir($1::bigint) as r',                args: (b) => [b.id] },
     };
     if (RPC_POST[type]) {
       try {
@@ -1356,6 +1358,9 @@ export default async function handler(req, res) {
               req.body?.valor ?? null, req.body?.tabela || null, req.body?.parcelas ?? null,
               req.body?.seguro || null, req.body?.data_pagamento || null,
               req.body?.cpf || null, req.body?.nome || null, req.body?.banco || null];
+  } else if (type === 'trello_docs') {
+    sql = 'select dashboard_trello_docs($1::bigint) as docs';
+    params = [req.query.quadro_id ? Number(req.query.quadro_id) : null];
   } else if (type === 'meta_vendedoras') {
     // callApi manda por query string (GET), nao no body
     sql = 'select * from dashboard_meta_vendedoras($1::int)';

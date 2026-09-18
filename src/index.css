@@ -2266,6 +2266,52 @@ html.is-scrolling::-webkit-scrollbar-thumb:horizontal {
 .trello-card.prio-media{ border-left-color:var(--lime); }
 .trello-card.prio-baixa{ border-left-color:var(--muted); }
 
+/* --- Documentos do Trello (aba Docs) --- */
+.doc-tela{ display:grid; grid-template-columns:230px minmax(0,1fr); gap:14px; margin-bottom:18px; min-height:460px; }
+.doc-lista{ display:flex; flex-direction:column; gap:4px; border-right:1px solid var(--border); padding-right:12px; }
+.doc-lista header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.doc-lista h2{ margin:0; font-size:12px; font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.doc-item{
+  text-align:left; background:none; border:1px solid transparent; border-radius:7px;
+  padding:7px 9px; cursor:pointer; font-family:inherit; display:flex; flex-direction:column; gap:2px;
+}
+.doc-item:hover{ border-color:var(--border); }
+.doc-item.on{ background:var(--surface-2); border-color:var(--border); }
+.doc-item-nome{ font-size:12.5px; color:var(--text); }
+.doc-item-card{ font-size:10.5px; color:var(--muted); }
+
+.doc-editor{ display:flex; flex-direction:column; gap:12px; min-width:0; }
+.doc-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.doc-titulo{
+  flex:1 1 240px; background:none; border:none; outline:none; font-family:inherit;
+  font-size:19px; font-weight:500; color:var(--text); padding:2px 0;
+}
+.doc-top-acoes{ display:flex; align-items:center; gap:7px; }
+
+.doc-corpo{ display:flex; flex-direction:column; gap:3px; }
+.doc-bloco{ display:flex; align-items:flex-start; gap:7px; position:relative; }
+.doc-bloco textarea{
+  flex:1; background:none; border:none; outline:none; resize:none; overflow:hidden;
+  font-family:inherit; color:var(--text); line-height:1.55; padding:3px 0;
+}
+.doc-bloco textarea::placeholder{ color:var(--muted); opacity:.5; }
+.doc-bloco textarea.feito{ text-decoration:line-through; opacity:.55; }
+.doc-titulo-bloco textarea, .doc-titulo textarea{ font-size:19px; }
+.doc-bloco.doc-titulo textarea{ font-size:18px; font-weight:500; }
+.doc-bloco.doc-subtitulo textarea{ font-size:15px; font-weight:500; color:var(--gold); }
+.doc-bloco.doc-texto textarea{ font-size:13px; }
+.doc-bloco.doc-check textarea{ font-size:13px; }
+.doc-bloco.doc-check input{ margin-top:7px; accent-color:var(--lime); }
+.doc-bloco.doc-divisor{ align-items:center; padding:6px 0; }
+.doc-bloco.doc-divisor hr{ flex:1; border:none; border-top:1px solid var(--border); margin:0; }
+.doc-bloco-x{
+  opacity:0; background:none; border:none; color:var(--muted); cursor:pointer;
+  font-size:15px; line-height:1; padding:3px 5px; transition:opacity .12s;
+}
+.doc-bloco:hover .doc-bloco-x{ opacity:.7; }
+.doc-bloco-x:hover{ color:var(--rose); }
+.doc-add{ display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+
 /* visao de agenda: tarefas em aberto por faixa de prazo */
 .trello-agenda{ display:flex; flex-direction:column; gap:16px; margin-bottom:18px; }
 .trello-agenda-grupo{ display:flex; flex-direction:column; gap:7px; }

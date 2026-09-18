@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import TrelloDocs from './TrelloDocs'
 
 import { callApi, useRevisaoCache } from './dadosCache'
 
@@ -276,6 +277,7 @@ export default function Trello({ onVoltar }) {
           <div className="home-toggle">
             <button type="button" className={visao === 'quadro' ? 'on' : ''} onClick={() => setVisao('quadro')}>Quadro</button>
             <button type="button" className={visao === 'agenda' ? 'on' : ''} onClick={() => setVisao('agenda')}>Agenda</button>
+            <button type="button" className={visao === 'docs' ? 'on' : ''} onClick={() => setVisao('docs')}>Docs</button>
           </div>
           {visao === 'quadro' && <button className="reset-btn" onClick={novaLista}>+ Lista</button>}
         </div>
@@ -297,6 +299,11 @@ export default function Trello({ onVoltar }) {
             <button type="button" className="reset-btn" onClick={() => setTagSel([])}>limpar</button>
           )}
         </div>
+      )}
+
+      {visao === 'docs' && (
+        <TrelloDocs quadroId={dados?.quadro?.id}
+          cards={listas.flatMap((l) => l.cards.map((c) => ({ id: c.id, titulo: c.titulo })))} />
       )}
 
       {visao === 'agenda' && (
