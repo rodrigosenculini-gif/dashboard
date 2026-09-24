@@ -896,7 +896,7 @@ function LeilaoDetalhado() {
     <>
       <div className="topbar">
         <div>
-          <h1><span className="pulse" /> Meta &middot; Painel de Disparos</h1>
+          <span className="pulse" title="dados ao vivo" />
           <p className="subtitle">Envio de leads e disparo de WhatsApp via API Meta &mdash; Hotline</p>
         </div>
         <div className="topbar-right">
@@ -908,6 +908,9 @@ function LeilaoDetalhado() {
           </button>
           <button className="refresh-btn" onClick={handleDownload} title="Baixar relat&oacute;rio filtrado em CSV">
             &#8595; Baixar
+          </button>
+          <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">
+            Consulta Cliente
           </button>
           <button className="refresh-btn" onClick={() => load({ forcar: true })} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
@@ -1127,7 +1130,7 @@ function EntradasLP() {
   return (
     <>
       <div className="topbar">
-        <h1><span className="pulse" /> Entradas LP</h1>
+        <span className="pulse" title="dados ao vivo" />
         <div className="topbar-right">
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
@@ -1666,7 +1669,7 @@ function N8nExecucoes() {
   return (
     <>
       <div className="topbar">
-        <h1><span className="pulse" /> n8n &mdash; Execu&ccedil;&otilde;es</h1>
+        <span className="pulse" title="dados ao vivo" />
         <div className="topbar-right">
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
@@ -5250,7 +5253,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
       </div>
 
       <div className="topbar">
-        <h1><span className="pulse" /> Minhas Vendas</h1>
+        <span className="pulse" title="dados ao vivo" />
         <div className="topbar-right">
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
@@ -5269,29 +5272,14 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
 
       {/* consultas de banco num grupo proprio: sao 7 botoes e, misturados com
           as acoes, a linha quebrava deixando um solto no fim */}
-      <div className="acoes-consultas">
-        <span className="acoes-titulo">consultas</span>
-          <button className="refresh-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: consulta status, saldo/ofertas e cadastro de proposta">
-            Novo Saque
-          </button>
-          <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">
-            Consulta Cliente
-          </button>
-          <button className="refresh-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro de proposta">
-            PAN
-          </button>
-          <button className="refresh-btn" onClick={() => setShowC6(true)} title="C6: consulta de proposta por adesão (API do banco) ou por CPF (propostas já registradas)">
-            C6
-          </button>
-          <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simula&ccedil;&atilde;o e cadastro de proposta">
-            Soma
-          </button>
-          <button className="refresh-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação de pagamento">
-            Presença
-          </button>
-          <button ref={tourFactaRef} className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
-            Consulta Facta
-          </button>
+      {/* bancos em quadradinhos; Consulta Cliente subiu para a barra de acoes */}
+      <div className="bancos-atalhos linha-propria">
+        <button className="banco-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: status, saldo/ofertas e cadastro de proposta">NS</button>
+        <button className="banco-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro">PAN</button>
+        <button className="banco-btn" onClick={() => setShowC6(true)} title="C6: consulta de proposta por adesão ou CPF">C6</button>
+        <button className="banco-btn" onClick={() => setShowSomaJornada(true)} title="Soma: margem, simulação e cadastro de proposta">SOMA</button>
+        <button className="banco-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação">PRE</button>
+        <button ref={tourFactaRef} className="banco-btn" onClick={() => setShowFacta(true)} title="Facta: consulta de proposta por CPF ou código AF">FAC</button>
       </div>
 
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
@@ -5648,12 +5636,15 @@ function VendedorasView({ ferramentas = null }) {
   return (
     <>
       <div className="topbar">
-        <h1><span className="pulse" /> Vendedoras</h1>
+        <span className="pulse" title="dados ao vivo" />
         <div className="topbar-right">
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
           {ferramentas}
+          <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">
+            Consulta Cliente
+          </button>
           <button className="reset-btn" onClick={() => { setVendedorSel([]); setBancoSel([]); setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
@@ -5681,16 +5672,6 @@ function VendedorasView({ ferramentas = null }) {
 
       {/* ferramentas gerais junto das acoes da tela, e as 7 consultas de banco
           em faixa propria: tudo numa linha so quebrava deixando botao solto */}
-      <div className="acoes-consultas">
-        <span className="acoes-titulo">consultas</span>
-        <button className="refresh-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: consulta status, saldo/ofertas e cadastro de proposta">Novo Saque</button>
-        <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">Consulta Cliente</button>
-        <button className="refresh-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro de proposta">PAN</button>
-        <button className="refresh-btn" onClick={() => setShowC6(true)} title="C6: consulta de proposta por adesão (API do banco) ou por CPF (propostas já registradas)">C6</button>
-        <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simulação e cadastro de proposta">Soma</button>
-        <button className="refresh-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação de pagamento">Presença</button>
-        <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou código AF">Consulta Facta</button>
-      </div>
 
       {importMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{importMsg}</div>}
       {syncMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{syncMsg}</div>}
@@ -5705,6 +5686,16 @@ function VendedorasView({ ferramentas = null }) {
         <button className="refresh-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
           {modo === 'valor' ? '⇄ Ver em pontos' : '⇄ Ver em valor'}
         </button>
+        {/* bancos em quadradinhos, agrupados no canto: sao 6 atalhos de
+            consulta e ocupavam uma linha inteira com o nome por extenso */}
+        <div className="bancos-atalhos">
+          <button className="banco-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: status, saldo/ofertas e cadastro de proposta">NS</button>
+          <button className="banco-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro">PAN</button>
+          <button className="banco-btn" onClick={() => setShowC6(true)} title="C6: consulta de proposta por adesão ou CPF">C6</button>
+          <button className="banco-btn" onClick={() => setShowSomaJornada(true)} title="Soma: margem, simulação e cadastro de proposta">SOMA</button>
+          <button className="banco-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação">PRE</button>
+          <button className="banco-btn" onClick={() => setShowFacta(true)} title="Facta: consulta de proposta por CPF ou código AF">FAC</button>
+        </div>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
@@ -6157,7 +6148,7 @@ function VendasView() {
   return (
     <>
       <div className="topbar">
-        <h1><span className="pulse" /> Vendas</h1>
+        <span className="pulse" title="dados ao vivo" />
         <div className="topbar-right">
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
@@ -6736,7 +6727,7 @@ function VisaoGeral() {
   return (
     <>
       <div className="topbar">
-        <h1><span className="pulse" /> Disparos &mdash; Dashboard</h1>
+        <span className="pulse" title="dados ao vivo" />
         <div className="topbar-right">
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}

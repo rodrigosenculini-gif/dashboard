@@ -2324,17 +2324,21 @@ body {
 .kpi.kpi-lista li span{ color:var(--muted); }
 .kpi.kpi-lista li strong{ color:var(--text); font-weight:500; font-variant-numeric:tabular-nums; text-align:right; }
 
-/* consultas de banco em linha propria: sao 7 botoes que, junto das acoes,
-   faziam a linha quebrar deixando um solto no canto */
-.acoes-consultas{
-  display:flex; flex-wrap:wrap; align-items:center; gap:7px;
-  margin:-4px 0 14px; padding-top:2px;
+/* Atalhos de banco em quadradinhos: sao 6 consultas que ocupavam uma linha
+   inteira com o nome por extenso. Sigla curta, alinhados a direita. */
+.bancos-atalhos{ display:flex; align-items:center; gap:5px; margin-left:auto; }
+.bancos-atalhos.linha-propria{ margin:-2px 0 14px auto; }
+.banco-btn{
+  width:38px; height:32px; padding:0; border-radius:8px; cursor:pointer;
+  background:var(--surface); border:1px solid var(--border); color:var(--muted);
+  font-family:var(--font-mono); font-size:10.5px; letter-spacing:.02em;
+  display:inline-flex; align-items:center; justify-content:center;
+  transition:color .13s, border-color .13s;
 }
-.acoes-consultas .acoes-titulo{
-  font-size:10.5px; color:var(--muted); text-transform:uppercase;
-  letter-spacing:.06em; margin-right:2px;
-}
-.acoes-consultas .refresh-btn{ height:30px; box-sizing:border-box; }
+.banco-btn:hover{ color:var(--text); border-color:var(--gold); }
+
+/* a barra de filtros precisa acomodar o grupo encostado a direita */
+.filters{ flex-wrap:wrap; }
 
 /* trofeu e alternador de modo junto dos filtros: alinhados com os selects */
 .filters .dots-btn, .filters .refresh-btn{
