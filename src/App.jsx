@@ -3169,6 +3169,16 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
                   {ajVenda.vendedor} &middot; {ajVenda.banco} &middot; ades&atilde;o {ajVenda.adesao}
                   {ajVenda.peso != null && <> &middot; peso {ajVenda.peso}</>}
                 </p>
+                <label>Banco
+                  <select value={ajForm.banco || ''} onChange={(e) => setAjForm({ ...ajForm, banco: e.target.value })}>
+                    <option value="">-</option>
+                    {/* o banco encontrado pode nao estar na lista padrao
+                        (banco novo, grafia diferente): mantem ele como opcao */}
+                    {[...new Set([...(ajVenda?.banco ? [ajVenda.banco] : []), ...BANCOS_VENDA])].map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </label>
                 <label>Valor
                   <input type="number" step="0.01" value={ajForm.valor}
                     onChange={(e) => setAjForm({ ...ajForm, valor: e.target.value })} />
