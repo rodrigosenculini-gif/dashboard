@@ -465,14 +465,29 @@ body {
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   /* Mantém os botões sempre encostados à direita, inclusive quando a
      linha quebra por falta de espaço (senão eles caem para a esquerda). */
   flex: 1 1 auto;
   margin-left: auto;
   flex-wrap: wrap;
   justify-content: flex-end;
+  row-gap: 7px;
 }
+/* Todos os botoes da barra com a MESMA altura e alinhamento: antes cada um
+   tinha o seu padding e a linha ficava irregular, com um caindo solto no fim. */
+.topbar-right .refresh-btn,
+.topbar-right .reset-btn,
+.topbar-right .dots-btn,
+.topbar-right .view-switcher-btn {
+  height: 30px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.topbar-right .status-line { margin-right: 4px; }
 
 .dots-btn {
   background: var(--surface);
@@ -2274,6 +2289,18 @@ body {
 .trello-card.prio-urgente{ border-left-color:var(--rose); box-shadow:inset 0 2px 0 -1px var(--rose); }
 .trello-card.prio-media{ border-left-color:var(--lime); }
 .trello-card.prio-baixa{ border-left-color:var(--muted); }
+
+/* KPI em lista: varios destaques de uma linha num card so, em vez de um
+   card inteiro para cada (a grade ficava com sobra no fim da linha) */
+.kpi.kpi-lista ul{ list-style:none; margin:6px 0 0; padding:0; display:flex; flex-direction:column; gap:5px; }
+.kpi.kpi-lista li{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; font-size:12px; }
+.kpi.kpi-lista li span{ color:var(--muted); }
+.kpi.kpi-lista li strong{ color:var(--text); font-weight:500; font-variant-numeric:tabular-nums; text-align:right; }
+
+/* barra de acoes: quebra em linha nova alinhada, sem card solto no fim */
+.acoes-barra{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+.acoes-barra .refresh-btn, .acoes-barra .reset-btn{ height:30px; box-sizing:border-box; display:inline-flex; align-items:center; }
+.acoes-barra .acoes-sep{ flex:1 1 auto; }
 
 /* --- Dialogo do projeto (substitui window.confirm/prompt) --- */
 .dlg-overlay{

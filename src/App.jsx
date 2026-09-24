@@ -2013,7 +2013,15 @@ function ChartTooltip({ active, payload, label }) {
         <p style={{ margin: '2px 0', color: '#fff' }}>Valor do dia: {fmtMoeda(row.valorDia)}</p>
       )}
       {row.pontoDia != null && (
-        <p style={{ margin: '2px 0 8px', color: '#fff' }}>Pontos do dia: {fmtInt(Math.round(row.pontoDia))}</p>
+        <p style={{ margin: '2px 0', color: '#fff' }}>Pontos do dia: {fmtInt(Math.round(row.pontoDia))}</p>
+      )}
+      {/* no grafico diario, a meta e por dia: mostra quanto do alvo daquele
+          dia ja foi feito, junto do numero */}
+      {row.pctMetaDia != null && (
+        <p style={{ margin: '2px 0 8px', color: row.pctMetaDia >= 100 ? '#a9d97f' : '#d9b877' }}>
+          {Number(row.pctMetaDia).toFixed(1)}% da meta do dia
+          {row.alvoDia ? ` (alvo ${fmtInt(row.alvoDia)})` : ''}
+        </p>
       )}
       {row.realizado != null && (
         <p style={{ margin: '2px 0', color: '#a9d97f' }}>Valor realizado: {fmtMoeda(row.realizado)}</p>
@@ -5044,9 +5052,21 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
   const [comemoracao, setComemoracao] = useState(null)
   const [marcos, setMarcos] = useState([])
 
+  // ja exibidas nesta sessao: o refresh automatico (3 min) e o botao Atualizar
+  // refaziam a busca antes de a marcacao no banco acontecer (ela so ocorria 3s
+  // depois, ao fim do confete), entao a mesma comemoracao voltava sempre.
+  const jaExibidas = useRef(new Set())
+
   useEffect(() => {
     callApi('metas_comemorar', { vendedor })
-      .then((r) => setComemoracao(r?.[0] ?? null))
+      .then((r) => {
+        const c = r?.[0] ?? null
+        if (!c) { setComemoracao(null); return }
+        const id = (c.chaves || []).join('|')
+        if (jaExibidas.current.has(id)) { setComemoracao(null); return }
+        jaExibidas.current.add(id)
+        setComemoracao(c)
+      })
       .catch(() => setComemoracao(null))
   }, [vendedor])
 
@@ -5201,6 +5221,13 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
   // alvo x dias uteis daquela semana.
   const alvoMes = marcos.reduce((s, m) => s + (Number(m.alvo) || 0), 0)
   const semanasBatidas = marcos.filter((m) => m.batido)
+  // semana corrente: a ultima ja iniciada (o valor dela ja traz so os dias
+  // que aconteceram, entao e o realizado da semana ate agora)
+  const semanaAtual = (() => {
+    const hoje = todayISO()
+    const iniciadas = (semanas || []).filter((s) => s.inicio?.slice(0, 10) <= hoje)
+    return iniciadas[iniciadas.length - 1] || null
+  })()
   const podeExpandir = page === 0 && tabela.total > 10
   const podeProximaPagina = page >= 1 && offset + limit < tabela.total
   const podePaginaAnterior = page >= 2
@@ -5298,8 +5325,29 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
       </div>
 
       <div ref={tourKpiRef} className="kpi-grid kpi-grid-3">
-        <div className="kpi"><p className="kpi-label">Maior {modo === 'ponto' ? 'pontuação' : 'venda'}</p><p className="kpi-value">{fmtV(modo === 'ponto' ? kpis?.maior_pontuacao : kpis?.maior_venda)}</p></div>
-        <div className="kpi"><p className="kpi-label">Dia com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.dia_mais_vendas ? fmtDataBR(kpis.dia_mais_vendas) : '-'}</p><p className="kpi-sub">{fmtInt(kpis?.dia_mais_vendas_qtd)} vendas</p></div>
+        {/* cinco indicadores de "destaque" num card so: cada um ocupava um
+            card inteiro para uma linha de texto e a grade ficava com sobra */}
+        <div className="kpi kpi-lista">
+          <p className="kpi-label">Destaques do per&iacute;odo</p>
+          <ul>
+            <li><span>Maior {modo === 'ponto' ? 'pontuação' : 'venda'}</span><strong>{fmtV(modo === 'ponto' ? kpis?.maior_pontuacao : kpis?.maior_venda)}</strong></li>
+            <li><span>Dia com mais vendas</span><strong>{kpis?.dia_mais_vendas ? `${fmtDataBR(kpis.dia_mais_vendas)} (${fmtInt(kpis.dia_mais_vendas_qtd)})` : '-'}</strong></li>
+            <li><span>Banco mais vendido</span><strong>{kpis?.banco_top || '-'}{kpis?.banco_top_qtd ? ` (${fmtInt(kpis.banco_top_qtd)})` : ''}</strong></li>
+            {modo !== 'ponto' && (
+              <>
+                <li><span>Semanas com meta batida</span><strong>{fmtInt(semanasBatidas.length)}</strong></li>
+                {semanasBatidas.slice(0, 2).map((sb) => (
+                  <li key={sb.semana}><span>Semana {sb.semana_label}</span><strong>{fmtMoeda(sb.valor_semana)}</strong></li>
+                ))}
+              </>
+            )}
+          </ul>
+        </div>
+        <div className="kpi">
+          <p className="kpi-label">{modo === 'ponto' ? 'Pontos da semana' : 'Valor da semana atual'}</p>
+          <p className="kpi-value">{fmtV(semanaAtual ? (modo === 'ponto' ? semanaAtual.ponto_semana : semanaAtual.valor_semana) : 0)}</p>
+          <p className="kpi-sub">{semanaAtual?.semana_label || 'semana corrente'}</p>
+        </div>
         <div className="kpi">
           <p className="kpi-label">{modo === 'ponto' ? 'Pontos totais' : 'Valor total vendido'}</p>
           <p className="kpi-value kpi-split"><span>{fmtV(modo === 'ponto' ? kpis?.pontos_total : kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtV(modo === 'ponto' ? meta?.pontos_projecao_mes_real : meta?.projecao_mes_real)}</span></p>
@@ -5307,15 +5355,6 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
           <p className="kpi-sub">considerando hoje: {fmtV(modo === 'ponto' ? meta?.pontos_projecao_mes : meta?.projecao_mes)}</p>
         </div>
         <div className="kpi"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpis?.qtd_total)}</p></div>
-        <div className="kpi"><p className="kpi-label">Banco mais vendido</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpis?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpis?.banco_top_qtd)} vendas</p></div>
-        {modo !== 'ponto' && (
-          <>
-            <div className="kpi"><p className="kpi-label">Semanas com meta batida</p><p className="kpi-value">{fmtInt(semanasBatidas.length)}</p></div>
-            {semanasBatidas.slice(0, 3).map((s) => (
-              <div className="kpi" key={s.semana}><p className="kpi-label">Semana {s.semana_label}</p><p className="kpi-value" style={{ fontSize: 16 }}>{fmtMoeda(s.valor_semana)}</p></div>
-            ))}
-          </>
-        )}
         {meta && (
           <>
             <div className="kpi">
@@ -5961,6 +6000,14 @@ function VendasView() {
       const row = { dia: fmtDataBR(d.dia) }
       row.valorDia = valor
       row.pontoDia = ponto
+      // meta diaria vigente: mostra no tooltip quanto do alvo daquele dia foi
+      // feito. so faz sentido quando a janela e por dia ('50 mil por dia')
+      if (metasV2?.janela_base === 'dia' && Number(metasV2?.janela_alvo) > 0
+          && d.dia.slice(0, 10) >= String(metasV2.janela_ini || '').slice(0, 10)
+          && d.dia.slice(0, 10) <= String(metasV2.janela_fim || '').slice(0, 10)) {
+        row.alvoDia = Number(metasV2.janela_alvo)
+        row.pctMetaDia = (ponto / Number(metasV2.janela_alvo)) * 100
+      }
       if (iniciado) {
         row.realizado = acumuladoValor
         row.pontoRealizado = acumuladoPonto
