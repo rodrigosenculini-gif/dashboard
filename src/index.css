@@ -34,12 +34,19 @@ body {
 
 .topbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 22px;
+  /* respiro entre o cabecalho (logo + seletor de view) e a barra de acoes:
+     sem o titulo, os botoes encostavam no seletor */
+  margin-top: 14px;
+  margin-bottom: 24px;
   flex-wrap: wrap;
+  min-height: 34px;
 }
+/* sem o titulo, o "atualizado as" e o primeiro item da barra: fica a
+   esquerda, alinhado sob o seletor de view, e empurra as acoes pra direita */
+.topbar > .status-line{ margin-right: auto; white-space: nowrap; }
 
 .topbar h1 {
   font-size: 20px;
@@ -249,7 +256,9 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 18px;
+  /* desce o bloco todo: antes o logo encostava no topo da janela */
+  margin-top: 6px;
+  margin-bottom: 8px;
   min-height: 34px;
 }
 .app-header .reset-btn { height: 34px; box-sizing: border-box; display: inline-flex; align-items: center; }
@@ -468,7 +477,7 @@ body {
   gap: 7px;
   /* Mantém os botões sempre encostados à direita, inclusive quando a
      linha quebra por falta de espaço (senão eles caem para a esquerda). */
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   margin-left: auto;
   flex-wrap: wrap;
   justify-content: flex-end;

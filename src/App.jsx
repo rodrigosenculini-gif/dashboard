@@ -896,13 +896,12 @@ function LeilaoDetalhado() {
     <>
       <div className="topbar">
         <div>
-          <span className="pulse" title="dados ao vivo" />
-          <p className="subtitle">Envio de leads e disparo de WhatsApp via API Meta &mdash; Hotline</p>
+            <p className="subtitle">Envio de leads e disparo de WhatsApp via API Meta &mdash; Hotline</p>
         </div>
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
+        </span>
         <div className="topbar-right">
-          <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-          </span>
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
@@ -1130,11 +1129,10 @@ function EntradasLP() {
   return (
     <>
       <div className="topbar">
-        <span className="pulse" title="dados ao vivo" />
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
+        </span>
         <div className="topbar-right">
-          <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-          </span>
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim(''); setAtribuicao('ultimo') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
@@ -1669,11 +1667,10 @@ function N8nExecucoes() {
   return (
     <>
       <div className="topbar">
-        <span className="pulse" title="dados ao vivo" />
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
+        </span>
         <div className="topbar-right">
-          <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-          </span>
           <button className="reset-btn" onClick={() => { setWorkflowId(''); setDataInicio(todayISO()); setDataFim(todayISO()) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
@@ -5253,11 +5250,10 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
       </div>
 
       <div className="topbar">
-        <span className="pulse" title="dados ao vivo" />
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
+        </span>
         <div className="topbar-right">
-          <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-          </span>
           <button className="reset-btn" onClick={() => { setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
@@ -5636,11 +5632,10 @@ function VendedorasView({ ferramentas = null }) {
   return (
     <>
       <div className="topbar">
-        <span className="pulse" title="dados ao vivo" />
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
+        </span>
         <div className="topbar-right">
-          <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-          </span>
           {ferramentas}
           <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">
             Consulta Cliente
@@ -6148,11 +6143,10 @@ function VendasView() {
   return (
     <>
       <div className="topbar">
-        <span className="pulse" title="dados ao vivo" />
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
+        </span>
         <div className="topbar-right">
-          <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-          </span>
           <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setProdutoSel([]); setBancoSel([]) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
@@ -6727,11 +6721,10 @@ function VisaoGeral() {
   return (
     <>
       <div className="topbar">
-        <span className="pulse" title="dados ao vivo" />
+        <span className="status-line">
+          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
+        </span>
         <div className="topbar-right">
-          <span className="status-line">
-            {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-          </span>
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setOrigemSel([]); setMetaSel([]); setTipoEnvioSel([]); setMensagemFiltroSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim(''); setSoDisparadas(false); setPagoDoPeriodo(false); setIncluirTardias(true); setAtribuicao('ultimo') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
