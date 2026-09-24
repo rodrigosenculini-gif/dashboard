@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useJanelaFlutuante } from './useJanelaFlutuante'
 
 const MASCOTE = 'https://hotlinesolucoes.com.br/wp-content/uploads/2024/08/macote.png'
 
@@ -49,9 +48,15 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const [painel, setPainel] = useState(false)
   const [titulo, setTitulo] = useState('')
   const [quandoCustom, setQuandoCustom] = useState('')
+  const [minutosLivres, setMinutosLivres] = useState('')
   const [salvando, setSalvando] = useState(false)
   const tituloRef = useRef(null)
-  const pip = useJanelaFlutuante()
+  const ehGestao = escopo === 'gestao'
+  // na gestao da pra escolher pra quem e a tarefa e ver as de todas
+  const [paraQuem, setParaQuem] = useState('')
+  const [vendedoras, setVendedoras] = useState([])
+  const [aba, setAba] = useState('tarefas')   // tarefas | regras
+  const [regras, setRegras] = useState([])
 
   const vencidas = tarefas.filter((t) => t.vencida)
   const aFalar = nota || vencidas[0] || null
@@ -61,7 +66,9 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     if (!vendedor) return
     try {
       const [tf, nt] = await Promise.all([
-        getJson('tarefas_pendentes', { vendedor }).catch(() => []),
+        (escopo === 'gestao'
+          ? getJson('tarefas_gestao', {})
+          : getJson('tarefas_pendentes', { vendedor })).catch(() => []),
         nota ? Promise.resolve(null) : getJson('notificacao_pendente', { vendedor, escopo }).catch(() => null),
       ])
       setTarefas(Array.isArray(tf) ? tf : [])
@@ -80,6 +87,12 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     const t = setInterval(carregar, CHECAGEM_MS)
     return () => clearInterval(t)
   }, [carregar])
+
+  useEffect(() => {
+    if (!ehGestao || !painel) return
+    getJson('vendedoras_lista').then((r) => setVendedoras(Array.isArray(r) ? r : [])).catch(() => {})
+    getJson('regras_listar').then((r) => setRegras(Array.isArray(r) ? r : [])).catch(() => {})
+  }, [ehGestao, painel])
 
   // com a aba em segundo plano, chama na barra de abas
   useEffect(() => {
@@ -110,11 +123,12 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     setSalvando(true)
     try {
       await postJson('tarefa_criar', {
-        vendedor, titulo: t,
+        vendedor: ehGestao ? (paraQuem || vendedor) : vendedor,
+        titulo: t,
         minutos: minutos ?? null,
         quando: minutos ? null : (quandoCustom || null),
       })
-      setTitulo(''); setQuandoCustom('')
+      setTitulo(''); setQuandoCustom(''); setMinutosLivres('')
       carregar()
       tituloRef.current?.focus()
     } catch { /* segue */ }
@@ -153,10 +167,49 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
       {painel && (
         <div className="mascote-painel">
           <div className="mascote-painel-topo">
-            <strong>Meus lembretes</strong>
+            <strong>{ehGestao ? 'Lembretes da equipe' : 'Meus lembretes'}</strong>
             <button type="button" className="mascote-fechar" onClick={() => setPainel(false)}>&times;</button>
           </div>
 
+          {ehGestao && (
+            <div className="home-toggle mascote-abas">
+              <button type="button" className={aba === 'tarefas' ? 'on' : ''}
+                      onClick={() => setAba('tarefas')}>Tarefas</button>
+              <button type="button" className={aba === 'regras' ? 'on' : ''}
+                      onClick={() => setAba('regras')}>Lembretes</button>
+            </div>
+          )}
+
+          {ehGestao && aba === 'regras' ? (
+            <ul className="mascote-lista regras">
+              {regras.length === 0 && <li className="vazio">nenhum lembrete cadastrado</li>}
+              {regras.map((r) => (
+                <li key={r.id} className={r.ativo ? '' : 'inativa'}>
+                  <div>
+                    <span className="mascote-tit">{r.mensagem}</span>
+                    <span className="mascote-hora">
+                      a cada {r.intervalo_min} min · {String(r.hora_ini).slice(0,5)}–{String(r.hora_fim).slice(0,5)} · {r.escopo}
+                    </span>
+                  </div>
+                  <div className="mascote-linha-acoes">
+                    <button type="button" title={r.ativo ? 'Desligar' : 'Ligar'}
+                      onClick={async () => {
+                        await postJson('regra_salvar', { id: r.id, ativo: !r.ativo })
+                        getJson('regras_listar').then((x) => setRegras(Array.isArray(x) ? x : []))
+                      }}>{r.ativo ? 'on' : 'off'}</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+          <>
+          {ehGestao && (
+            <select className="mascote-input" value={paraQuem}
+                    onChange={(e) => setParaQuem(e.target.value)}>
+              <option value="">para quem? (todas veem a sua)</option>
+              {vendedoras.map((v) => <option key={v.vendedor} value={v.vendedor}>{v.vendedor}</option>)}
+            </select>
+          )}
           <input ref={tituloRef} className="mascote-input" value={titulo} maxLength={120}
                  placeholder="o que lembrar?" onChange={(e) => setTitulo(e.target.value)}
                  onKeyDown={(e) => { if (e.key === 'Enter' && titulo.trim()) criar(30) }} />
@@ -165,6 +218,15 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
               <button key={a.min} type="button" className="mascote-chip"
                       disabled={!titulo.trim() || salvando} onClick={() => criar(a.min)}>{a.rotulo}</button>
             ))}
+          </div>
+          {/* minutos livres, alem dos atalhos */}
+          <div className="mascote-data">
+            <input type="number" min="1" max="10080" value={minutosLivres} placeholder="min"
+                   style={{ width: 70 }}
+                   onChange={(e) => setMinutosLivres(e.target.value)} />
+            <button type="button" className="mascote-chip"
+                    disabled={!titulo.trim() || !minutosLivres || salvando}
+                    onClick={() => criar(Number(minutosLivres))}>criar</button>
           </div>
           <div className="mascote-data">
             <input type="datetime-local" value={quandoCustom}
@@ -180,7 +242,9 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
               <li key={t.id} className={t.vencida ? 'vencida' : ''}>
                 <div>
                   <span className="mascote-tit">{t.titulo}</span>
-                  <span className="mascote-hora">{fmtQuando(t.lembrar_em)}</span>
+                  <span className="mascote-hora">
+                    {ehGestao && t.vendedor ? `${t.vendedor} · ` : ''}{fmtQuando(t.lembrar_em)}
+                  </span>
                 </div>
                 <div className="mascote-linha-acoes">
                   <button type="button" onClick={() => acaoTarefa(t.id, 'concluir')} title="Concluir">&#10003;</button>
@@ -189,6 +253,8 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
               </li>
             ))}
           </ul>
+          </>
+          )}
         </div>
       )}
 
@@ -200,34 +266,10 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     </>
   )
 
-  // Com a janela flutuante aberta, o conteudo vai pra la -- ela fica por cima
-  // de tudo, mesmo com o Chrome em outra aba. Na pagina fica so o atalho pra
-  // trazer de volta.
-  if (pip.janela) {
-    return (
-      <>
-        <div className="mascote-flut">
-          <button type="button" className="mascote-voltar" onClick={pip.fechar}
-                  title="Trazer os lembretes de volta pra esta tela">
-            <img src={MASCOTE} alt="" />
-            <span>lembretes na janelinha</span>
-          </button>
-        </div>
-        <pip.Portal>
-          <div className={`mascote-flut na-janela ${pendencias ? 'chamando' : ''}`}>{conteudo}</div>
-        </pip.Portal>
-      </>
-    )
-  }
-
+  // A janela flutuante (Picture-in-Picture) saiu: a extensao do Chrome cobre
+  // melhor o mesmo caso -- aparece em qualquer site, sem clique por sessao.
   return (
     <div className={`mascote-flut ${pendencias ? 'chamando' : ''}`}>
-      {pip.suportado && (
-        <button type="button" className="mascote-destacar" onClick={() => pip.abrir()}
-                title="Abrir numa janelinha que fica por cima das outras telas">
-          &#11021; destacar
-        </button>
-      )}
       {conteudo}
     </div>
   )
