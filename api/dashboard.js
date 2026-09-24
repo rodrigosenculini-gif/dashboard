@@ -996,6 +996,10 @@ export default async function handler(req, res) {
                                args: (b) => [b.regra_id, b.vendedor || null] },
       notificacao_responder: { sql: 'select dashboard_notificacao_responder($1::bigint,$2::text) as r',
                                args: (b) => [b.id, b.resposta] },
+      tarefa_criar:          { sql: 'select dashboard_tarefa_criar($1::text,$2::text,$3::int,$4::timestamptz) as r',
+                               args: (b) => [b.vendedor || null, b.titulo || '', b.minutos ?? null, b.quando || null] },
+      tarefa_acao:           { sql: 'select dashboard_tarefa_acao($1::bigint,$2::text,$3::int) as r',
+                               args: (b) => [b.id, b.acao, b.minutos ?? 10] },
       // Ajustar adesao: o front chama por POST (postApi), entao as rotas
       // precisam estar AQUI -- no bloco GET elas nunca eram alcancadas.
       vendedoras_buscar_venda: {
@@ -1366,6 +1370,9 @@ export default async function handler(req, res) {
   } else if (type === 'trello_docs') {
     sql = 'select dashboard_trello_docs($1::bigint) as docs';
     params = [req.query.quadro_id ? Number(req.query.quadro_id) : null];
+  } else if (type === 'tarefas_pendentes') {
+    sql = 'select * from dashboard_tarefas_pendentes($1::text)';
+    params = [req.query.vendedor || null];
   } else if (type === 'notificacao_pendente') {
     sql = 'select * from dashboard_notificacao_pendente($1::text,$2::text)';
     params = [req.query.vendedor || null, req.query.escopo || 'vendedora'];

@@ -2372,6 +2372,97 @@ body {
 .acoes-barra .refresh-btn, .acoes-barra .reset-btn{ height:30px; box-sizing:border-box; display:inline-flex; align-items:center; }
 .acoes-barra .acoes-sep{ flex:1 1 auto; }
 
+/* --- Esquentadinho flutuante: lembretes e tarefas --- */
+.mascote-flut{
+  position:fixed; right:20px; bottom:20px; z-index:900;
+  display:flex; flex-direction:column; align-items:flex-end; gap:10px;
+}
+.mascote-botao{
+  width:58px; height:58px; padding:0; border:none; background:none; cursor:pointer;
+  position:relative; filter:drop-shadow(0 6px 14px rgba(0,0,0,.5));
+  transition:transform .15s;
+}
+.mascote-botao:hover{ transform:scale(1.07); }
+.mascote-botao img{ width:100%; height:100%; object-fit:contain; }
+/* chamando: o mascote pula devagar quando ha algo pendente */
+.mascote-flut.chamando .mascote-botao{ animation:mascote-pula 1.6s ease-in-out infinite; }
+@keyframes mascote-pula{
+  0%,70%,100%{ transform:translateY(0) }
+  80%{ transform:translateY(-7px) }
+  90%{ transform:translateY(-3px) }
+}
+.mascote-selo{
+  position:absolute; top:-2px; right:-2px; min-width:19px; height:19px; padding:0 5px;
+  background:var(--rose); color:#12160f; border-radius:10px;
+  font-family:var(--font-mono); font-size:11px; font-weight:600;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* balao de fala */
+.mascote-balao{
+  width:min(270px, calc(100vw - 40px));
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:12px 13px 10px; box-shadow:0 12px 30px rgba(0,0,0,.45);
+  animation:mascote-entra .18s ease-out; position:relative;
+}
+.mascote-balao::after{
+  content:''; position:absolute; right:20px; bottom:-7px;
+  width:12px; height:12px; background:var(--surface);
+  border-right:1px solid var(--border); border-bottom:1px solid var(--border);
+  transform:rotate(45deg);
+}
+@keyframes mascote-entra{ from{ opacity:0; transform:translateY(8px) } to{ opacity:1; transform:none } }
+.mascote-balao p{ margin:0 0 10px; font-size:12.5px; line-height:1.5; color:var(--text); }
+.mascote-acoes{ display:flex; gap:6px; }
+.mascote-btn{
+  flex:1; padding:7px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:11.5px;
+  background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
+  transition:color .13s, border-color .13s;
+}
+.mascote-btn:hover{ color:var(--text); border-color:var(--gold); }
+.mascote-btn.sim{ color:var(--lime); border-color:rgba(169,217,127,.35); }
+.mascote-btn.nao{ color:var(--rose); border-color:rgba(217,144,137,.35); }
+
+/* painel de tarefas */
+.mascote-painel{
+  width:min(300px, calc(100vw - 40px));
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:13px; box-shadow:0 14px 34px rgba(0,0,0,.5);
+  display:flex; flex-direction:column; gap:8px;
+  animation:mascote-entra .18s ease-out;
+}
+.mascote-painel-topo{ display:flex; align-items:center; justify-content:space-between; }
+.mascote-painel-topo strong{ font-size:12.5px; color:var(--text); font-weight:500; }
+.mascote-fechar{ background:none; border:none; color:var(--muted); font-size:17px; line-height:1; cursor:pointer; padding:0 2px; }
+.mascote-fechar:hover{ color:var(--rose); }
+.mascote-input, .mascote-data input{
+  width:100%; background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-family:inherit; font-size:12px; color:var(--text); outline:none;
+}
+.mascote-input:focus, .mascote-data input:focus{ border-color:var(--gold); }
+.mascote-atalhos, .mascote-data{ display:flex; gap:5px; }
+.mascote-data input{ flex:1; }
+.mascote-chip{
+  padding:6px 9px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
+  font-family:var(--font-mono); font-size:10.5px;
+}
+.mascote-chip:hover:not(:disabled){ color:var(--lime); border-color:rgba(169,217,127,.4); }
+.mascote-chip:disabled{ opacity:.4; cursor:default; }
+.mascote-lista{ list-style:none; margin:2px 0 0; padding:0; display:flex; flex-direction:column; gap:5px; max-height:210px; overflow-y:auto; }
+.mascote-lista li{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11.5px; }
+.mascote-lista li.vazio{ color:var(--muted); opacity:.7; justify-content:center; padding:6px 0; }
+.mascote-lista li > div:first-child{ display:flex; flex-direction:column; min-width:0; }
+.mascote-tit{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mascote-hora{ color:var(--muted); font-family:var(--font-mono); font-size:10px; }
+.mascote-lista li.vencida .mascote-hora{ color:var(--rose); }
+.mascote-linha-acoes{ display:flex; gap:4px; flex:0 0 auto; }
+.mascote-linha-acoes button{
+  background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
+  border-radius:6px; padding:3px 7px; font-size:10.5px; cursor:pointer; font-family:var(--font-mono);
+}
+.mascote-linha-acoes button:hover{ color:var(--lime); border-color:rgba(169,217,127,.4); }
+
 /* Lembrete periodico no portal da vendedora: canto inferior direito, sem
    bloquear a tela -- ela responde quando puder e continua trabalhando. */
 .lembrete-card{

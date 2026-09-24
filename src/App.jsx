@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import LembreteVendedora from './LembreteVendedora'
+import MascoteLembretes from './MascoteLembretes'
 import ReactDOM from 'react-dom'
 import { useDialogo } from './Dialogo'
 import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, LabelList } from 'recharts'
@@ -5422,7 +5422,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
       )}
       {showNovoSaque && <NovoSaqueModal vendedorFixo={vendedor} onClose={() => setShowNovoSaque(false)} />}
       {showConsultaCliente && <ConsultaClienteModal vendedorFixo={vendedor} onClose={() => setShowConsultaCliente(false)} />}
-      <LembreteVendedora vendedor={vendedor} />
+      <MascoteLembretes vendedor={vendedor} escopo="vendedora" />
       {showPan && <PanModal vendedorFixo={vendedor} onClose={() => setShowPan(false)} />}
       {showC6 && <C6Modal vendedorFixo={vendedor} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal vendedorFixo={vendedor} onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
@@ -5947,9 +5947,8 @@ function VendedorasView({ ferramentas = null }) {
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
       {showConsultaCliente && <ConsultaClienteModal onClose={() => setShowConsultaCliente(false)} />}
-      {/* versao de teste dos lembretes, so na gestao: regra propria no banco,
-          sem restricao de horario */}
-      <LembreteVendedora vendedor="gestao" escopo="gestao" />
+      {/* versao de teste, so na gestao: regra propria no banco, sem horario */}
+      <MascoteLembretes vendedor="gestao" escopo="gestao" />
       {showPan && <PanModal onClose={() => setShowPan(false)} />}
       {showC6 && <C6Modal vendedoresDisponiveis={vendedores} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
