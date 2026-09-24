@@ -1363,8 +1363,10 @@ export default async function handler(req, res) {
     params = [req.query.quadro_id ? Number(req.query.quadro_id) : null];
   } else if (type === 'meta_vendedoras') {
     // callApi manda por query string (GET), nao no body
-    sql = 'select * from dashboard_meta_vendedoras($1::int)';
-    params = [req.query.periodo_id ? Number(req.query.periodo_id) : null];
+    // p_dia: periodos com base 'dia' tem uma meta por dia
+    sql = 'select * from dashboard_meta_vendedoras($1::int,$2::date)';
+    params = [req.query.periodo_id ? Number(req.query.periodo_id) : null,
+              req.query.dia || null];
   } else if (type === 'meta_periodos') {
     sql = 'select * from dashboard_meta_periodos()';
     params = [];

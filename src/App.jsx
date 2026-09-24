@@ -1831,7 +1831,11 @@ function RankingOverlay({ onClose }) {
     Promise.all([
       // forcar: o periodo muda a leitura inteira e o usuario espera ver a
       // troca na hora -- cache aqui so confunde
-      callApi('meta_vendedoras', periodoSel ? { periodo_id: periodoSel } : {}, { forcar: true }),
+      // periodoSel guarda "id|dia" para metas diarias (uma opcao por dia)
+      callApi('meta_vendedoras', periodoSel
+        ? { periodo_id: String(periodoSel).split('|')[0],
+            ...(String(periodoSel).split('|')[1] ? { dia: String(periodoSel).split('|')[1] } : {}) }
+        : {}, { forcar: true }),
       periodos.length ? Promise.resolve(periodos) : callApi('meta_periodos', {}, { forcar: true }),
     ])
       .then(([m, p]) => { setMetas(m ?? []); if (!periodos.length) setPeriodos(p ?? []) })
@@ -1874,12 +1878,12 @@ function RankingOverlay({ onClose }) {
               onClick={() => setAba('meta')}>Meta vendedoras</button>
           </div>
           {aba === 'meta' && periodos.length > 0 && (
-            <select value={periodoSel ?? ''} onChange={(e) => setPeriodoSel(e.target.value ? Number(e.target.value) : null)}
+            <select value={periodoSel ?? ''} onChange={(e) => setPeriodoSel(e.target.value || null)}
               title="Per&iacute;odo da meta">
               {/* o periodo atual JA e a opcao padrao: marca ele em vez de
                   repetir "meta atual" + a mesma janela logo abaixo */}
               {periodos.map((p) => (
-                <option key={p.id} value={p.atual ? '' : p.id}>
+                <option key={`${p.id}|${p.dia || ''}`} value={p.atual ? '' : `${p.id}|${p.dia || ''}`}>
                   {p.descricao}{p.atual ? ' (atual)' : ''}
                 </option>
               ))}
