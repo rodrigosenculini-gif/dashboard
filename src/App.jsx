@@ -5331,8 +5331,9 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
       </div>
 
       <div ref={tourKpiRef} className="kpi-grid kpi-grid-3">
-        {/* 1o e o total do mes, em destaque (e o numero que importa);
-            2o a semana corrente; quantidade fica ao lado, no mesmo tamanho */}
+        {/* linha 1: total do mes (destaque) + semana atual + quantidade
+            linha 2: media e projecao diaria
+            linha 3: destaques do periodo, largura toda */}
         <div className="kpi kpi-destaque">
           <p className="kpi-label">{modo === 'ponto' ? 'Pontos totais' : 'Valor total vendido'}</p>
           <p className="kpi-value kpi-split"><span>{fmtV(modo === 'ponto' ? kpis?.pontos_total : kpis?.valor_total)}</span><span className="kpi-split-bar">|</span><span className="kpi-split-proj">{fmtV(modo === 'ponto' ? meta?.pontos_projecao_mes_real : meta?.projecao_mes_real)}</span></p>
@@ -5344,28 +5345,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
           <p className="kpi-value">{fmtV(semanaAtual ? (modo === 'ponto' ? semanaAtual.ponto_semana : semanaAtual.valor_semana) : 0)}</p>
           <p className="kpi-sub">{semanaAtual?.semana_label || 'semana corrente'}</p>
         </div>
-        <div className="kpi kpi-lista">
-          <p className="kpi-label">Destaques do per&iacute;odo</p>
-          <ul>
-            <li><span>Maior {modo === 'ponto' ? 'pontuação' : 'venda'}</span><strong>{fmtV(modo === 'ponto' ? kpis?.maior_pontuacao : kpis?.maior_venda)}</strong></li>
-            <li><span>Dia com mais vendas</span><strong>{kpis?.dia_mais_vendas ? `${fmtDataBR(kpis.dia_mais_vendas)} (${fmtInt(kpis.dia_mais_vendas_qtd)})` : '-'}</strong></li>
-            <li><span>Banco mais vendido</span><strong>{kpis?.banco_top || '-'}{kpis?.banco_top_qtd ? ` (${fmtInt(kpis.banco_top_qtd)})` : ''}</strong></li>
-            {modo !== 'ponto' && (
-              <>
-                <li><span>Semanas com meta batida</span><strong>{fmtInt(semanasBatidas.length)}</strong></li>
-                {/* o marco traz rotulo/realizado -- antes usava campos que nao
-                    existem (semana_label/valor_semana) e saia R$ 0,00 */}
-                {semanasBatidas.slice(0, 2).map((sb) => (
-                  <li key={sb.ordem ?? sb.semana}>
-                    <span>{String(sb.rotulo || `Semana ${sb.semana}`).split(' — ')[0]}</span>
-                    <strong>{fmtV(sb.realizado)}</strong>
-                  </li>
-                ))}
-              </>
-            )}
-          </ul>
-        </div>
-        <div className="kpi kpi-meio"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpis?.qtd_total)}</p></div>
+        <div className="kpi kpi-curto"><p className="kpi-label">Quantidade total</p><p className="kpi-value">{fmtInt(kpis?.qtd_total)}</p></div>
         {meta && (
           <>
             <div className="kpi kpi-largo">
@@ -5388,6 +5368,27 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
             </div>
           </>
         )}
+        <div className="kpi kpi-lista">
+          <p className="kpi-label">Destaques do per&iacute;odo</p>
+          <ul>
+            <li><span>Maior {modo === 'ponto' ? 'pontuação' : 'venda'}</span><strong>{fmtV(modo === 'ponto' ? kpis?.maior_pontuacao : kpis?.maior_venda)}</strong></li>
+            <li><span>Dia com mais vendas</span><strong>{kpis?.dia_mais_vendas ? `${fmtDataBR(kpis.dia_mais_vendas)} (${fmtInt(kpis.dia_mais_vendas_qtd)})` : '-'}</strong></li>
+            <li><span>Banco mais vendido</span><strong>{kpis?.banco_top || '-'}{kpis?.banco_top_qtd ? ` (${fmtInt(kpis.banco_top_qtd)})` : ''}</strong></li>
+            {modo !== 'ponto' && (
+              <>
+                <li><span>Semanas com meta batida</span><strong>{fmtInt(semanasBatidas.length)}</strong></li>
+                {/* o marco traz rotulo/realizado -- antes usava campos que nao
+                    existem (semana_label/valor_semana) e saia R$ 0,00 */}
+                {semanasBatidas.slice(0, 2).map((sb) => (
+                  <li key={sb.ordem ?? sb.semana}>
+                    <span>{String(sb.rotulo || `Semana ${sb.semana}`).split(' — ')[0]}</span>
+                    <strong>{fmtV(sb.realizado)}</strong>
+                  </li>
+                ))}
+              </>
+            )}
+          </ul>
+        </div>
       </div>
 
       <div className="panel table-panel">

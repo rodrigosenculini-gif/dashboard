@@ -2292,15 +2292,18 @@ body {
 
 /* Grade dos KPIs da view Vendedoras: 6 colunas para permitir cards de
    tamanhos diferentes sem sobra no fim da linha.
-   linha 1: total do mes (destaque, 4 col) + semana atual (2 col)
-   linha 2: destaques (4 col) + quantidade (2 col)
-   linha 3: media e projecao, esticadas (3 col cada) */
+   linha 1: total do mes (destaque, 3 col) + semana atual (2) + quantidade (1)
+   linha 2: media e projecao diaria, esticadas (3 col cada)
+   linha 3: destaques do periodo, largura toda */
 .kpi-grid.kpi-grid-3{ grid-template-columns:repeat(6, minmax(0, 1fr)); }
 .kpi-grid.kpi-grid-3 > .kpi{ grid-column:span 2; }
-.kpi-grid.kpi-grid-3 > .kpi-destaque{ grid-column:span 4; }
-.kpi-grid.kpi-grid-3 > .kpi-lista{ grid-column:span 4; }
+.kpi-grid.kpi-grid-3 > .kpi-destaque{ grid-column:span 3; }
 .kpi-grid.kpi-grid-3 > .kpi-meio{ grid-column:span 2; }
+.kpi-grid.kpi-grid-3 > .kpi-curto{ grid-column:span 1; }
 .kpi-grid.kpi-grid-3 > .kpi-largo{ grid-column:span 3; }
+.kpi-grid.kpi-grid-3 > .kpi-lista{ grid-column:1 / -1; }
+/* quantidade e um numero curto: cabe em 1 coluna sem apertar */
+.kpi-grid.kpi-grid-3 > .kpi-curto .kpi-value{ font-size:22px; }
 /* o total do mes e o numero que importa: fonte maior que os demais */
 .kpi.kpi-destaque .kpi-value{ font-size:30px; }
 .kpi.kpi-destaque .kpi-value .kpi-split-proj{ font-size:20px; }
@@ -2310,6 +2313,7 @@ body {
   .kpi-grid.kpi-grid-3 > .kpi-destaque,
   .kpi-grid.kpi-grid-3 > .kpi-lista,
   .kpi-grid.kpi-grid-3 > .kpi-meio,
+  .kpi-grid.kpi-grid-3 > .kpi-curto,
   .kpi-grid.kpi-grid-3 > .kpi-largo{ grid-column:span 2; }
 }
 
