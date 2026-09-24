@@ -2372,6 +2372,29 @@ body {
 .acoes-barra .refresh-btn, .acoes-barra .reset-btn{ height:30px; box-sizing:border-box; display:inline-flex; align-items:center; }
 .acoes-barra .acoes-sep{ flex:1 1 auto; }
 
+/* Lembrete periodico no portal da vendedora: canto inferior direito, sem
+   bloquear a tela -- ela responde quando puder e continua trabalhando. */
+.lembrete-card{
+  position:fixed; right:18px; bottom:18px; z-index:900; width:min(300px, calc(100vw - 36px));
+  background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--gold);
+  border-radius:12px; padding:14px 15px 12px;
+  box-shadow:0 12px 30px rgba(0,0,0,.45);
+  animation:lembrete-entra .18s ease-out;
+}
+@keyframes lembrete-entra{ from{ opacity:0; transform:translateY(10px) } to{ opacity:1; transform:none } }
+.lembrete-texto{ margin:0 0 11px; font-size:12.5px; line-height:1.5; color:var(--text); }
+.lembrete-acoes{ display:flex; gap:7px; }
+.lembrete-btn{
+  flex:1; padding:8px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:12px;
+  background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
+  transition:color .13s, border-color .13s;
+}
+.lembrete-btn.sim{ color:var(--lime); border-color:rgba(169,217,127,.35); }
+.lembrete-btn.sim:hover{ border-color:var(--lime); }
+.lembrete-btn.nao{ color:var(--rose); border-color:rgba(217,144,137,.35); }
+.lembrete-btn.nao:hover{ border-color:var(--rose); }
+.lembrete-btn:disabled{ opacity:.5; cursor:default; }
+
 /* --- Dialogo do projeto (substitui window.confirm/prompt) --- */
 .dlg-overlay{
   position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
