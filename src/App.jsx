@@ -6069,6 +6069,24 @@ function VendasView() {
       return row
     })
   }, [diasMes, kpis])
+  // O recharts anima de dois jeitos: ao MONTAR ele "desenha" a linha da
+  // esquerda pra direita; quando os dados MUDAM, ele interpola os valores, o
+  // que sobe de baixo pra cima. Sair e voltar pra view remonta o componente e
+  // trazia o traco lateral.
+  // Para ter sempre o crescimento vertical: o primeiro frame sai com os
+  // valores zerados e, logo apos o paint, entram os valores reais -- assim o
+  // recharts trata como atualizacao, nao como montagem.
+  const [animPronta, setAnimPronta] = useState(false)
+  useEffect(() => {
+    if (!chartData.length) { setAnimPronta(false); return }
+    const t = requestAnimationFrame(() => setAnimPronta(true))
+    return () => cancelAnimationFrame(t)
+  }, [chartData])
+  const dadosGrafico = useMemo(
+    () => (animPronta ? chartData : chartData.map((r) => ({ ...r, realizado: 0, projecao: 0 }))),
+    [chartData, animPronta]
+  )
+
 
   // cor do gráfico e dos KPIs muda de acordo com o produto selecionado no
   // filtro (mesma cor do card daquele produto); sem filtro, usa o verde padrão
@@ -6268,12 +6286,13 @@ function VendasView() {
         <p className="section-label">Vendas por dia &mdash; realizado e proje&ccedil;&atilde;o</p>
         <p className="section-sub">linha tracejada = proje&ccedil;&atilde;o do m&ecirc;s (m&ecirc;s corrente, independente do filtro de data acima)</p>
         <ResponsiveContainer width="100%" height="80%">
-          <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <ComposedChart data={dadosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <XAxis dataKey="dia" tick={{ fontSize: 9, fill: '#8a978f' }} interval={2} />
             <YAxis tick={{ fontSize: 10, fill: '#8a978f' }} width={50} />
             <Tooltip content={<ChartTooltip />} />
-            <Line type="monotone" dataKey="realizado" stroke={corAtual} strokeWidth={2.5} dot={false} connectNulls />
-            <Line type="monotone" dataKey="projecao" stroke={corAtual} strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={false} connectNulls legendType="none" />
+            {/* animacao sempre de baixo pra cima: ver dadosGrafico acima */}
+            <Line type="monotone" dataKey="realizado" stroke={corAtual} strokeWidth={2.5} dot={false} connectNulls animationDuration={700} animationEasing="ease-out" />
+            <Line type="monotone" dataKey="projecao" stroke={corAtual} strokeOpacity={0.4} strokeDasharray="5 5" strokeWidth={2} dot={false} connectNulls legendType="none" animationDuration={700} animationEasing="ease-out" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -6295,7 +6314,7 @@ function VendasView() {
         </div>
         <div className="kpi">
           <p className="kpi-label">% vendas de vendedoras</p>
-          <p className="kpi-value" style={{ fontSize: 20 }}>{fmtPct2(kpis?.qtd_total > 0 ? (Number(kpis.qtd_vendedor) / Number(kpis.qtd_total)) * 100 : 0)}</p>
+          <p className="kpi-value">{fmtPct2(kpis?.qtd_total > 0 ? (Number(kpis.qtd_vendedor) / Number(kpis.qtd_total)) * 100 : 0)}</p>
           <p className="kpi-sub">{fmtInt(kpis?.qtd_vendedor)} de {fmtInt(kpis?.qtd_total)} vendas</p>
           <p className="kpi-sub">{fmtInt(Math.round(kpis?.pontos_vendedor ?? 0))} pontos &middot; {fmtMoeda(kpis?.valor_vendedor)}</p>
         </div>
