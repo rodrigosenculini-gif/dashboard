@@ -5756,7 +5756,7 @@ function VendedorasView({ ferramentas = null }) {
 
       {!vendedor && mediasGeral && (
         <div className="kpi-grid kpi-grid-3">
-          <div className="kpi">
+          <div className="kpi kpi-destaque">
             <p className="kpi-label">{modo === 'ponto' ? 'Pontos' : 'Valor'} total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
             <p className="kpi-value kpi-split">
               <span>{fmtV(modo === 'ponto' ? kpisGeral?.pontos_total : kpisGeral?.valor_total)}</span>
@@ -5775,7 +5775,7 @@ function VendedorasView({ ferramentas = null }) {
             </p>
             <p className="kpi-sub">por dia &uacute;til do m&ecirc;s | di&aacute;ria &times; 5 dias</p>
           </div>
-          <div className="kpi">
+          <div className="kpi kpi-meio">
             <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
             <p className="kpi-value kpi-split">
               <span>{fmtV(modo === 'ponto' ? mediasGeral.pontos_projecao_diaria : mediasGeral.projecao_diaria)}</span>
@@ -5798,7 +5798,7 @@ function VendedorasView({ ferramentas = null }) {
               {fmtV(modo === 'ponto' ? participacao?.pontos_total : participacao?.valor_total)}
             </p>
           </div>
-          <div className="kpi kpi-curto">
+          <div className="kpi kpi-meio">
             <p className="kpi-label">Meta atual</p>
             <p className="kpi-value">
               {Number(metasV2?.janela_alvo) > 0

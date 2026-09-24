@@ -91,7 +91,8 @@ body {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  /* respiro entre a linha de filtros e a de datas logo abaixo */
+  margin-bottom: 26px;
 }
 
 .filters select, .filters input[type="date"] {
@@ -496,6 +497,10 @@ body {
   white-space: nowrap;
 }
 .topbar-right .status-line { margin-right: 4px; }
+/* as ferramentas gerais (Refin, Arquivos, Info, IA) sao um grupo; as acoes da
+   tela (Consulta Cliente, Redefinir, Adicionar) sao outro. Um respiro entre
+   eles, senao vira uma fileira continua de botoes sem hierarquia. */
+.topbar-right > .refresh-btn:nth-of-type(1){ margin-left: 14px; }
 
 .dots-btn {
   background: var(--surface);
@@ -547,7 +552,7 @@ body {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 26px;
 }
 
 .date-presets {
@@ -2308,6 +2313,11 @@ body {
 .kpi-grid.kpi-grid-3 > .kpi-destaque{ grid-column:span 3; }
 .kpi-grid.kpi-grid-3 > .kpi-meio{ grid-column:span 2; }
 .kpi-grid.kpi-grid-3 > .kpi-curto{ grid-column:span 1; }
+/* alinhamento vertical: todos os cards da mesma linha com a mesma altura e o
+   conteudo encostado embaixo, para os numeros ficarem na mesma base */
+.kpi-grid.kpi-grid-3 > .kpi{ display:flex; flex-direction:column; }
+.kpi-grid.kpi-grid-3 > .kpi .kpi-value{ margin-top:auto; }
+.kpi-grid.kpi-grid-3 > .kpi-lista .kpi-value{ margin-top:0; }
 .kpi-grid.kpi-grid-3 > .kpi-largo{ grid-column:span 3; }
 .kpi-grid.kpi-grid-3 > .kpi-lista{ grid-column:1 / -1; }
 /* quantidade e um numero curto: cabe em 1 coluna sem apertar */
@@ -2335,6 +2345,9 @@ body {
 /* Atalhos de banco em quadradinhos: sao 6 consultas que ocupavam uma linha
    inteira com o nome por extenso. Sigla curta, alinhados a direita. */
 .bancos-atalhos{ display:flex; align-items:center; gap:5px; margin-left:auto; }
+/* os quadradinhos de banco ficam no canto oposto aos filtros: um respiro
+   antes deles deixa claro que sao outro grupo */
+.filters .bancos-atalhos{ padding-left:18px; }
 .bancos-atalhos.linha-propria{ margin:-2px 0 14px auto; }
 .banco-btn{
   width:38px; height:32px; padding:0; border-radius:8px; cursor:pointer;
