@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useJanelaFlutuante } from './useJanelaFlutuante'
 
 const MASCOTE = 'https://hotlinesolucoes.com.br/wp-content/uploads/2024/08/macote.png'
 
@@ -50,6 +51,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const [quandoCustom, setQuandoCustom] = useState('')
   const [salvando, setSalvando] = useState(false)
   const tituloRef = useRef(null)
+  const pip = useJanelaFlutuante()
 
   const vencidas = tarefas.filter((t) => t.vencida)
   const aFalar = nota || vencidas[0] || null
@@ -121,8 +123,9 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
 
   if (!vendedor) return null
 
-  return (
-    <div className={`mascote-flut ${pendencias ? 'chamando' : ''}`}>
+  // mesmo conteudo nos dois lugares: na pagina e na janela flutuante
+  const conteudo = (
+    <>
       {/* balao: so aparece quando ha algo a dizer */}
       {aFalar && !painel && (
         <div className="mascote-balao">
@@ -194,6 +197,38 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
         <img src={MASCOTE} alt="Esquentadinho" />
         {pendencias > 0 && <span className="mascote-selo">{pendencias}</span>}
       </button>
+    </>
+  )
+
+  // Com a janela flutuante aberta, o conteudo vai pra la -- ela fica por cima
+  // de tudo, mesmo com o Chrome em outra aba. Na pagina fica so o atalho pra
+  // trazer de volta.
+  if (pip.janela) {
+    return (
+      <>
+        <div className="mascote-flut">
+          <button type="button" className="mascote-voltar" onClick={pip.fechar}
+                  title="Trazer os lembretes de volta pra esta tela">
+            <img src={MASCOTE} alt="" />
+            <span>lembretes na janelinha</span>
+          </button>
+        </div>
+        <pip.Portal>
+          <div className={`mascote-flut na-janela ${pendencias ? 'chamando' : ''}`}>{conteudo}</div>
+        </pip.Portal>
+      </>
+    )
+  }
+
+  return (
+    <div className={`mascote-flut ${pendencias ? 'chamando' : ''}`}>
+      {pip.suportado && (
+        <button type="button" className="mascote-destacar" onClick={() => pip.abrir()}
+                title="Abrir numa janelinha que fica por cima das outras telas">
+          &#11021; destacar
+        </button>
+      )}
+      {conteudo}
     </div>
   )
 }

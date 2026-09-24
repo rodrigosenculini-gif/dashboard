@@ -2372,6 +2372,36 @@ body {
 .acoes-barra .refresh-btn, .acoes-barra .reset-btn{ height:30px; box-sizing:border-box; display:inline-flex; align-items:center; }
 .acoes-barra .acoes-sep{ flex:1 1 auto; }
 
+/* --- Janela flutuante (Picture-in-Picture) --- */
+/* dentro da janelinha nao ha pagina: o corpo E o painel */
+.pip-body{
+  margin:0; padding:10px; background:var(--bg, #0d100c);
+  font-family:var(--font-sans, system-ui), sans-serif;
+  color:var(--text, #e8ebe6);
+}
+.mascote-flut.na-janela{
+  position:static; right:auto; bottom:auto;
+  align-items:stretch; gap:8px;
+}
+/* na janelinha o painel ocupa tudo e o mascote vira so um detalhe no topo */
+.mascote-flut.na-janela .mascote-painel,
+.mascote-flut.na-janela .mascote-balao{
+  width:100%; box-shadow:none; animation:none;
+}
+.mascote-flut.na-janela .mascote-balao::after{ display:none; }
+.mascote-flut.na-janela .mascote-botao{ width:44px; height:44px; align-self:center; }
+.mascote-flut.na-janela .mascote-lista{ max-height:none; }
+
+/* atalhos de abrir/voltar */
+.mascote-destacar, .mascote-voltar{
+  background:var(--surface); border:1px solid var(--border); color:var(--muted);
+  border-radius:8px; padding:5px 9px; cursor:pointer;
+  font-family:var(--font-mono); font-size:10.5px;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.mascote-destacar:hover, .mascote-voltar:hover{ color:var(--gold); border-color:var(--gold); }
+.mascote-voltar img{ width:20px; height:20px; object-fit:contain; }
+
 /* --- Esquentadinho flutuante: lembretes e tarefas --- */
 .mascote-flut{
   position:fixed; right:20px; bottom:20px; z-index:900;
