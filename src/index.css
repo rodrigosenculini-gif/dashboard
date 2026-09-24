@@ -2336,6 +2336,12 @@ body {
 }
 .acoes-consultas .refresh-btn{ height:30px; box-sizing:border-box; }
 
+/* trofeu e alternador de modo junto dos filtros: alinhados com os selects */
+.filters .dots-btn, .filters .refresh-btn{
+  height:32px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;
+}
+.filters .dots-btn{ margin-left:4px; }
+
 /* barra de acoes: quebra em linha nova alinhada, sem card solto no fim */
 .acoes-barra{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
 .acoes-barra .refresh-btn, .acoes-barra .reset-btn{ height:30px; box-sizing:border-box; display:inline-flex; align-items:center; }

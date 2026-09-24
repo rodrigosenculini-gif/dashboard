@@ -5456,7 +5456,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
     </div>
   )
 }
-function VendedorasView() {
+function VendedorasView({ ferramentas = null }) {
   const revisaoCache = useRevisaoCache()
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [vendedores, setVendedores] = useState([])
@@ -5653,38 +5653,12 @@ function VendedorasView() {
           <span className="status-line">
             {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
           </span>
+          {ferramentas}
           <button className="reset-btn" onClick={() => { setVendedorSel([]); setBancoSel([]); setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
           </button>
           <button className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão para qualquer vendedora">
             + Adicionar adesão
-          </button>
-          <button className="refresh-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: consulta status, saldo/ofertas e cadastro de proposta">
-            Novo Saque
-          </button>
-          <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">
-            Consulta Cliente
-          </button>
-          <button className="refresh-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro de proposta">
-            PAN
-          </button>
-          <button className="refresh-btn" onClick={() => setShowC6(true)} title="C6: consulta de proposta por adesão (API do banco) ou por CPF (propostas já registradas)">
-            C6
-          </button>
-          <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simula&ccedil;&atilde;o e cadastro de proposta">
-            Soma
-          </button>
-          <button className="refresh-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação de pagamento">
-            Presença
-          </button>
-          <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou c&oacute;digo AF">
-            Consulta Facta
-          </button>
-          <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras" style={{ fontSize: 15 }}>
-            &#127942;
-          </button>
-          <button className="refresh-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
-            {modo === 'valor' ? '⇄ Ver em pontos' : '⇄ Ver em valor'}
           </button>
           <input
             type="file"
@@ -5705,12 +5679,32 @@ function VendedorasView() {
         </div>
       </div>
 
+      {/* ferramentas gerais junto das acoes da tela, e as 7 consultas de banco
+          em faixa propria: tudo numa linha so quebrava deixando botao solto */}
+      <div className="acoes-consultas">
+        <span className="acoes-titulo">consultas</span>
+        <button className="refresh-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: consulta status, saldo/ofertas e cadastro de proposta">Novo Saque</button>
+        <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">Consulta Cliente</button>
+        <button className="refresh-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro de proposta">PAN</button>
+        <button className="refresh-btn" onClick={() => setShowC6(true)} title="C6: consulta de proposta por adesão (API do banco) ou por CPF (propostas já registradas)">C6</button>
+        <button className="refresh-btn" onClick={() => setShowSomaJornada(true)} title="Soma: consulta de margem, simulação e cadastro de proposta">Soma</button>
+        <button className="refresh-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação de pagamento">Presença</button>
+        <button className="refresh-btn" onClick={() => setShowFacta(true)} title="Consultar proposta na Facta por CPF ou código AF">Consulta Facta</button>
+      </div>
+
       {importMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{importMsg}</div>}
       {syncMsg && <div className="state-msg" style={{ marginBottom: 10 }}>{syncMsg}</div>}
 
+      {/* trofeu e modo ficam com os filtros: sao controles da leitura da tela */}
       <div className="filters">
         <MultiSelect value={vendedorSel} onChange={setVendedorSel} options={vendedores} label="vendedor" />
         <MultiSelect value={bancoSel} onChange={setBancoSel} options={bancosDisponiveis} label="banco" />
+        <button className="dots-btn" onClick={() => setShowRanking(true)} title="Ranking de Vendedoras" style={{ fontSize: 15 }}>
+          &#127942;
+        </button>
+        <button className="refresh-btn" onClick={() => setModo(modo === 'valor' ? 'ponto' : 'valor')} title="Alternar entre valor e pontos">
+          {modo === 'valor' ? '⇄ Ver em pontos' : '⇄ Ver em valor'}
+        </button>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
@@ -6893,14 +6887,11 @@ function Dashboard({ permitidas, onLogout }) {
           </button>
         )}
         <ViewSwitcher view={view} setView={changeView} permitidas={permitidas} />
-        {view === 'vendedoras' && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {acoesVendedoras}
-          </div>
-        )}
+        {/* Refin/Arquivos/Info sairam daqui: agora ficam na barra de acoes da
+            propria tela, junto de Redefinir filtros e Adicionar adesao */}
         {onLogout && (
           <button className="reset-btn" onClick={onLogout} title="Sair"
-            style={view === 'vendedoras' ? undefined : { marginLeft: 'auto' }}>Sair</button>
+            style={{ marginLeft: 'auto' }}>Sair</button>
         )}
       </div>
       {view === 'inicio' && podeVer('inicio') && (
@@ -6915,7 +6906,7 @@ function Dashboard({ permitidas, onLogout }) {
       {view === 'leilao' && podeVer('leilao') && <LeilaoDetalhado />}
       {view === 'produtos' && podeVer('produtos') && <EntradasLP />}
       {view === 'n8n' && podeVer('n8n') && <N8nExecucoes />}
-      {view === 'vendedoras' && podeVer('vendedoras') && <VendedorasView />}
+      {view === 'vendedoras' && podeVer('vendedoras') && <VendedorasView ferramentas={acoesVendedoras} />}
       {view === 'vendas' && podeVer('vendas') && <VendasView />}
       {view === 'ia' && podeVer('ia') && <IATreinamento />}
       {view === 'trello' && podeVer('trello') && <Trello onVoltar={() => changeView('inicio')} />}
