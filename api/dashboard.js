@@ -1378,14 +1378,14 @@ export default async function handler(req, res) {
            where ativo and role = 'vendedora' order by 1`;
     params = [];
   } else if (type === 'tarefas_gestao') {
-    sql = 'select * from dashboard_tarefas_gestao($1::text)';
-    params = [req.query.vendedor || null];
+    sql = 'select * from dashboard_tarefas_gestao($1::text,$2::boolean)';
+    params = [req.query.vendedor || null, req.query.com_feitas === '1'];
   } else if (type === 'regras_listar') {
     sql = 'select * from dashboard_regras_listar()';
     params = [];
   } else if (type === 'tarefas_pendentes') {
-    sql = 'select * from dashboard_tarefas_pendentes($1::text)';
-    params = [req.query.vendedor || null];
+    sql = 'select * from dashboard_tarefas_pendentes($1::text,$2::boolean)';
+    params = [req.query.vendedor || null, req.query.com_feitas === '1'];
   } else if (type === 'notificacao_pendente') {
     sql = 'select * from dashboard_notificacao_pendente($1::text,$2::text)';
     params = [req.query.vendedor || null, req.query.escopo || 'vendedora'];

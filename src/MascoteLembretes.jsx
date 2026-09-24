@@ -58,17 +58,34 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const [aba, setAba] = useState('tarefas')   // tarefas | regras
   const [regras, setRegras] = useState([])
 
-  const vencidas = tarefas.filter((t) => t.vencida)
+  const vencidas = tarefas.filter((t) => t.vencida && !t.feita)
   const aFalar = nota || vencidas[0] || null
   const pendencias = (nota ? 1 : 0) + vencidas.length
+
+  // clicar fora fecha o painel: antes so o proprio mascote fechava
+  const raizRef = useRef(null)
+  useEffect(() => {
+    if (!painel) return
+    const foraDaqui = (e) => {
+      if (raizRef.current && !raizRef.current.contains(e.target)) setPainel(false)
+    }
+    const esc = (e) => { if (e.key === 'Escape') setPainel(false) }
+    // captura para pegar o clique antes de a pagina tratar
+    document.addEventListener('mousedown', foraDaqui, true)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', foraDaqui, true)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [painel])
 
   const carregar = useCallback(async () => {
     if (!vendedor) return
     try {
       const [tf, nt] = await Promise.all([
         (escopo === 'gestao'
-          ? getJson('tarefas_gestao', {})
-          : getJson('tarefas_pendentes', { vendedor })).catch(() => []),
+          ? getJson('tarefas_gestao', { com_feitas: '1' })
+          : getJson('tarefas_pendentes', { vendedor, com_feitas: '1' })).catch(() => []),
         nota ? Promise.resolve(null) : getJson('notificacao_pendente', { vendedor, escopo }).catch(() => null),
       ])
       setTarefas(Array.isArray(tf) ? tf : [])
@@ -153,7 +170,12 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
             </>
           ) : (
             <>
+              <p className="mascote-chamada">chegou a hora</p>
               <p><strong>{vencidas[0].titulo}</strong></p>
+              <p className="mascote-sub">
+                marcado para {fmtQuando(vencidas[0].lembrar_em)}
+                {vencidas.length > 1 ? ` · mais ${vencidas.length - 1} na fila` : ''}
+              </p>
               <div className="mascote-acoes">
                 <button type="button" className="mascote-btn sim" onClick={() => acaoTarefa(vencidas[0].id, 'concluir')}>Feito</button>
                 <button type="button" className="mascote-btn" onClick={() => acaoTarefa(vencidas[0].id, 'adiar', 10)}>+10 min</button>
@@ -239,7 +261,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
           <ul className="mascote-lista">
             {tarefas.length === 0 && <li className="vazio">nenhum lembrete por aqui</li>}
             {tarefas.map((t) => (
-              <li key={t.id} className={t.vencida ? 'vencida' : ''}>
+              <li key={t.id} className={`${t.vencida ? 'vencida' : ''} ${t.feita ? 'feita' : ''}`}>
                 <div>
                   <span className="mascote-tit">{t.titulo}</span>
                   <span className="mascote-hora">
@@ -247,8 +269,14 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                   </span>
                 </div>
                 <div className="mascote-linha-acoes">
-                  <button type="button" onClick={() => acaoTarefa(t.id, 'concluir')} title="Concluir">&#10003;</button>
-                  <button type="button" onClick={() => acaoTarefa(t.id, 'adiar', 10)} title="Adiar 10 min">+10</button>
+                  {t.feita ? (
+                    <button type="button" onClick={() => acaoTarefa(t.id, 'reabrir')} title="Reabrir">&#8630;</button>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => acaoTarefa(t.id, 'concluir')} title="Concluir">&#10003;</button>
+                      <button type="button" onClick={() => acaoTarefa(t.id, 'adiar', 10)} title="Adiar 10 min">+10</button>
+                    </>
+                  )}
                 </div>
               </li>
             ))}
@@ -269,7 +297,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   // A janela flutuante (Picture-in-Picture) saiu: a extensao do Chrome cobre
   // melhor o mesmo caso -- aparece em qualquer site, sem clique por sessao.
   return (
-    <div className={`mascote-flut ${pendencias ? 'chamando' : ''}`}>
+    <div className={`mascote-flut ${pendencias ? 'chamando' : ''}`} ref={raizRef}>
       {conteudo}
     </div>
   )

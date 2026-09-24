@@ -2413,6 +2413,11 @@ body {
 }
 @keyframes mascote-entra{ from{ opacity:0; transform:translateY(8px) } to{ opacity:1; transform:none } }
 .mascote-balao p{ margin:0 0 10px; font-size:12.5px; line-height:1.5; color:var(--text); }
+.mascote-chamada{
+  margin:0 0 4px !important; font-size:10px !important; color:var(--gold);
+  text-transform:uppercase; letter-spacing:.07em;
+}
+.mascote-sub{ margin:-4px 0 10px !important; font-size:10.5px !important; color:var(--muted); }
 .mascote-acoes{ display:flex; gap:6px; }
 .mascote-btn{
   flex:1; padding:7px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:11.5px;
@@ -2462,6 +2467,8 @@ select.mascote-input{ cursor:pointer; }
 .mascote-tit{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mascote-hora{ color:var(--muted); font-family:var(--font-mono); font-size:10px; }
 .mascote-lista li.vencida .mascote-hora{ color:var(--rose); }
+.mascote-lista li.feita .mascote-tit{ text-decoration:line-through; opacity:.55; }
+.mascote-lista li.feita .mascote-hora{ color:var(--lime); opacity:.8; }
 .mascote-linha-acoes{ display:flex; gap:4px; flex:0 0 auto; }
 .mascote-linha-acoes button{
   background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
