@@ -41,6 +41,38 @@ export default function LembreteVendedora({ vendedor, escopo = 'vendedora' }) {
     setAberto(null)
   }, [])
 
+  // Com a aba em segundo plano o card nao e visto -- e sumiria sozinho em 90s,
+  // fazendo ela perder o lembrete sem saber. Enquanto estiver fora da aba:
+  // o card espera, e o titulo pisca para chamar na barra de abas.
+  useEffect(() => {
+    if (!aberto) return
+    const tituloOriginal = document.title
+    let visivel = true
+    const piscar = setInterval(() => {
+      if (document.hidden) {
+        document.title = visivel ? '🔔 Responda no dashboard' : tituloOriginal
+        visivel = !visivel
+      } else {
+        document.title = tituloOriginal
+      }
+    }, 1200)
+    return () => { clearInterval(piscar); document.title = tituloOriginal }
+  }, [aberto])
+
+  // o tempo na tela so corre com a aba a vista: se ela esta em outra aba, o
+  // lembrete espera em vez de expirar sem ninguem ver
+  const agendarSumico = useCallback(() => {
+    clearTimeout(timerRef.current)
+    if (document.hidden) return
+    timerRef.current = setTimeout(() => setAberto(null), NA_TELA_MS)
+  }, [])
+
+  useEffect(() => {
+    const aoVoltar = () => { if (aberto) agendarSumico() }
+    document.addEventListener('visibilitychange', aoVoltar)
+    return () => document.removeEventListener('visibilitychange', aoVoltar)
+  }, [aberto, agendarSumico])
+
   const checar = useCallback(async () => {
     if (!vendedor || aberto) return
     try {
@@ -52,9 +84,9 @@ export default function LembreteVendedora({ vendedor, escopo = 'vendedora' }) {
       const m = await postJson('notificacao_mostrada', { regra_id: nota.regra_id, vendedor })
       const id = m?.r ?? m
       setAberto({ id, regra_id: nota.regra_id, mensagem: nota.mensagem })
-      timerRef.current = setTimeout(() => setAberto(null), NA_TELA_MS)
+      agendarSumico()
     } catch { /* silencioso: lembrete nunca atrapalha a tela */ }
-  }, [vendedor, escopo, aberto])
+  }, [vendedor, escopo, aberto, agendarSumico])
 
   useEffect(() => {
     checar()
