@@ -1370,6 +1370,11 @@ export default async function handler(req, res) {
   } else if (type === 'trello_docs') {
     sql = 'select dashboard_trello_docs($1::bigint) as docs';
     params = [req.query.quadro_id ? Number(req.query.quadro_id) : null];
+  } else if (type === 'vendedoras_lista') {
+    // usada pela extensao do Chrome, para a vendedora se identificar
+    sql = `select nome_completo as vendedor from vendedoras_login
+           where ativo and role = 'vendedora' order by 1`;
+    params = [];
   } else if (type === 'tarefas_pendentes') {
     sql = 'select * from dashboard_tarefas_pendentes($1::text)';
     params = [req.query.vendedor || null];
