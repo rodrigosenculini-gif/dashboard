@@ -5938,6 +5938,9 @@ function VendasView() {
   const [kpis, setKpis] = useState(null)
   const [porProduto, setPorProduto] = useState([])
   const [diasMes, setDiasMes] = useState([])
+  // meta vigente (geral, sem vendedora): usada so para mostrar a % do dia no
+  // tooltip do grafico diario
+  const [metasV2, setMetasV2] = useState(null)
   const [porCampanha, setPorCampanha] = useState([])
   const [porOrigem, setPorOrigem] = useState([])
   const [filtrosBanco, setFiltrosBanco] = useState([])
@@ -5962,13 +5965,15 @@ function VendasView() {
     setLoading(true)
     setError(null)
     try {
-      const [kp, pp, dm, pc, po] = await Promise.all([
+      const [kp, pp, dm, pc, po, mv] = await Promise.all([
         callApi('vendas_kpis', { date_from: dataInicio, date_to: dataFim, produto, banco }, opts),
         callApi('vendas_por_produto', { date_from: dataInicio, date_to: dataFim }, opts),
         callApi('vendas_dias_mes', { produto, banco }, opts),
         callApi('vendas_por_campanha', { date_from: dataInicio, date_to: dataFim, produto, banco }, opts),
         callApi('vendas_por_origem', { date_from: dataInicio, date_to: dataFim, produto, banco }, opts),
+        callApi('metas_v2', {}, opts).catch(() => null),
       ])
+      setMetasV2(mv?.[0] ?? null)
       setKpis(kp?.[0] ?? null)
       setPorProduto(pp ?? [])
       setDiasMes(dm ?? [])
