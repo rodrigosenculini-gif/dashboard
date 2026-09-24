@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import { useDialogo } from './Dialogo'
 import { BarChart, Bar, AreaChart, Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, LabelList } from 'recharts'
 import IATreinamento from './IATreinamento'
@@ -898,9 +899,7 @@ function LeilaoDetalhado() {
         <div>
             <p className="subtitle">Envio de leads e disparo de WhatsApp via API Meta &mdash; Hotline</p>
         </div>
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
         <div className="topbar-right">
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setDataInicio(todayISO()); setDataFim(todayISO()); setHoraInicio(''); setHoraFim('') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -1129,9 +1128,7 @@ function EntradasLP() {
   return (
     <>
       <div className="topbar">
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
         <div className="topbar-right">
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setProdutoSel([]); setOrigemSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim(''); setAtribuicao('ultimo') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -1667,9 +1664,7 @@ function N8nExecucoes() {
   return (
     <>
       <div className="topbar">
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
         <div className="topbar-right">
           <button className="reset-btn" onClick={() => { setWorkflowId(''); setDataInicio(todayISO()); setDataFim(todayISO()) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -5250,9 +5245,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
       </div>
 
       <div className="topbar">
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
         <div className="topbar-right">
           <button className="reset-btn" onClick={() => { setDataInicio(week.from); setDataFim(week.to) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -5440,6 +5433,19 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
     </div>
   )
 }
+// Renderiza o "atualizado as" dentro do cabecalho (ao lado do seletor de
+// view), de onde quer que seja chamado.
+function StatusNoTopo({ loading, lastUpdate }) {
+  const [slot, setSlot] = useState(null)
+  useEffect(() => {
+    // o slot existe no App; espera o primeiro paint
+    setSlot(document.getElementById('status-slot'))
+  }, [])
+  if (!slot) return null
+  const texto = loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''
+  return ReactDOM.createPortal(<span className="status-line">{texto}</span>, slot)
+}
+
 function VendedorasView({ ferramentas = null }) {
   const revisaoCache = useRevisaoCache()
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
@@ -5458,6 +5464,7 @@ function VendedorasView({ ferramentas = null }) {
   const [kpisGeral, setKpisGeral] = useState(null)
   const [kpisVendedor, setKpisVendedor] = useState(null)
   const [mediasGeral, setMediasGeral] = useState(null)
+  const [participacao, setParticipacao] = useState(null)
   const [metaVendedor, setMetaVendedor] = useState(null)
   const [porDia, setPorDia] = useState({ rows: [], vendedoresVistos: [] })
   const [tabela, setTabela] = useState({ rows: [], total: 0 })
@@ -5513,12 +5520,15 @@ function VendedorasView({ ferramentas = null }) {
     const date_from = dataInicio || ''
     const date_to = dataFim || ''
     try {
-      const [dia, tab, medias] = await Promise.all([
+      const [dia, tab, medias, part] = await Promise.all([
         callApi('vendedoras_por_dia', { vendedor: vendedorLista, date_from, date_to, banco }, opts),
         callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }, opts),
         callApi('vendedoras_medias_geral', {}, opts),
+        // quanto do total geral passa pela equipe, no mesmo periodo filtrado
+        callApi('vendas_participacao', { date_from, date_to }, opts).catch(() => null),
       ])
       setMediasGeral(medias?.[0] ?? null)
+      setParticipacao(part?.[0] ?? null)
 
       const porDiaMap = {}
       const totalPorVendedor = {}
@@ -5632,9 +5642,7 @@ function VendedorasView({ ferramentas = null }) {
   return (
     <>
       <div className="topbar">
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
         <div className="topbar-right">
           {ferramentas}
           <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">
@@ -5746,16 +5754,8 @@ function VendedorasView({ ferramentas = null }) {
         </ResponsiveContainer>
       </div>
 
-      {!vendedor && (
-        <div className="kpi-grid">
-          <div className="kpi"><p className="kpi-label">Vendedora com mais vendas</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.top_qtd_vendedor || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.top_qtd_valor)} vendas</p></div>
-          <div className="kpi"><p className="kpi-label">Vendedora com maior {modo === 'ponto' ? 'pontuação' : 'valor'}</p><p className="kpi-value" style={{ fontSize: 16 }}>{(modo === 'ponto' ? kpisGeral?.top_ponto_vendedor : kpisGeral?.top_valor_vendedor) || '-'}</p><p className="kpi-sub">{fmtV(modo === 'ponto' ? kpisGeral?.top_ponto_valor : kpisGeral?.top_valor_valor)}</p></div>
-          <div className="kpi"><p className="kpi-label">Banco mais utilizado</p><p className="kpi-value" style={{ fontSize: 16 }}>{kpisGeral?.banco_top || '-'}</p><p className="kpi-sub">{fmtInt(kpisGeral?.banco_top_qtd)} vendas</p></div>
-          <div className="kpi"><p className="kpi-label">Dia com maior {modo === 'ponto' ? 'pontuação' : 'valor'}</p><p className="kpi-value" style={{ fontSize: 16 }}>{(modo === 'ponto' ? kpisGeral?.dia_maior_ponto : kpisGeral?.dia_maior_valor) ? fmtDataBR(modo === 'ponto' ? kpisGeral.dia_maior_ponto : kpisGeral.dia_maior_valor) : '-'}</p><p className="kpi-sub">{fmtV(modo === 'ponto' ? kpisGeral?.dia_maior_ponto_total : kpisGeral?.dia_maior_valor_total)}</p></div>
-        </div>
-      )}
       {!vendedor && mediasGeral && (
-        <div className="kpi-grid">
+        <div className="kpi-grid kpi-grid-3">
           <div className="kpi">
             <p className="kpi-label">{modo === 'ponto' ? 'Pontos' : 'Valor'} total | Proje&ccedil;&atilde;o do m&ecirc;s</p>
             <p className="kpi-value kpi-split">
@@ -5766,15 +5766,14 @@ function VendedorasView({ ferramentas = null }) {
             <p className="kpi-sub">{fmtInt(kpisGeral?.qtd_total)} vendas no per&iacute;odo</p>
             <p className="kpi-sub">considerando hoje: {fmtV(modo === 'ponto' ? mediasGeral?.pontos_projecao_mes : mediasGeral?.projecao_mes)}</p>
           </div>
-          <div className="kpi">
-            <p className="kpi-label">M&eacute;dia di&aacute;ria (time todo)</p>
-            <p className="kpi-value">{fmtV(mediasGeral.dias_uteis_passados > 0 ? (modo === 'ponto' ? mediasGeral.pontos_mes_atual : mediasGeral.total_mes_atual) / mediasGeral.dias_uteis_passados : 0)}</p>
-            <p className="kpi-sub">por dia &uacute;til, m&ecirc;s corrente</p>
-          </div>
-          <div className="kpi">
-            <p className="kpi-label">M&eacute;dia semanal (time todo)</p>
-            <p className="kpi-value">{fmtV(mediasGeral.dias_uteis_passados > 0 ? ((modo === 'ponto' ? mediasGeral.pontos_mes_atual : mediasGeral.total_mes_atual) / mediasGeral.dias_uteis_passados) * 5 : 0)}</p>
-            <p className="kpi-sub">m&eacute;dia di&aacute;ria &times; 5 dias &uacute;teis</p>
+          <div className="kpi kpi-largo">
+            <p className="kpi-label">M&eacute;dia di&aacute;ria | semanal (time todo)</p>
+            <p className="kpi-value kpi-split">
+              <span>{fmtV(mediasGeral.dias_uteis_passados > 0 ? (modo === 'ponto' ? mediasGeral.pontos_mes_atual : mediasGeral.total_mes_atual) / mediasGeral.dias_uteis_passados : 0)}</span>
+              <span className="kpi-split-bar">|</span>
+              <span className="kpi-split-proj">{fmtV(mediasGeral.dias_uteis_passados > 0 ? ((modo === 'ponto' ? mediasGeral.pontos_mes_atual : mediasGeral.total_mes_atual) / mediasGeral.dias_uteis_passados) * 5 : 0)}</span>
+            </p>
+            <p className="kpi-sub">por dia &uacute;til do m&ecirc;s | di&aacute;ria &times; 5 dias</p>
           </div>
           <div className="kpi">
             <p className="kpi-label">Proje&ccedil;&atilde;o di&aacute;ria | semanal</p>
@@ -5784,6 +5783,40 @@ function VendedorasView({ ferramentas = null }) {
               <span className="kpi-split-proj">{fmtV(modo === 'ponto' ? mediasGeral.pontos_projecao_semanal : mediasGeral.projecao_semanal)}</span>
             </p>
             <p className="kpi-sub">ritmo por hora &uacute;til (8h&ndash;18h) de hoje/semana</p>
+          </div>
+
+          {/* quanto do total geral veio das vendedoras e onde a equipe esta
+              na meta vigente */}
+          <div className="kpi kpi-meio">
+            <p className="kpi-label">Vendas das vendedoras</p>
+            <p className="kpi-value">
+              {participacao ? `${Number(modo === 'ponto' ? participacao.pct_pontos : participacao.pct_valor).toFixed(1)}%` : '-'}
+            </p>
+            <p className="kpi-sub">
+              {fmtV(modo === 'ponto' ? participacao?.pontos_vendedoras : participacao?.valor_vendedoras)}
+              {' de '}
+              {fmtV(modo === 'ponto' ? participacao?.pontos_total : participacao?.valor_total)}
+            </p>
+          </div>
+          <div className="kpi kpi-curto">
+            <p className="kpi-label">Meta atual</p>
+            <p className="kpi-value">
+              {Number(metasV2?.janela_alvo) > 0
+                ? `${((Number(metasV2?.janela_realizado || 0) / Number(metasV2.janela_alvo)) * 100).toFixed(1)}%`
+                : '-'}
+            </p>
+            <p className="kpi-sub">{metasV2?.janela_descricao || 'sem janela vigente'}</p>
+          </div>
+
+          {/* destaques de uma linha num card so, como na tela de Vendedoras */}
+          <div className="kpi kpi-lista">
+            <p className="kpi-label">Destaques do per&iacute;odo</p>
+            <ul>
+              <li><span>Vendedora com mais vendas</span><strong>{kpisGeral?.top_qtd_vendedor || '-'}{kpisGeral?.top_qtd_valor ? ` (${fmtInt(kpisGeral.top_qtd_valor)})` : ''}</strong></li>
+              <li><span>Vendedora com maior {modo === 'ponto' ? 'pontuação' : 'valor'}</span><strong>{(modo === 'ponto' ? kpisGeral?.top_ponto_vendedor : kpisGeral?.top_valor_vendedor) || '-'} · {fmtV(modo === 'ponto' ? kpisGeral?.top_ponto_valor : kpisGeral?.top_valor_valor)}</strong></li>
+              <li><span>Banco mais utilizado</span><strong>{kpisGeral?.banco_top || '-'}{kpisGeral?.banco_top_qtd ? ` (${fmtInt(kpisGeral.banco_top_qtd)})` : ''}</strong></li>
+              <li><span>Dia com maior {modo === 'ponto' ? 'pontuação' : 'valor'}</span><strong>{(modo === 'ponto' ? kpisGeral?.dia_maior_ponto : kpisGeral?.dia_maior_valor) ? `${fmtDataBR(modo === 'ponto' ? kpisGeral.dia_maior_ponto : kpisGeral.dia_maior_valor)} · ${fmtV(modo === 'ponto' ? kpisGeral?.dia_maior_ponto_total : kpisGeral?.dia_maior_valor_total)}` : '-'}</strong></li>
+            </ul>
           </div>
         </div>
       )}
@@ -5918,8 +5951,8 @@ function VendasView() {
   const [kpis, setKpis] = useState(null)
   const [porProduto, setPorProduto] = useState([])
   const [diasMes, setDiasMes] = useState([])
-  // meta vigente (geral, sem vendedora): usada so para mostrar a % do dia no
-  // tooltip do grafico diario
+  // meta vigente (geral, sem vendedora): usada no tooltip do grafico diario
+  // e no KPI de atingimento
   const [metasV2, setMetasV2] = useState(null)
   const [porCampanha, setPorCampanha] = useState([])
   const [porOrigem, setPorOrigem] = useState([])
@@ -6143,9 +6176,7 @@ function VendasView() {
   return (
     <>
       <div className="topbar">
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
         <div className="topbar-right">
           <button className="reset-btn" onClick={() => { setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setProdutoSel([]); setBancoSel([]) }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -6721,9 +6752,7 @@ function VisaoGeral() {
   return (
     <>
       <div className="topbar">
-        <span className="status-line">
-          {loading ? 'atualizando...' : lastUpdate ? `atualizado às ${fmtHora(lastUpdate)}` : ''}
-        </span>
+        <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
         <div className="topbar-right">
           <button className="reset-btn" onClick={() => { setCampanhaSel([]); setOrigemSel([]); setMetaSel([]); setTipoEnvioSel([]); setMensagemFiltroSel([]); setDataInicio(mesAtual.from); setDataFim(mesAtual.to); setHoraInicio(''); setHoraFim(''); setSoDisparadas(false); setPagoDoPeriodo(false); setIncluirTardias(true); setAtribuicao('ultimo') }} title="Redefinir filtros">
             &#10226; Redefinir filtros
@@ -6871,6 +6900,10 @@ function Dashboard({ permitidas, onLogout }) {
           </button>
         )}
         <ViewSwitcher view={view} setView={changeView} permitidas={permitidas} />
+        {/* o "atualizado as" de cada view e renderizado aqui via portal, para
+            ficar na MESMA linha do seletor -- cada view tem seu proprio
+            lastUpdate, entao nao da pra levantar o estado */}
+        <span id="status-slot" className="status-slot" />
         {/* Refin/Arquivos/Info sairam daqui: agora ficam na barra de acoes da
             propria tela, junto de Redefinir filtros e Adicionar adesao */}
         {onLogout && (

@@ -29,7 +29,8 @@ body {
 .app {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 28px 24px 64px;
+  /* respiro no topo: o cabecalho encostava na borda da janela */
+  padding: 44px 24px 64px;
 }
 
 .topbar {
@@ -37,16 +38,16 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  /* respiro entre o cabecalho (logo + seletor de view) e a barra de acoes:
-     sem o titulo, os botoes encostavam no seletor */
-  margin-top: 14px;
-  margin-bottom: 24px;
+  /* separacao real entre o cabecalho e a barra de acoes: sem o titulo os
+     botoes ficavam colados no seletor de view */
+  margin-top: 26px;
+  margin-bottom: 22px;
   flex-wrap: wrap;
   min-height: 34px;
 }
-/* sem o titulo, o "atualizado as" e o primeiro item da barra: fica a
-   esquerda, alinhado sob o seletor de view, e empurra as acoes pra direita */
-.topbar > .status-line{ margin-right: auto; white-space: nowrap; }
+/* o status agora vive no cabecalho (portal), nao mais aqui */
+.status-slot{ display: inline-flex; align-items: center; margin-left: 4px; }
+.status-slot .status-line{ white-space: nowrap; }
 
 .topbar h1 {
   font-size: 20px;
@@ -256,9 +257,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* desce o bloco todo: antes o logo encostava no topo da janela */
-  margin-top: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   min-height: 34px;
 }
 .app-header .reset-btn { height: 34px; box-sizing: border-box; display: inline-flex; align-items: center; }

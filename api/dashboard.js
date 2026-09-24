@@ -1361,6 +1361,9 @@ export default async function handler(req, res) {
   } else if (type === 'trello_docs') {
     sql = 'select dashboard_trello_docs($1::bigint) as docs';
     params = [req.query.quadro_id ? Number(req.query.quadro_id) : null];
+  } else if (type === 'vendas_participacao') {
+    sql = 'select * from dashboard_vendas_participacao($1::date,$2::date)';
+    params = [req.query.date_from || null, req.query.date_to || null];
   } else if (type === 'consulta_cliente') {
     // Nova Vida (NVCHECK ADICIONAL): dados cadastrais, telefones com flag de
     // WhatsApp e FGTS presumido pelo CPF. A consulta e paga por chamada,
