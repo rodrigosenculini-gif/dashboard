@@ -1367,8 +1367,8 @@ export default async function handler(req, res) {
     sql = 'select dashboard_trello_docs($1::bigint) as docs';
     params = [req.query.quadro_id ? Number(req.query.quadro_id) : null];
   } else if (type === 'notificacao_pendente') {
-    sql = 'select * from dashboard_notificacao_pendente($1::text)';
-    params = [req.query.vendedor || null];
+    sql = 'select * from dashboard_notificacao_pendente($1::text,$2::text)';
+    params = [req.query.vendedor || null, req.query.escopo || 'vendedora'];
   } else if (type === 'meta_equipe') {
     sql = 'select * from dashboard_meta_equipe()';
     params = [];

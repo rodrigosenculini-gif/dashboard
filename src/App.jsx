@@ -5947,6 +5947,9 @@ function VendedorasView({ ferramentas = null }) {
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
       {showConsultaCliente && <ConsultaClienteModal onClose={() => setShowConsultaCliente(false)} />}
+      {/* versao de teste dos lembretes, so na gestao: regra propria no banco,
+          sem restricao de horario */}
+      <LembreteVendedora vendedor="gestao" escopo="gestao" />
       {showPan && <PanModal onClose={() => setShowPan(false)} />}
       {showC6 && <C6Modal vendedoresDisponiveis={vendedores} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}

@@ -31,7 +31,7 @@ const NA_TELA_MS = 90 * 1000    // some sozinho depois disso
  * Ignorar conta: a linha é gravada assim que aparece, com resposta nula.
  * É isso que permite medir quem responde e quem deixa passar.
  */
-export default function LembreteVendedora({ vendedor }) {
+export default function LembreteVendedora({ vendedor, escopo = 'vendedora' }) {
   const [aberto, setAberto] = useState(null)   // { id, regra_id, mensagem }
   const [enviando, setEnviando] = useState(false)
   const timerRef = useRef(null)
@@ -44,7 +44,7 @@ export default function LembreteVendedora({ vendedor }) {
   const checar = useCallback(async () => {
     if (!vendedor || aberto) return
     try {
-      const r = await getJson('notificacao_pendente', { vendedor })
+      const r = await getJson('notificacao_pendente', { vendedor, escopo })
       const nota = Array.isArray(r) ? r[0] : null
       if (!nota?.regra_id) return
       // grava que foi mostrada ANTES de exibir: se ela fechar a aba, o
@@ -54,7 +54,7 @@ export default function LembreteVendedora({ vendedor }) {
       setAberto({ id, regra_id: nota.regra_id, mensagem: nota.mensagem })
       timerRef.current = setTimeout(() => setAberto(null), NA_TELA_MS)
     } catch { /* silencioso: lembrete nunca atrapalha a tela */ }
-  }, [vendedor, aberto])
+  }, [vendedor, escopo, aberto])
 
   useEffect(() => {
     checar()
