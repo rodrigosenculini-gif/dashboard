@@ -3954,6 +3954,133 @@ function C6Modal({ vendedorFixo, vendedoresDisponiveis, onClose }) {
   )
 }
 
+// Consulta Cliente (Nova Vida / NVCHECK ADICIONAL): dados cadastrais,
+// telefones com flag de WhatsApp, e-mails e FGTS presumido a partir do CPF.
+// O resultado fica guardado 24h -- a consulta e paga por chamada.
+function ConsultaClienteModal({ vendedorFixo, onClose }) {
+  const [cpf, setCpf] = useState('')
+  const [dados, setDados] = useState(null)
+  const [erro, setErro] = useState('')
+  const [buscando, setBuscando] = useState(false)
+
+  const soNumeros = (v) => String(v || '').replace(/\D/g, '')
+
+  const consultar = async (forcar) => {
+    const n = soNumeros(cpf)
+    if (n.length !== 11) { setErro('Informe um CPF com 11 dígitos.'); return }
+    setBuscando(true); setErro(''); setDados(null)
+    try {
+      const d = await postApi('consulta_cliente', { cpf: n, vendedor: vendedorFixo || null, forcar: !!forcar })
+      if (d?.error) { setErro(d.error); return }
+      if (!d?.ok) { setErro(d?.mensagem || 'Nada encontrado para este CPF.'); return }
+      setDados(d)
+    } catch (e) { setErro(e.message || 'Erro na consulta.') }
+    finally { setBuscando(false) }
+  }
+
+  const tels = (dados?.telefones || []).filter((t) => t.TELEFONE)
+  const mails = (dados?.emails || []).filter((e) => e.EMAIL)
+  const ends = dados?.enderecos || []
+
+  return (
+    <div className="funil-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="funil-modal">
+        <div className="funil-header">
+          <div>
+            <h2>Consulta Cliente</h2>
+            <p className="subtitle">Dados cadastrais, contatos e FGTS presumido</p>
+          </div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <form className="add-venda-form" onSubmit={(e) => { e.preventDefault(); consultar(false) }}>
+          <label>CPF
+            <input value={cpf} onChange={(e) => setCpf(e.target.value)}
+                   placeholder="somente n&uacute;meros" inputMode="numeric" />
+          </label>
+          <button className="refresh-btn" type="submit" disabled={buscando}>
+            {buscando ? 'Consultando...' : 'Consultar'}
+          </button>
+        </form>
+
+        {erro && <div className="state-msg error">{erro}</div>}
+
+        {dados && (
+          <>
+            {dados.do_cache && (
+              <p className="subtitle" style={{ margin: '0 0 8px' }}>
+                Consulta guardada de {new Date(dados.consultado_em).toLocaleString('pt-BR')} &middot;{' '}
+                <button type="button" className="reset-btn" onClick={() => consultar(true)}>consultar de novo</button>
+              </p>
+            )}
+
+            <div className="kpis">
+              <Metrica titulo="Nome" valor={dados.nome || '-'} />
+              <Metrica titulo="Nascimento" valor={`${dados.nascimento || '-'}${dados.idade ? ` (${dados.idade})` : ''}`} />
+              <Metrica titulo="Score" valor={`${dados.score || '-'}${dados.faixa_score ? ` · ${dados.faixa_score}` : ''}`} />
+              <Metrica titulo="FGTS presumido"
+                       valor={dados.fgts_tem ? fmtMoeda(dados.fgts_valor || 0) : 'não tem'} />
+            </div>
+
+            <div className="kpis">
+              <Metrica titulo="M&atilde;e" valor={dados.nome_mae || '-'} />
+              <Metrica titulo="Renda" valor={dados.renda || '-'} />
+              <Metrica titulo="Fonte de renda" valor={dados.fonte_renda || '-'} />
+              <Metrica titulo="Sacável" valor={dados.fgts_sacavel ? 'sim' : 'não'} />
+            </div>
+
+            {dados.obito && <div className="state-msg error">Consta indicativo de óbito.</div>}
+
+            {tels.length > 0 && (
+              <div className="panel">
+                <p className="section-label">Telefones</p>
+                <table className="ia-tabela">
+                  <thead><tr><th>Telefone</th><th>Tipo</th><th>Operadora</th><th>WhatsApp</th></tr></thead>
+                  <tbody>
+                    {tels.map((t, i) => (
+                      <tr key={i}>
+                        <td>({t.DDD}) {t.TELEFONE}</td>
+                        <td>{t.TIPO_TELEFONE === 'C' ? 'celular' : t.TIPO_TELEFONE === 'F' ? 'fixo' : (t.TIPO_TELEFONE || '-')}</td>
+                        <td>{t.OPERADORA || '-'}</td>
+                        <td>{String(t.FLWHATSAPP || '').toUpperCase() === 'S' ? 'sim' : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {mails.length > 0 && (
+              <div className="panel">
+                <p className="section-label">E-mails</p>
+                <table className="ia-tabela">
+                  <tbody>{mails.map((e, i) => <tr key={i}><td>{e.EMAIL}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+
+            {ends.length > 0 && (
+              <div className="panel">
+                <p className="section-label">Endere&ccedil;os</p>
+                <table className="ia-tabela">
+                  <tbody>
+                    {ends.map((e, i) => (
+                      <tr key={i}>
+                        <td>{[e.TIPO, e.LOGRADOURO, e.NUMERO, e.COMPLEMENTO].filter(Boolean).join(' ')}
+                            {' — '}{[e.BAIRRO, e.CIDADE, e.UF, e.CEP].filter(Boolean).join(', ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function NovoSaqueModal({ vendedorFixo, onClose }) {
   const [etapa, setEtapa] = useState('cpf') // cpf | status | manual | ofertas | pagamento | feito
   const [cpf, setCpf] = useState('')
@@ -4947,6 +5074,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
 
   const [showAdd, setShowAdd] = useState(false)
   const [showNovoSaque, setShowNovoSaque] = useState(false)
+  const [showConsultaCliente, setShowConsultaCliente] = useState(false)
   const [showPan, setShowPan] = useState(false)
   const [showC6, setShowC6] = useState(false)
   const [showSomaJornada, setShowSomaJornada] = useState(false)
@@ -5109,6 +5237,9 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
           <button className="refresh-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: consulta status, saldo/ofertas e cadastro de proposta">
             Novo Saque
           </button>
+          <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">
+            Consulta Cliente
+          </button>
           <button className="refresh-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro de proposta">
             PAN
           </button>
@@ -5251,6 +5382,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
         />
       )}
       {showNovoSaque && <NovoSaqueModal vendedorFixo={vendedor} onClose={() => setShowNovoSaque(false)} />}
+      {showConsultaCliente && <ConsultaClienteModal vendedorFixo={vendedor} onClose={() => setShowConsultaCliente(false)} />}
       {showPan && <PanModal vendedorFixo={vendedor} onClose={() => setShowPan(false)} />}
       {showC6 && <C6Modal vendedorFixo={vendedor} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal vendedorFixo={vendedor} onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
@@ -5305,6 +5437,7 @@ function VendedorasView() {
   const [showFacta, setShowFacta] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [showNovoSaque, setShowNovoSaque] = useState(false)
+  const [showConsultaCliente, setShowConsultaCliente] = useState(false)
   const [showPan, setShowPan] = useState(false)
   const [showC6, setShowC6] = useState(false)
   const [showSomaJornada, setShowSomaJornada] = useState(false)
@@ -5477,6 +5610,9 @@ function VendedorasView() {
           </button>
           <button className="refresh-btn" onClick={() => setShowNovoSaque(true)} title="Novo Saque: consulta status, saldo/ofertas e cadastro de proposta">
             Novo Saque
+          </button>
+          <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)} title="Consulta Cliente: dados cadastrais, telefones com WhatsApp e FGTS presumido">
+            Consulta Cliente
           </button>
           <button className="refresh-btn" onClick={() => setShowPan(true)} title="PAN: consulta por CPF ou adesão, acompanhamento e cadastro de proposta">
             PAN
@@ -5726,6 +5862,7 @@ function VendedorasView() {
         />
       )}
       {showNovoSaque && <NovoSaqueModal onClose={() => setShowNovoSaque(false)} />}
+      {showConsultaCliente && <ConsultaClienteModal onClose={() => setShowConsultaCliente(false)} />}
       {showPan && <PanModal onClose={() => setShowPan(false)} />}
       {showC6 && <C6Modal vendedoresDisponiveis={vendedores} onClose={() => setShowC6(false)} />}
       {showSomaJornada && <ErroNaTela onClose={() => setShowSomaJornada(false)}><SomaJornadaModal onClose={() => setShowSomaJornada(false)} /></ErroNaTela>}
