@@ -1000,6 +1000,8 @@ export default async function handler(req, res) {
                                args: (b) => [b.vendedor || null, b.titulo || '', b.minutos ?? null, b.quando || null] },
       tarefa_acao:           { sql: 'select dashboard_tarefa_acao($1::bigint,$2::text,$3::int) as r',
                                args: (b) => [b.id, b.acao, b.minutos ?? 10] },
+      regra_salvar:          { sql: 'select dashboard_regra_salvar($1::jsonb) as r',
+                               args: (b) => [JSON.stringify(b)] },
       // Ajustar adesao: o front chama por POST (postApi), entao as rotas
       // precisam estar AQUI -- no bloco GET elas nunca eram alcancadas.
       vendedoras_buscar_venda: {
@@ -1374,6 +1376,12 @@ export default async function handler(req, res) {
     // usada pela extensao do Chrome, para a vendedora se identificar
     sql = `select nome_completo as vendedor from vendedoras_login
            where ativo and role = 'vendedora' order by 1`;
+    params = [];
+  } else if (type === 'tarefas_gestao') {
+    sql = 'select * from dashboard_tarefas_gestao($1::text)';
+    params = [req.query.vendedor || null];
+  } else if (type === 'regras_listar') {
+    sql = 'select * from dashboard_regras_listar()';
     params = [];
   } else if (type === 'tarefas_pendentes') {
     sql = 'select * from dashboard_tarefas_pendentes($1::text)';
