@@ -5465,6 +5465,9 @@ function VendedorasView({ ferramentas = null }) {
   const [kpisVendedor, setKpisVendedor] = useState(null)
   const [mediasGeral, setMediasGeral] = useState(null)
   const [participacao, setParticipacao] = useState(null)
+  // meta da equipe: o alvo e INDIVIDUAL, entao o time so chega a 100% quando
+  // todas baterem -- o excedente de uma nao cobre a falta de outra
+  const [metaEquipe, setMetaEquipe] = useState(null)
   const [metaVendedor, setMetaVendedor] = useState(null)
   const [porDia, setPorDia] = useState({ rows: [], vendedoresVistos: [] })
   const [tabela, setTabela] = useState({ rows: [], total: 0 })
@@ -5520,15 +5523,17 @@ function VendedorasView({ ferramentas = null }) {
     const date_from = dataInicio || ''
     const date_to = dataFim || ''
     try {
-      const [dia, tab, medias, part] = await Promise.all([
+      const [dia, tab, medias, part, eq] = await Promise.all([
         callApi('vendedoras_por_dia', { vendedor: vendedorLista, date_from, date_to, banco }, opts),
         callApi('vendedoras_tabela', { vendedor, date_from, date_to, limit: String(limit), offset: String(offset) }, opts),
         callApi('vendedoras_medias_geral', {}, opts),
         // quanto do total geral passa pela equipe, no mesmo periodo filtrado
         callApi('vendas_participacao', { date_from, date_to }, opts).catch(() => null),
+        callApi('meta_equipe', {}, opts).catch(() => null),
       ])
       setMediasGeral(medias?.[0] ?? null)
       setParticipacao(part?.[0] ?? null)
+      setMetaEquipe(eq?.[0] ?? null)
 
       const porDiaMap = {}
       const totalPorVendedor = {}
@@ -5799,13 +5804,16 @@ function VendedorasView({ ferramentas = null }) {
             </p>
           </div>
           <div className="kpi kpi-meio">
-            <p className="kpi-label">Meta atual</p>
+            <p className="kpi-label">Meta atual (equipe)</p>
             <p className="kpi-value">
-              {Number(metasV2?.janela_alvo) > 0
-                ? `${((Number(metasV2?.janela_realizado || 0) / Number(metasV2.janela_alvo)) * 100).toFixed(1)}%`
-                : '-'}
+              {metaEquipe ? `${Number(metaEquipe.pct).toFixed(1)}%` : '-'}
             </p>
-            <p className="kpi-sub">{metasV2?.janela_descricao || 'sem janela vigente'}</p>
+            <p className="kpi-sub">
+              {metaEquipe
+                ? `${fmtInt(metaEquipe.bateram)} de ${fmtInt(metaEquipe.vendedoras)} bateram · alvo ${fmtInt(metaEquipe.alvo_individual)} cada`
+                : 'sem janela vigente'}
+            </p>
+            <p className="kpi-sub">{metaEquipe?.janela_descricao || ''}</p>
           </div>
 
           {/* destaques de uma linha num card so, como na tela de Vendedoras */}
