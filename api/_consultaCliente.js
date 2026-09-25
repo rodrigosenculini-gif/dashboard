@@ -52,15 +52,16 @@ async function novaVidaToken(client, { renovar = false } = {}) {
   const cliente = process.env.NOVAVIDA_CLIENTE
   if (!usuario || !senha || !cliente) throw new Error('credenciais da Nova Vida ausentes')
 
-  // a doc pede as credenciais em BASE64
-  const b64 = (v) => Buffer.from(String(v), 'utf8').toString('base64')
+  // Em BASE64 a Nova Vida responde "USUARIO, SENHA OU CLIENTE INCORRETO";
+  // em texto puro ela reconhece a credencial e passa para a checagem de IP.
+  // Ou seja: a doc que temos nao vale para esta versao do servico.
   const corpo = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
     <GerarToken xmlns="http://tempuri.org/">
-      <usuario>${b64(usuario)}</usuario>
-      <senha>${b64(senha)}</senha>
-      <cliente>${b64(cliente)}</cliente>
+      <usuario>${usuario}</usuario>
+      <senha>${senha}</senha>
+      <cliente>${cliente}</cliente>
     </GerarToken>
   </soap:Body>
 </soap:Envelope>`
@@ -72,7 +73,15 @@ async function novaVidaToken(client, { renovar = false } = {}) {
   })
   const xml = await r.text()
   const token = tag(xml, 'GerarTokenResult')
-  if (!token || token.length < 10) throw new Error('token da Nova Vida nao veio')
+  // O servico devolve o erro DENTRO do GerarTokenResult, como XML escapado.
+  // Eu guardava isso como token e toda consulta virava "TOKEN EXPIRADO",
+  // escondendo a causa real por horas.
+  const dentro = desescapar(token || '')
+  const erro = (dentro.match(/<ERRO>([\s\S]*?)<\/ERRO>/i) || [])[1]
+  if (erro) throw new Error(`Nova Vida recusou: ${erro.trim()}`)
+  if (!token || /[<>]/.test(dentro) || token.trim().length < 15) {
+    throw new Error('token da Nova Vida nao veio')
+  }
 
   await client.query(
     `insert into api_tokens (servico, token, expira_em)
@@ -83,6 +92,28 @@ async function novaVidaToken(client, { renovar = false } = {}) {
 }
 
 async function consultaNovaVida(client, cpf, { renovar = false } = {}) {
+  // Assim como o Lemit, a Nova Vida trava por IP e o do Vercel nao esta
+  // liberado ("IP DE ACESSO INVALIDO"). Com o webhook configurado, a
+  // chamada sai pelo n8n.
+  const viaN8n = process.env.NOVAVIDA_WEBHOOK
+  if (viaN8n) {
+    const r = await fetch(viaN8n, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cpf }),
+    })
+    const bruto = await r.text()
+    const d = vazio()
+    const xml = desescapar(tag(bruto, 'NvBookCelObWhatsResult') || bruto)
+    d.payload = { xml: xml.slice(0, 8000) }
+    if (!/\<CADASTRO\>/i.test(xml)) {
+      d.mensagem = `Nova Vida (via n8n) HTTP ${r.status}: ${
+        (xml || '').replace(/\s+/g, ' ').slice(0, 200) || 'resposta vazia'}`
+      return d
+    }
+    return preencherNovaVida(d, xml)
+  }
+
   const token = await novaVidaToken(client, { renovar })
   const corpo = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -121,6 +152,11 @@ async function consultaNovaVida(client, cpf, { renovar = false } = {}) {
     return d
   }
 
+  return preencherNovaVida(d, xml)
+}
+
+// o mesmo parse serve para a chamada direta e para a que passa pelo n8n
+function preencherNovaVida(d, xml) {
   const cad = tag(xml, 'CADASTRO')
   d.ok = true
   d.nome = tag(cad, 'NOME') || null
