@@ -5128,6 +5128,12 @@ function OnboardingTour({ step, onNext, targets }) {
 }
 
 function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
+  // O cache devolve o dado antigo na hora e revalida em segundo plano; quando
+  // o novo chega, ele avisa por aqui. Este era o unico painel que nao
+  // escutava, entao correcoes feitas no banco (atribuir vendedora, ajustar
+  // valor) nao apareciam: o ranking e a meta atualizavam, o grafico e os
+  // KPIs da vendedora nao.
+  const revisaoCache = useRevisaoCache()
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [kpis, setKpis] = useState(null)
   const [meta, setMeta] = useState(null)
@@ -5237,7 +5243,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
     } finally {
       setLoading(false)
     }
-  }, [vendedor, dataInicio, dataFim, limit, offset])
+  }, [vendedor, dataInicio, dataFim, limit, offset, revisaoCache])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
