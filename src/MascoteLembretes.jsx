@@ -57,6 +57,9 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const [vendedoras, setVendedoras] = useState([])
   const [aba, setAba] = useState('tarefas')   // tarefas | regras
   const [regras, setRegras] = useState([])
+  const [novaRegra, setNovaRegra] = useState({
+    mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00',
+  })
 
   const vencidas = tarefas.filter((t) => t.vencida && !t.feita)
   const aFalar = nota || vencidas[0] || null
@@ -64,6 +67,18 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
 
   // clicar fora fecha o painel: antes so o proprio mascote fechava
   const raizRef = useRef(null)
+  // A extensao marca presenca no <html>. Com ela ativa, o mascote do
+  // dashboard sai de cena pra nao ficarem dois na mesma tela -- exceto na
+  // gestao, onde o painel tem a visao da equipe que a extensao nao tem.
+  const [temExtensao, setTemExtensao] = useState(false)
+  useEffect(() => {
+    const ver = () => setTemExtensao(
+      document.documentElement.getAttribute('data-esquentadinho') === '1'
+    )
+    ver()
+    const t = setInterval(ver, 3000)
+    return () => clearInterval(t)
+  }, [])
   useEffect(() => {
     if (!painel) return
     const foraDaqui = (e) => {
@@ -153,6 +168,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   }
 
   if (!vendedor) return null
+  if (temExtensao && escopo !== 'gestao') return null
 
   // mesmo conteudo nos dois lugares: na pagina e na janela flutuante
   const conteudo = (
@@ -203,6 +219,43 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
           )}
 
           {ehGestao && aba === 'regras' ? (
+            <>
+            {/* cadastro de lembrete periodico novo */}
+            <input className="mascote-input" value={novaRegra.mensagem} maxLength={200}
+                   placeholder="pergunta do lembrete"
+                   onChange={(e) => setNovaRegra({ ...novaRegra, mensagem: e.target.value })} />
+            <div className="mascote-linha-campos">
+              <label>a cada
+                <input type="number" min="1" value={novaRegra.intervalo_min}
+                       onChange={(e) => setNovaRegra({ ...novaRegra, intervalo_min: e.target.value })} />
+              </label>
+              <label>reforço
+                <input type="number" min="1" value={novaRegra.reforco_min}
+                       onChange={(e) => setNovaRegra({ ...novaRegra, reforco_min: e.target.value })} />
+              </label>
+            </div>
+            <div className="mascote-linha-campos">
+              <label>das
+                <input type="time" value={novaRegra.hora_ini}
+                       onChange={(e) => setNovaRegra({ ...novaRegra, hora_ini: e.target.value })} />
+              </label>
+              <label>até
+                <input type="time" value={novaRegra.hora_fim}
+                       onChange={(e) => setNovaRegra({ ...novaRegra, hora_fim: e.target.value })} />
+              </label>
+            </div>
+            <button type="button" className="mascote-chip" style={{ alignSelf: 'flex-start' }}
+                    disabled={!novaRegra.mensagem.trim() || salvando}
+                    onClick={async () => {
+                      setSalvando(true)
+                      try {
+                        await postJson('regra_salvar', { ...novaRegra, escopo: 'vendedora' })
+                        setNovaRegra({ mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00' })
+                        const r = await getJson('regras_listar')
+                        setRegras(Array.isArray(r) ? r : [])
+                      } finally { setSalvando(false) }
+                    }}>+ criar lembrete</button>
+
             <ul className="mascote-lista regras">
               {regras.length === 0 && <li className="vazio">nenhum lembrete cadastrado</li>}
               {regras.map((r) => (
@@ -219,10 +272,16 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                         await postJson('regra_salvar', { id: r.id, ativo: !r.ativo })
                         getJson('regras_listar').then((x) => setRegras(Array.isArray(x) ? x : []))
                       }}>{r.ativo ? 'on' : 'off'}</button>
+                    <button type="button" title="Excluir"
+                      onClick={async () => {
+                        await postJson('regra_excluir', { id: r.id })
+                        getJson('regras_listar').then((x) => setRegras(Array.isArray(x) ? x : []))
+                      }}>&times;</button>
                   </div>
                 </li>
               ))}
             </ul>
+            </>
           ) : (
           <>
           {ehGestao && (

@@ -2445,8 +2445,24 @@ body {
   padding:8px 10px; font-family:inherit; font-size:12px; color:var(--text); outline:none;
 }
 .mascote-input:focus, .mascote-data input:focus{ border-color:var(--gold); }
-.mascote-atalhos, .mascote-data{ display:flex; gap:5px; }
-.mascote-data input{ flex:1; }
+.mascote-atalhos, .mascote-data{ display:flex; gap:5px; align-items:center; }
+.mascote-data input{ flex:1; min-width:0; }
+/* o datetime-local nativo saia com a cara do sistema, destoando do resto */
+.mascote-data input[type="datetime-local"],
+.mascote-data input[type="number"],
+.mascote-linha-campos input{
+  background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+  padding:7px 9px; font-family:var(--font-mono); font-size:11px; color:var(--text);
+  outline:none; color-scheme:dark; box-sizing:border-box;
+}
+.mascote-data input:focus, .mascote-linha-campos input:focus{ border-color:var(--gold); }
+/* linha de campos rotulados (gestao de lembretes) */
+.mascote-linha-campos{ display:flex; gap:6px; }
+.mascote-linha-campos label{
+  flex:1; display:flex; align-items:center; gap:5px;
+  font-size:10.5px; color:var(--muted);
+}
+.mascote-linha-campos input{ flex:1; min-width:0; }
 .mascote-chip{
   padding:6px 9px; border-radius:7px; cursor:pointer; white-space:nowrap;
   background:var(--surface-2); border:1px solid var(--border); color:var(--muted);

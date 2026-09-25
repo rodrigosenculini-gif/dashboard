@@ -996,12 +996,14 @@ export default async function handler(req, res) {
                                args: (b) => [b.regra_id, b.vendedor || null] },
       notificacao_responder: { sql: 'select dashboard_notificacao_responder($1::bigint,$2::text) as r',
                                args: (b) => [b.id, b.resposta] },
-      tarefa_criar:          { sql: 'select dashboard_tarefa_criar($1::text,$2::text,$3::int,$4::timestamptz) as r',
+      tarefa_criar:          { sql: 'select dashboard_tarefa_criar($1::text,$2::text,$3::int,$4::text) as r',
                                args: (b) => [b.vendedor || null, b.titulo || '', b.minutos ?? null, b.quando || null] },
       tarefa_acao:           { sql: 'select dashboard_tarefa_acao($1::bigint,$2::text,$3::int) as r',
                                args: (b) => [b.id, b.acao, b.minutos ?? 10] },
       regra_salvar:          { sql: 'select dashboard_regra_salvar($1::jsonb) as r',
                                args: (b) => [JSON.stringify(b)] },
+      regra_excluir:         { sql: 'select dashboard_regra_excluir($1::bigint) as r',
+                               args: (b) => [b.id] },
       // Ajustar adesao: o front chama por POST (postApi), entao as rotas
       // precisam estar AQUI -- no bloco GET elas nunca eram alcancadas.
       vendedoras_buscar_venda: {
