@@ -103,7 +103,10 @@ async function consultaNovaVida(client, cpf) {
   const d = vazio()
   d.payload = { xml: xml.slice(0, 8000) }
   if (!/\<CADASTRO\>/i.test(xml)) {
-    d.mensagem = 'sem retorno na Nova Vida'
+    // guarda o inicio do XML: o erro da Nova Vida vem no proprio envelope
+    const falha = tag(bruto, 'faultstring') || tag(xml, 'MENSAGEM') || tag(xml, 'ERRO')
+    d.mensagem = `Nova Vida HTTP ${r.status}: ${
+      falha || (xml || '').replace(/\s+/g, ' ').slice(0, 200) || 'resposta vazia'}`
     return d
   }
 
@@ -174,10 +177,17 @@ async function consultaLemit(cpf) {
   const r = await fetch(`${LEMIT_URL}/${cpf}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   })
-  const j = await r.json().catch(() => null)
-  d.payload = j
+  const bruto = await r.text()
+  let j = null
+  try { j = JSON.parse(bruto) } catch { /* nao veio json */ }
+  d.payload = j || { bruto: bruto.slice(0, 500) }
   const p = j?.pessoa
-  if (!p) { d.mensagem = 'sem retorno no Lemit'; return d }
+  if (!p) {
+    // o motivo importa: 401 e token, 404 e CPF sem cadastro, 5xx e a API
+    d.mensagem = `Lemit HTTP ${r.status}: ${
+      j?.errors ? JSON.stringify(j.errors) : bruto.slice(0, 160) || 'resposta vazia'}`
+    return d
+  }
 
   d.ok = true
   d.nome = p.nome || null
@@ -282,7 +292,10 @@ async function consultarCliente(client, cpf, { forcar = false, por = null } = {}
 
   const salvo = await client.query('select * from dashboard_consulta_salvar($1::jsonb)', [
     JSON.stringify({ cpf: n, fonte: 'nenhuma', por, ok: false,
-      mensagem: 'não encontrado nas fontes consultadas' }),
+      mensagem: 'não encontrado nas fontes consultadas',
+      // o porque de cada fonte ter falhado fica gravado: sem isso so sobrava
+      // o resultado final, que nao diz nada
+      extras: { tentativas } }),
   ])
   return { ...salvo.rows[0], tentativas }
 }
