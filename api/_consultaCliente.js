@@ -320,7 +320,10 @@ async function consultarCliente(client, cpf, { forcar = false, por = null } = {}
       // so aceita se achou a pessoa E tem algum contato util
       if (d.ok && (d.telefones.length || d.emails.length || d.nome)) {
         const salvo = await client.query('select * from dashboard_consulta_salvar($1::jsonb)', [
-          JSON.stringify({ ...d, cpf: n, fonte: nome, por, ok: true }),
+          // as tentativas vao junto mesmo quando uma responde: sem isso o
+          // motivo de a Nova Vida ter falhado se perdia, e ela e a primeira
+          JSON.stringify({ ...d, cpf: n, fonte: nome, por, ok: true,
+            extras: { ...(d.extras || {}), tentativas } }),
         ])
         return { ...salvo.rows[0], tentativas }
       }

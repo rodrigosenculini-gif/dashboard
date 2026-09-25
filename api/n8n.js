@@ -142,6 +142,38 @@ export default async function handler(req, res) {
   const { type = 'stats', workflowId, date_from, date_to } = req.query;
 
   try {
+    if (type === 'ver_no' && req.method === 'POST') {
+      // le os parametros de um no, pra conferir sem abrir o n8n
+      const { id, no } = req.body || {};
+      const w = await n8nFetch(`/api/v1/workflows/${id}`);
+      const alvo = (w.nodes || []).find((x) => x.name === no);
+      if (!alvo) {
+        return res.status(404).json({ error: 'nó não encontrado', nos: (w.nodes || []).map((x) => x.name) });
+      }
+      return res.status(200).json({ nome: alvo.name, tipo: alvo.type, parameters: alvo.parameters });
+    }
+
+    if (type === 'ajusta_url' && req.method === 'POST') {
+      // corrige a URL de um no HTTP: ela precisa ser expressao com o CPF
+      // recebido, senao o no repete sempre a mesma consulta
+      const { id, no, url } = req.body || {};
+      const w = await n8nFetch(`/api/v1/workflows/${id}`);
+      const alvo = (w.nodes || []).find((x) => x.name === no);
+      if (!alvo) {
+        return res.status(404).json({ error: 'nó não encontrado', nos: (w.nodes || []).map((x) => x.name) });
+      }
+      const antes = alvo.parameters?.url;
+      alvo.parameters = { ...(alvo.parameters || {}), url };
+      await n8nFetch(`/api/v1/workflows/${id}`, {
+        metodo: 'PUT',
+        corpo: {
+          name: w.name, nodes: w.nodes, connections: w.connections,
+          settings: { executionOrder: w.settings?.executionOrder || 'v1' },
+        },
+      });
+      return res.status(200).json({ ok: true, antes, agora: url });
+    }
+
     if (type === 'ajusta_no' && req.method === 'POST') {
       // troca o codigo de um no Code num workflow, pela API do n8n
       const { id, no, codigo } = req.body || {};
