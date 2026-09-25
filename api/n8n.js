@@ -142,6 +142,49 @@ export default async function handler(req, res) {
   const { type = 'stats', workflowId, date_from, date_to } = req.query;
 
   try {
+    if (type === 'nv_teste' && req.method === 'POST') {
+      // Diagnostico temporario: a Nova Vida recusou as credenciais
+      // ("USUARIO, SENHA OU CLIENTE INCORRETO"). Testa base64 e texto puro
+      // para saber se e formato do envio ou credencial invalida mesmo.
+      const u = process.env.NOVAVIDA_USUARIO || '';
+      const se = process.env.NOVAVIDA_SENHA || '';
+      const cl = process.env.NOVAVIDA_CLIENTE || '';
+      const b64 = (v) => Buffer.from(String(v), 'utf8').toString('base64');
+      const monta = (a1, a2, a3) => `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body><GerarToken xmlns="http://tempuri.org/">
+    <usuario>${a1}</usuario><senha>${a2}</senha><cliente>${a3}</cliente>
+  </GerarToken></soap:Body></soap:Envelope>`;
+
+      const tentar = async (rotulo, corpo) => {
+        const r = await fetch('https://wsnv.novavidati.com.br/WSLocalizador.asmx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: 'http://tempuri.org/GerarToken' },
+          body: corpo,
+        });
+        const t = await r.text();
+        const m = t.match(/<GerarTokenResult>([\s\S]*?)<\/GerarTokenResult>/i);
+        const dentro = (m ? m[1] : t)
+          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+        const erro = (dentro.match(/<ERRO>([\s\S]*?)<\/ERRO>/i) || [])[1];
+        return {
+          rotulo, status: r.status,
+          // um token de verdade nao tem XML dentro
+          parece_token: !/[<>]/.test(dentro) && dentro.trim().length > 15,
+          erro: erro || null,
+          amostra: dentro.replace(/\s+/g, ' ').slice(0, 120),
+        };
+      };
+
+      const saida = [];
+      saida.push(await tentar('base64', monta(b64(u), b64(se), b64(cl))));
+      saida.push(await tentar('texto puro', monta(u, se, cl)));
+      return res.status(200).json({
+        credenciais_presentes: { usuario: !!u, senha: !!se, cliente: !!cl },
+        tentativas: saida,
+      });
+    }
+
     if (type === 'ver_no' && req.method === 'POST') {
       // le os parametros de um no, pra conferir sem abrir o n8n
       const { id, no } = req.body || {};
