@@ -65,7 +65,6 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   })
 
   const vencidas = tarefas.filter((t) => t.vencida && !t.feita)
-  const aFalar = vencidas[0] || null
   const pendencias = vencidas.length
 
   // clicar fora fecha o painel: antes so o proprio mascote fechava
@@ -76,15 +75,16 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const [temExtensao, setTemExtensao] = useState(false)
   useEffect(() => {
     const ver = () => setTemExtensao(
-      document.documentElement.getAttribute('data-esquentadinho') === '1'
+      // a extensao marca a VERSAO aqui (ex: '1.3.0'); antes eu comparava com
+      // '1' e a deteccao nunca dava certo -- os dois mascotes conviviam
+      !!document.documentElement.getAttribute('data-esquentadinho')
     )
     ver()
     const t = setInterval(ver, 3000)
     return () => clearInterval(t)
   }, [])
-  const [dispensadoAte, setDispensadoAte] = useState(0)
   useEffect(() => {
-    const fechaTudo = () => { setPainel(false); setDispensadoAte(Date.now() + 5 * 60 * 1000) }
+    const fechaTudo = () => setPainel(false)
     const foraDaqui = (e) => {
       if (raizRef.current && !raizRef.current.contains(e.target)) fechaTudo()
     }
@@ -163,16 +163,6 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     }
   }, [carregar])
 
-  // pendencia nova cancela a dispensa: esconder um lembrete que acabou de
-  // chegar seria pior que nao mostrar
-  const ultimaChave = useRef('')
-  useEffect(() => {
-    const chave = vencidas.map((t) => t.id).join(',')
-    if (chave !== ultimaChave.current) {
-      ultimaChave.current = chave
-      if (chave.replace(/[|,]/g, '')) setDispensadoAte(0)
-    }
-  }, [vencidas])
 
   const acaoTarefa = async (id, acao, minutos) => {
     try { await postJson('tarefa_acao', { id, acao, minutos }) } catch { /* segue */ }
@@ -206,22 +196,9 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const conteudo = (
     <>
       {/* balao: so aparece quando ha algo a dizer */}
-      {aFalar && !painel && Date.now() >= dispensadoAte && (
-        <div className="mascote-balao">
-            <>
-              <p className="mascote-chamada">chegou a hora</p>
-              <p><strong>{vencidas[0].titulo}</strong></p>
-              <p className="mascote-sub">
-                marcado para {fmtQuando(vencidas[0].lembrar_em)}
-                {vencidas.length > 1 ? ` · mais ${vencidas.length - 1} na fila` : ''}
-              </p>
-              <div className="mascote-acoes">
-                <button type="button" className="mascote-btn sim" onClick={() => acaoTarefa(vencidas[0].id, 'concluir')}>Feito</button>
-                <button type="button" className="mascote-btn" onClick={() => acaoTarefa(vencidas[0].id, 'adiar', 10)}>+10 min</button>
-              </div>
-            </>
-        </div>
-      )}
+      {/* sem balao no dashboard: quem avisa e a extensao, que segue a
+          vendedora em qualquer site. Aqui e o registro -- o selo mostra
+          quantas venceram e o painel tem tudo. */}
 
       {/* painel: tarefas dela e o cadastro de novas */}
       {painel && (
