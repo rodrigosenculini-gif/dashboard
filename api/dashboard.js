@@ -1004,6 +1004,10 @@ export default async function handler(req, res) {
                                args: (b) => [JSON.stringify(b)] },
       regra_excluir:         { sql: 'select dashboard_regra_excluir($1::bigint) as r',
                                args: (b) => [b.id] },
+      equipe_salvar:         { sql: 'select dashboard_equipe_salvar($1::jsonb) as r',
+                               args: (b) => [JSON.stringify(b)] },
+      equipe_excluir:        { sql: 'select dashboard_equipe_excluir($1::bigint) as r',
+                               args: (b) => [b.id] },
       // Ajustar adesao: o front chama por POST (postApi), entao as rotas
       // precisam estar AQUI -- no bloco GET elas nunca eram alcancadas.
       vendedoras_buscar_venda: {
@@ -1378,6 +1382,9 @@ export default async function handler(req, res) {
     // usada pela extensao do Chrome, para a vendedora se identificar
     sql = `select nome_completo as vendedor from vendedoras_login
            where ativo and role = 'vendedora' order by 1`;
+    params = [];
+  } else if (type === 'equipes_listar') {
+    sql = 'select * from dashboard_equipes_listar()';
     params = [];
   } else if (type === 'tarefas_gestao') {
     sql = 'select * from dashboard_tarefas_gestao($1::text,$2::boolean)';

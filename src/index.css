@@ -2456,20 +2456,31 @@ body {
   outline:none; color-scheme:dark; box-sizing:border-box;
 }
 .mascote-data input:focus, .mascote-linha-campos input:focus{ border-color:var(--gold); }
-/* linha de campos rotulados (gestao de lembretes) */
-.mascote-linha-campos{ display:flex; gap:6px; }
+/* linha de campos rotulados (gestao de lembretes).
+   min-width:0 no label e no input: sem isso o campo nao encolhe e a linha
+   "a cada / reforco" estourava pra fora do painel. */
+.mascote-linha-campos{ display:flex; gap:6px; width:100%; }
 .mascote-linha-campos label{
-  flex:1; display:flex; align-items:center; gap:5px;
-  font-size:10.5px; color:var(--muted);
+  flex:1 1 0; min-width:0; display:flex; align-items:center; gap:5px;
+  font-size:10.5px; color:var(--muted); white-space:nowrap;
 }
-.mascote-linha-campos input{ flex:1; min-width:0; }
-.mascote-linha-campos select[multiple]{
+.mascote-linha-campos input{ flex:1 1 0; min-width:0; width:100%; }
+
+/* campo em coluna, com rotulo em cima (equipes, seletores multiplos) */
+.mascote-campo{ display:flex; flex-direction:column; gap:3px; width:100%; }
+.mascote-campo > span{ font-size:10.5px; color:var(--muted); }
+.mascote-campo select{
+  width:100%; box-sizing:border-box;
   background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
-  padding:4px; font-family:inherit; font-size:11px; color:var(--text);
-  outline:none; color-scheme:dark; width:100%;
+  padding:5px; font-family:inherit; font-size:11px; color:var(--text);
+  outline:none; color-scheme:dark;
 }
-.mascote-linha-campos select[multiple]:focus{ border-color:var(--gold); }
-.mascote-linha-campos select[multiple] option:checked{ background:var(--border); color:var(--lime); }
+.mascote-campo select:focus{ border-color:var(--gold); }
+.mascote-campo select option:checked{ background:var(--border); color:var(--lime); }
+
+/* o painel nao pode vazar, aconteca o que acontecer */
+.mascote-painel{ box-sizing:border-box; max-width:calc(100vw - 32px); overflow:hidden; }
+.mascote-painel > *{ max-width:100%; box-sizing:border-box; }
 .mascote-chip{
   padding:6px 9px; border-radius:7px; cursor:pointer; white-space:nowrap;
   background:var(--surface-2); border:1px solid var(--border); color:var(--muted);

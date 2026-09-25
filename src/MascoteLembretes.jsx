@@ -56,9 +56,12 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const [vendedoras, setVendedoras] = useState([])
   const [aba, setAba] = useState('tarefas')   // tarefas | regras
   const [regras, setRegras] = useState([])
+  const [equipes, setEquipes] = useState([])
+  const [novaEquipe, setNovaEquipe] = useState({ nome: '', membros: [] })
+  const [verEquipes, setVerEquipes] = useState(false)
   const [novaRegra, setNovaRegra] = useState({
     mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00',
-    aplica_a: [],   // vazio = toda a equipe
+    aplica_a: [], equipes: [],   // vazio nos dois = toda a equipe
   })
 
   const vencidas = tarefas.filter((t) => t.vencida && !t.feita)
@@ -121,6 +124,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     if (!ehGestao || !painel) return
     getJson('vendedoras_lista').then((r) => setVendedoras(Array.isArray(r) ? r : [])).catch(() => {})
     getJson('regras_listar').then((r) => setRegras(Array.isArray(r) ? r : [])).catch(() => {})
+    getJson('equipes_listar').then((r) => setEquipes(Array.isArray(r) ? r : [])).catch(() => {})
   }, [ehGestao, painel])
 
   // com a aba em segundo plano, chama na barra de abas
@@ -238,6 +242,63 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
 
           {ehGestao && aba === 'regras' ? (
             <>
+            {/* equipes: monta o grupo uma vez e usa nos lembretes */}
+            <button type="button" className="mascote-chip" style={{ alignSelf: 'flex-start' }}
+                    onClick={() => setVerEquipes((v) => !v)}>
+              {verEquipes ? '← voltar aos lembretes' : `⚙ equipes (${equipes.length})`}
+            </button>
+
+            {verEquipes ? (
+              <>
+                <input className="mascote-input" value={novaEquipe.nome} maxLength={60}
+                       placeholder="nome da equipe (ex: Turno manhã)"
+                       onChange={(e) => setNovaEquipe({ ...novaEquipe, nome: e.target.value })} />
+                <label className="mascote-campo">
+                  <span>quem faz parte</span>
+                  <select multiple size={Math.min(vendedoras.length || 1, 4)} value={novaEquipe.membros}
+                          onChange={(e) => setNovaEquipe({
+                            ...novaEquipe,
+                            membros: Array.from(e.target.selectedOptions, (o) => o.value),
+                          })}>
+                    {vendedoras.map((v) => <option key={v.vendedor} value={v.vendedor}>{v.vendedor}</option>)}
+                  </select>
+                </label>
+                <button type="button" className="mascote-chip" style={{ alignSelf: 'flex-start' }}
+                        disabled={!novaEquipe.nome.trim() || salvando}
+                        onClick={async () => {
+                          setSalvando(true)
+                          try {
+                            await postJson('equipe_salvar', novaEquipe)
+                            setNovaEquipe({ nome: '', membros: [] })
+                            const r = await getJson('equipes_listar')
+                            setEquipes(Array.isArray(r) ? r : [])
+                          } finally { setSalvando(false) }
+                        }}>+ salvar equipe</button>
+
+                <ul className="mascote-lista regras">
+                  {equipes.length === 0 && <li className="vazio">nenhuma equipe ainda</li>}
+                  {equipes.map((eq) => (
+                    <li key={eq.id}>
+                      <div>
+                        <span className="mascote-tit">{eq.nome}</span>
+                        <span className="mascote-hora">{(eq.membros || []).join(', ') || 'sem membros'}</span>
+                      </div>
+                      <div className="mascote-linha-acoes">
+                        <button type="button" title="Editar"
+                          onClick={() => setNovaEquipe({ id: eq.id, nome: eq.nome, membros: eq.membros || [] })}>&#9998;</button>
+                        <button type="button" title="Excluir"
+                          onClick={async () => {
+                            await postJson('equipe_excluir', { id: eq.id })
+                            const r = await getJson('equipes_listar')
+                            setEquipes(Array.isArray(r) ? r : [])
+                          }}>&times;</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+            <>
             {/* cadastro de lembrete periodico novo */}
             <input className="mascote-input" value={novaRegra.mensagem} maxLength={200}
                    placeholder="pergunta do lembrete"
@@ -262,20 +323,33 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                        onChange={(e) => setNovaRegra({ ...novaRegra, hora_fim: e.target.value })} />
               </label>
             </div>
-            <div className="mascote-linha-campos">
-              <label style={{ flexDirection: 'column', alignItems: 'stretch', gap: 3 }}>
-                quem recebe
-                <select multiple size={3} value={novaRegra.aplica_a}
-                        onChange={(e) => setNovaRegra({
-                          ...novaRegra,
-                          aplica_a: Array.from(e.target.selectedOptions, (o) => o.value),
-                        })}>
-                  {vendedoras.map((v) => <option key={v.vendedor} value={v.vendedor}>{v.vendedor}</option>)}
-                </select>
-              </label>
-            </div>
+            <label className="mascote-campo">
+              <span>equipe que recebe</span>
+              <select multiple size={Math.min(equipes.length || 1, 3)} value={novaRegra.equipes.map(String)}
+                      onChange={(e) => setNovaRegra({
+                        ...novaRegra,
+                        equipes: Array.from(e.target.selectedOptions, (o) => Number(o.value)),
+                      })}>
+                {equipes.length === 0 && <option disabled>nenhuma equipe criada ainda</option>}
+                {equipes.map((eq) => (
+                  <option key={eq.id} value={eq.id}>{eq.nome} ({eq.qtd})</option>
+                ))}
+              </select>
+            </label>
+            <label className="mascote-campo">
+              <span>ou vendedoras avulsas</span>
+              <select multiple size={Math.min(vendedoras.length || 1, 3)} value={novaRegra.aplica_a}
+                      onChange={(e) => setNovaRegra({
+                        ...novaRegra,
+                        aplica_a: Array.from(e.target.selectedOptions, (o) => o.value),
+                      })}>
+                {vendedoras.map((v) => <option key={v.vendedor} value={v.vendedor}>{v.vendedor}</option>)}
+              </select>
+            </label>
             <p className="mascote-sub" style={{ margin: 0 }}>
-              {novaRegra.aplica_a.length ? `${novaRegra.aplica_a.length} selecionada(s)` : 'nenhuma selecionada = toda a equipe'}
+              {novaRegra.equipes.length || novaRegra.aplica_a.length
+                ? `${novaRegra.equipes.length} equipe(s) · ${novaRegra.aplica_a.length} avulsa(s)`
+                : 'nada selecionado = toda a equipe de vendas'}
             </p>
             <button type="button" className="mascote-chip" style={{ alignSelf: 'flex-start' }}
                     disabled={!novaRegra.mensagem.trim() || salvando}
@@ -283,7 +357,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                       setSalvando(true)
                       try {
                         await postJson('regra_salvar', { ...novaRegra, escopo: 'vendedora' })
-                        setNovaRegra({ mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00', aplica_a: [] })
+                        setNovaRegra({ mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00', aplica_a: [], equipes: [] })
                         const r = await getJson('regras_listar')
                         setRegras(Array.isArray(r) ? r : [])
                       } finally { setSalvando(false) }
@@ -314,6 +388,8 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                 </li>
               ))}
             </ul>
+            </>
+            )}
             </>
           ) : (
           <>
