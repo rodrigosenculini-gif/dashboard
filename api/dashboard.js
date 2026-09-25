@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { consultarCliente } from './_consultaCliente.js';
 
 // Remove qualquer sslmode da connection string (pode forçar validação
 // estrita do certificado e sobrescrever a opção ssl abaixo)
@@ -1405,59 +1406,13 @@ export default async function handler(req, res) {
     sql = 'select * from dashboard_vendas_participacao($1::date,$2::date)';
     params = [req.query.date_from || null, req.query.date_to || null];
   } else if (type === 'consulta_cliente') {
-    // Nova Vida (NVCHECK ADICIONAL): dados cadastrais, telefones com flag de
-    // WhatsApp e FGTS presumido pelo CPF. A consulta e paga por chamada,
-    // entao reaproveitamos o resultado do mesmo CPF por 24h.
-    const cpfNum = String(req.body?.cpf || req.query.cpf || '').replace(/\D/g, '');
-    if (cpfNum.length !== 11) return res.status(400).json({ error: 'CPF inválido' });
-
-    const cache = await client.query('select * from novavida_cache($1::text, 24)', [cpfNum]);
-    if (cache.rows.length && !req.body?.forcar) {
-      return res.json({ ...cache.rows[0], do_cache: true });
-    }
-
-    const cred = {
-      usuario: process.env.NOVAVIDA_USUARIO,
-      senha: process.env.NOVAVIDA_SENHA,
-      cliente: process.env.NOVAVIDA_CLIENTE,
-    };
-    if (!cred.usuario || !cred.senha || !cred.cliente) {
-      return res.status(500).json({ error: 'Credenciais da Nova Vida não configuradas no servidor.' });
-    }
-
-    // token vale 24h: so gera quando o guardado expirou
-    let token = null;
-    const tk = await client.query("select token from novavida_token where id=1 and expira_em > now()");
-    if (tk.rows.length) token = tk.rows[0].token;
-    if (!token) {
-      const rt = await fetch('https://wsnv.novavidati.com.br/WSLocalizador.asmx/GerarTokenJson', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credencial: cred }),
-      });
-      const dt = await rt.json().catch(() => null);
-      token = (dt?.d ?? dt?.GerarTokenJsonResult ?? '').toString().trim();
-      if (!token || token.length < 10) {
-        return res.status(502).json({ error: 'Não foi possível gerar o token da Nova Vida.', detalhe: dt });
-      }
-      await client.query(
-        `insert into novavida_token (id, token, gerado_em, expira_em)
-         values (1, $1, now(), now() + interval '23 hours')
-         on conflict (id) do update set token=excluded.token, gerado_em=now(),
-           expira_em=excluded.expira_em`, [token]);
-    }
-
-    const rc = await fetch('https://wsnv.novavidati.com.br/WSLocalizador.asmx/NVCHECKADICIONALJson', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Token: token },
-      body: JSON.stringify({ nvcheck: { Documento: cpfNum } }),
+    // tres fontes em cascata; detalhes em _consultaCliente.js
+    const r = await consultarCliente(client, req.body?.cpf || req.query.cpf, {
+      forcar: !!req.body?.forcar,
+      por: req.body?.vendedor || null,
     });
-    const dc = await rc.json().catch(() => null);
-    if (!dc) return res.status(502).json({ error: 'Resposta inválida da Nova Vida.' });
-
-    const salvo = await client.query('select * from novavida_salvar($1::jsonb,$2::text,$3::text)',
-      [JSON.stringify(dc), cpfNum, req.body?.vendedor || null]);
-    return res.json(salvo.rows[0]?.novavida_salvar ?? salvo.rows[0]);
+    if (r?.erro) return res.status(400).json({ error: r.erro });
+    return res.json(r);
   } else if (type === 'meta_vendedoras') {
     // callApi manda por query string (GET), nao no body
     // p_dia: periodos com base 'dia' tem uma meta por dia

@@ -3971,16 +3971,19 @@ function C6Modal({ vendedorFixo, vendedoresDisponiveis, onClose }) {
 // Consulta Cliente (Nova Vida / NVCHECK ADICIONAL): dados cadastrais,
 // telefones com flag de WhatsApp, e-mails e FGTS presumido a partir do CPF.
 // O resultado fica guardado 24h -- a consulta e paga por chamada.
+// Consulta de cliente em tres fontes (CRM, Nova Vida, Lemit). O backend
+// resolve qual usar; aqui so mostramos o resultado, em cards.
 function ConsultaClienteModal({ vendedorFixo, onClose }) {
   const [cpf, setCpf] = useState('')
   const [dados, setDados] = useState(null)
   const [erro, setErro] = useState('')
   const [buscando, setBuscando] = useState(false)
+  const [copiado, setCopiado] = useState('')
 
-  const soNumeros = (v) => String(v || '').replace(/\D/g, '')
+  const soNum = (v) => String(v || '').replace(/\D/g, '')
 
   const consultar = async (forcar) => {
-    const n = soNumeros(cpf)
+    const n = soNum(cpf)
     if (n.length !== 11) { setErro('Informe um CPF com 11 dígitos.'); return }
     setBuscando(true); setErro(''); setDados(null)
     try {
@@ -3992,17 +3995,43 @@ function ConsultaClienteModal({ vendedorFixo, onClose }) {
     finally { setBuscando(false) }
   }
 
-  const tels = (dados?.telefones || []).filter((t) => t.TELEFONE)
-  const mails = (dados?.emails || []).filter((e) => e.EMAIL)
+  const copiar = async (texto, marca) => {
+    try {
+      await navigator.clipboard.writeText(texto)
+      setCopiado(marca)
+      setTimeout(() => setCopiado(''), 1200)
+    } catch { /* sem permissao de area de transferencia */ }
+  }
+
+  const fmtTel = (t) => {
+    const n = soNum(t.numero)
+    const ddd = soNum(t.ddd)
+    const corpo = n.length === 9 ? `${n.slice(0,5)}-${n.slice(5)}`
+                : n.length === 8 ? `${n.slice(0,4)}-${n.slice(4)}` : n
+    return ddd ? `(${ddd}) ${corpo}` : corpo
+  }
+  const fmtCep = (c) => {
+    const n = soNum(c)
+    return n.length === 8 ? `${n.slice(0,5)}-${n.slice(5)}` : (c || '')
+  }
+  const fmtCpfTexto = (v) => {
+    const n = soNum(v)
+    return n.length === 11 ? `${n.slice(0,3)}.${n.slice(3,6)}.${n.slice(6,9)}-${n.slice(9)}` : v
+  }
+
+  const tels = dados?.telefones || []
+  const zaps = tels.filter((t) => t.whatsapp)
+  const outros = tels.filter((t) => !t.whatsapp)
+  const mails = dados?.emails || []
   const ends = dados?.enderecos || []
 
   return (
     <div className="funil-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="funil-modal">
+      <div className="funil-modal consulta-modal">
         <div className="funil-header">
           <div>
             <h2>Consulta Cliente</h2>
-            <p className="subtitle">Dados cadastrais, contatos e FGTS presumido</p>
+            <p className="subtitle">Contatos, endereço e dados cadastrais pelo CPF</p>
           </div>
           <button className="funil-close" onClick={onClose}>&times;</button>
         </div>
@@ -4021,73 +4050,114 @@ function ConsultaClienteModal({ vendedorFixo, onClose }) {
 
         {dados && (
           <>
-            {dados.do_cache && (
-              <p className="subtitle" style={{ margin: '0 0 8px' }}>
-                Consulta guardada de {new Date(dados.consultado_em).toLocaleString('pt-BR')} &middot;{' '}
-                <button type="button" className="reset-btn" onClick={() => consultar(true)}>consultar de novo</button>
-              </p>
-            )}
-
-            <div className="kpis">
-              <Metrica titulo="Nome" valor={dados.nome || '-'} />
-              <Metrica titulo="Nascimento" valor={`${dados.nascimento || '-'}${dados.idade ? ` (${dados.idade})` : ''}`} />
-              <Metrica titulo="Score" valor={`${dados.score || '-'}${dados.faixa_score ? ` · ${dados.faixa_score}` : ''}`} />
-              <Metrica titulo="FGTS presumido"
-                       valor={dados.fgts_tem ? fmtMoeda(dados.fgts_valor || 0) : 'não tem'} />
-            </div>
-
-            <div className="kpis">
-              <Metrica titulo="M&atilde;e" valor={dados.nome_mae || '-'} />
-              <Metrica titulo="Renda" valor={dados.renda || '-'} />
-              <Metrica titulo="Fonte de renda" valor={dados.fonte_renda || '-'} />
-              <Metrica titulo="Sacável" valor={dados.fgts_sacavel ? 'sim' : 'não'} />
+            <div className="consulta-topo">
+              <div>
+                <h3>{dados.nome || 'sem nome'}</h3>
+                <p className="consulta-cpf">{fmtCpfTexto(dados.cpf)}</p>
+              </div>
+              <div className="consulta-selos">
+                <span className="consulta-fonte">{dados.fonte}</span>
+                {dados.do_cache && (
+                  <button type="button" className="reset-btn" onClick={() => consultar(true)}>
+                    consultar de novo
+                  </button>
+                )}
+              </div>
             </div>
 
             {dados.obito && <div className="state-msg error">Consta indicativo de óbito.</div>}
 
-            {tels.length > 0 && (
-              <div className="panel">
-                <p className="section-label">Telefones</p>
-                <table className="ia-tabela">
-                  <thead><tr><th>Telefone</th><th>Tipo</th><th>Operadora</th><th>WhatsApp</th></tr></thead>
-                  <tbody>
-                    {tels.map((t, i) => (
-                      <tr key={i}>
-                        <td>({t.DDD}) {t.TELEFONE}</td>
-                        <td>{t.TIPO_TELEFONE === 'C' ? 'celular' : t.TIPO_TELEFONE === 'F' ? 'fixo' : (t.TIPO_TELEFONE || '-')}</td>
-                        <td>{t.OPERADORA || '-'}</td>
-                        <td>{String(t.FLWHATSAPP || '').toUpperCase() === 'S' ? 'sim' : '-'}</td>
-                      </tr>
+            <div className="consulta-cards">
+              {/* contatos com WhatsApp primeiro: e o que serve pra abordagem */}
+              {zaps.length > 0 && (
+                <div className="consulta-card destaque">
+                  <p className="consulta-card-label">WhatsApp</p>
+                  <ul className="consulta-lista">
+                    {zaps.map((t, i) => (
+                      <li key={`z${i}`}>
+                        <span className="consulta-valor">{fmtTel(t)}</span>
+                        <button type="button" className="consulta-copiar"
+                                onClick={() => copiar(soNum(t.ddd) + soNum(t.numero), `z${i}`)}>
+                          {copiado === `z${i}` ? 'copiado' : 'copiar'}
+                        </button>
+                      </li>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  </ul>
+                </div>
+              )}
 
-            {mails.length > 0 && (
-              <div className="panel">
-                <p className="section-label">E-mails</p>
-                <table className="ia-tabela">
-                  <tbody>{mails.map((e, i) => <tr key={i}><td>{e.EMAIL}</td></tr>)}</tbody>
-                </table>
-              </div>
-            )}
+              {outros.length > 0 && (
+                <div className="consulta-card">
+                  <p className="consulta-card-label">Outros telefones</p>
+                  <ul className="consulta-lista">
+                    {outros.map((t, i) => (
+                      <li key={`t${i}`}>
+                        <span className="consulta-valor">{fmtTel(t)}</span>
+                        <span className="consulta-tag">{t.tipo || '-'}</span>
+                        <button type="button" className="consulta-copiar"
+                                onClick={() => copiar(soNum(t.ddd) + soNum(t.numero), `t${i}`)}>
+                          {copiado === `t${i}` ? 'copiado' : 'copiar'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-            {ends.length > 0 && (
-              <div className="panel">
-                <p className="section-label">Endere&ccedil;os</p>
-                <table className="ia-tabela">
-                  <tbody>
+              {mails.length > 0 && (
+                <div className="consulta-card">
+                  <p className="consulta-card-label">E-mail</p>
+                  <ul className="consulta-lista">
+                    {mails.map((m, i) => (
+                      <li key={`m${i}`}>
+                        <span className="consulta-valor consulta-email">{m.email}</span>
+                        <button type="button" className="consulta-copiar"
+                                onClick={() => copiar(m.email, `m${i}`)}>
+                          {copiado === `m${i}` ? 'copiado' : 'copiar'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {ends.length > 0 && (
+                <div className="consulta-card largo">
+                  <p className="consulta-card-label">Endere&ccedil;o</p>
+                  <ul className="consulta-lista">
                     {ends.map((e, i) => (
-                      <tr key={i}>
-                        <td>{[e.TIPO, e.LOGRADOURO, e.NUMERO, e.COMPLEMENTO].filter(Boolean).join(' ')}
-                            {' — '}{[e.BAIRRO, e.CIDADE, e.UF, e.CEP].filter(Boolean).join(', ')}</td>
-                      </tr>
+                      <li key={`e${i}`} className="consulta-endereco">
+                        <span className="consulta-valor">
+                          {[e.logradouro, e.complemento].filter(Boolean).join(' ')}
+                          {e.bairro ? ` — ${e.bairro}` : ''}
+                        </span>
+                        <span className="consulta-sub">
+                          {[e.cidade, e.uf].filter(Boolean).join('/')}
+                          {e.cep ? ` · CEP ${fmtCep(e.cep)}` : ''}
+                        </span>
+                      </li>
                     ))}
-                  </tbody>
-                </table>
+                  </ul>
+                </div>
+              )}
+
+              <div className="consulta-card largo">
+                <p className="consulta-card-label">Cadastro</p>
+                <ul className="consulta-pares">
+                  {dados.nascimento && (
+                    <li><span>Nascimento</span><strong>{fmtDataBR(dados.nascimento)}{dados.idade ? ` (${dados.idade})` : ''}</strong></li>
+                  )}
+                  {dados.nome_mae && <li><span>Mãe</span><strong>{dados.nome_mae}</strong></li>}
+                  {dados.situacao_cpf && <li><span>Situação do CPF</span><strong>{dados.situacao_cpf}</strong></li>}
+                  {dados.renda && <li><span>Renda</span><strong>{dados.renda}</strong></li>}
+                  {dados.ocupacao && <li><span>Ocupação</span><strong>{dados.ocupacao}</strong></li>}
+                  {dados.faixa_score && <li><span>Score</span><strong>{dados.faixa_score}</strong></li>}
+                  {dados.fgts_tem && (
+                    <li><span>FGTS presumido</span><strong>{fmtMoeda(dados.fgts_valor || 0)}</strong></li>
+                  )}
+                </ul>
               </div>
-            )}
+            </div>
           </>
         )}
       </div>
