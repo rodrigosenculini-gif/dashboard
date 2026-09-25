@@ -83,7 +83,7 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-async function n8nFetch(path) {
+async function n8nFetch(path, { metodo = 'GET', corpo = null } = {}) {
   const base = process.env.N8N_BASE_URL;
   const key = process.env.N8N_API_KEY;
   if (!base || !key) {
@@ -92,7 +92,12 @@ async function n8nFetch(path) {
     );
   }
   const res = await fetch(`${base.replace(/\/$/, '')}${path}`, {
-    headers: { 'X-N8N-API-KEY': key },
+    method: metodo,
+    headers: {
+      'X-N8N-API-KEY': key,
+      ...(corpo ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(corpo ? { body: JSON.stringify(corpo) } : {}),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -130,11 +135,39 @@ async function fetchByStatus({ status, workflowId, from, useDateCutoff, maxPages
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método não permitido' });
+  }
 
   const { type = 'stats', workflowId, date_from, date_to } = req.query;
 
   try {
+    if (type === 'ajusta_no' && req.method === 'POST') {
+      // troca o codigo de um no Code num workflow, pela API do n8n
+      const { id, no, codigo } = req.body || {};
+      if (!id || !no || !codigo) {
+        return res.status(400).json({ error: 'informe id, no e codigo' });
+      }
+      const w = await n8nFetch(`/api/v1/workflows/${id}`);
+      const alvo = (w.nodes || []).find((x) => x.name === no);
+      if (!alvo) {
+        return res.status(404).json({
+          error: `nó "${no}" não encontrado`,
+          nos: (w.nodes || []).map((x) => x.name),
+        });
+      }
+      alvo.parameters = { ...(alvo.parameters || {}), jsCode: codigo };
+      // a API so aceita estes campos no PUT
+      const salvo = await n8nFetch(`/api/v1/workflows/${id}`, {
+        metodo: 'PUT',
+        corpo: {
+          name: w.name, nodes: w.nodes, connections: w.connections,
+          settings: w.settings || {},
+        },
+      });
+      return res.status(200).json({ ok: true, id: salvo.id, no, atualizado: true });
+    }
+
     if (type === 'workflows') {
       let all = [];
       let cursor = null;
