@@ -149,13 +149,24 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   // avisa as outras abas do dashboard: concluir numa deixava a tarefa na tela
   // das outras ate o proximo ciclo
   const avisarAbas = () => {
-    try { localStorage.setItem('esq_acao', String(Date.now())) } catch { /* sem storage */ }
+    try {
+      localStorage.setItem('esq_acao', String(Date.now()))
+      // a extensao escuta este evento na mesma pagina
+      document.dispatchEvent(new CustomEvent('esquentadinho:acao'))
+    } catch { /* sem storage */ }
   }
 
   useEffect(() => {
+    // 'storage' vem de OUTRAS abas do dashboard; o CustomEvent vem da
+    // extensao, que roda nesta mesma pagina e nao dispara 'storage' aqui
     const ouvir = (e) => { if (e.key === 'esq_acao') carregar() }
+    const ouvirExt = () => carregar()
     window.addEventListener('storage', ouvir)
-    return () => window.removeEventListener('storage', ouvir)
+    document.addEventListener('esquentadinho:acao', ouvirExt)
+    return () => {
+      window.removeEventListener('storage', ouvir)
+      document.removeEventListener('esquentadinho:acao', ouvirExt)
+    }
   }, [carregar])
 
   // pendencia nova cancela a dispensa: esconder um lembrete que acabou de
