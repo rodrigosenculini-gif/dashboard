@@ -343,9 +343,11 @@ async function consultarCliente(client, cpf, { forcar = false, por = null } = {}
   }
 
   const tentativas = []
+  // Ordem pedida: CRM primeiro (dado proprio, sem custo por consulta);
+  // sem retorno, Nova Vida; sem retorno, Lemit.
+  // CONSULTA_CRM_ATIVO=0 tira o CRM da fila, se precisar.
   const fontes = []
-  // o CRM sera o primeiro quando ligado
-  if (process.env.CONSULTA_CRM_ATIVO === '1') fontes.push(['crm', () => consultaCrm(n)])
+  if (process.env.CONSULTA_CRM_ATIVO !== '0') fontes.push(['crm', () => consultaCrm(n)])
   fontes.push(['novavida', () => consultaNovaVida(client, n)])
   fontes.push(['lemit', () => consultaLemit(n)])
 

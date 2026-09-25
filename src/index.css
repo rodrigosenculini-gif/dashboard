@@ -2373,63 +2373,87 @@ body {
 .acoes-barra .acoes-sep{ flex:1 1 auto; }
 
 /* --- Consulta de cliente: resultado em cards --- */
-.consulta-modal{ max-width:660px; }
+/* Regra unica de alinhamento: TODO texto a esquerda, todo card com a mesma
+   estrutura (rotulo em cima, conteudo embaixo) e a mesma altura na linha.
+   Antes havia text-align diferente por card e altura pelo conteudo, o que
+   deixava a grade com aparencia aleatoria. */
+.consulta-modal{ max-width:680px; }
+.consulta-modal *{ text-align:left; }
+
 .consulta-topo{
-  display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-  padding:2px 0 12px; border-bottom:1px solid var(--border); margin-bottom:12px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:0 0 12px; border-bottom:1px solid var(--border); margin-bottom:14px;
 }
-.consulta-topo h3{ margin:0; font-size:16px; font-weight:500; color:var(--text); }
-.consulta-cpf{ margin:2px 0 0; font-family:var(--font-mono); font-size:12px; color:var(--muted); }
+.consulta-topo h3{ margin:0; font-size:15px; font-weight:500; color:var(--text); }
+.consulta-cpf{ margin:3px 0 0; font-family:var(--font-mono); font-size:11.5px; color:var(--muted); }
 .consulta-selos{ display:flex; align-items:center; gap:7px; flex-shrink:0; }
 .consulta-fonte{
-  font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em;
+  font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.06em;
   color:var(--muted); border:1px solid var(--border); border-radius:20px; padding:3px 9px;
 }
 
-/* align-items:start: cada card com a altura do proprio conteudo, em vez de
-   esticar ate o vizinho mais alto e deixar um vazio embaixo */
+/* duas colunas iguais; cards da mesma linha com a mesma altura */
 .consulta-cards{
   display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
-  gap:10px; align-items:start;
+  gap:10px; align-items:stretch;
 }
 .consulta-card{
+  display:flex; flex-direction:column;
   background:var(--surface-2); border:1px solid var(--border); border-radius:11px;
-  padding:12px 13px; min-width:0;
+  padding:13px; min-width:0; box-sizing:border-box;
 }
 .consulta-card.largo{ grid-column:1 / -1; }
-/* WhatsApp e o contato que serve pra abordagem: ganha a borda dourada */
-.consulta-card.destaque{ border-color:rgba(169,217,127,.35); }
+.consulta-card.destaque{ border-color:rgba(169,217,127,.3); }
 .consulta-card-label{
-  margin:0 0 9px; font-size:10px; color:var(--muted);
-  text-transform:uppercase; letter-spacing:.06em;
+  margin:0 0 10px; font-size:9.5px; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.07em;
 }
+
+/* uma linha por item, sempre no mesmo formato */
 .consulta-lista{
-  list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px;
-  max-height:170px; overflow-y:auto;
+  list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:8px;
 }
 .consulta-lista li{ display:flex; align-items:center; gap:8px; min-width:0; }
-.consulta-valor{ font-family:var(--font-mono); font-size:13px; color:var(--text); }
-.consulta-email{ font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.consulta-valor{
+  font-family:var(--font-mono); font-size:12.5px; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 .consulta-card.destaque .consulta-valor{ color:var(--lime); }
+.consulta-email{ font-size:11px; }
 .consulta-tag{
-  font-size:9.5px; color:var(--muted); border:1px solid var(--border);
-  border-radius:4px; padding:1px 5px; text-transform:uppercase;
+  flex-shrink:0; font-size:9px; color:var(--muted); border:1px solid var(--border);
+  border-radius:4px; padding:1px 5px; text-transform:uppercase; letter-spacing:.03em;
 }
 .consulta-copiar{
   margin-left:auto; flex-shrink:0; background:none; border:1px solid var(--border);
-  color:var(--muted); border-radius:6px; padding:2px 8px; cursor:pointer;
-  font-family:var(--font-mono); font-size:10px;
+  color:var(--muted); border-radius:6px; padding:3px 8px; cursor:pointer;
+  font-family:var(--font-mono); font-size:9.5px;
 }
 .consulta-copiar:hover{ color:var(--lime); border-color:rgba(169,217,127,.4); }
-.consulta-endereco{ flex-direction:column; align-items:flex-start; gap:2px; }
-.consulta-endereco .consulta-valor{ font-family:inherit; font-size:12.5px; }
-.consulta-sub{ font-size:11px; color:var(--muted); font-family:var(--font-mono); }
-.consulta-pares{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px 14px; }
-.consulta-pares li{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:12px; }
-.consulta-pares span{ color:var(--muted); }
-.consulta-pares strong{ color:var(--text); font-weight:500; text-align:right; }
+
+/* endereco: duas linhas, ambas a esquerda */
+.consulta-endereco{ flex-direction:column; align-items:flex-start; gap:3px; }
+.consulta-endereco .consulta-valor{
+  font-family:var(--font-sans); font-size:12px; white-space:normal;
+}
+.consulta-sub{ font-size:10.5px; color:var(--muted); font-family:var(--font-mono); }
+
+/* cadastro: rotulo e valor em linhas separadas, para nao virar tabela torta */
+.consulta-pares{
+  list-style:none; margin:0; padding:0;
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:11px 16px;
+}
+.consulta-pares li{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.consulta-pares span{ font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+.consulta-pares strong{
+  font-size:12px; color:var(--text); font-weight:500;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
 @media (max-width: 620px){
-  .consulta-cards, .consulta-pares{ grid-template-columns:1fr; }
+  .consulta-cards{ grid-template-columns:1fr; }
+  .consulta-pares{ grid-template-columns:1fr; }
 }
 
 /* --- Esquentadinho flutuante: lembretes e tarefas --- */
