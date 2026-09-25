@@ -167,20 +167,6 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { type } = req.query;
 
-    if (type === 'consulta_teste_proxy') {
-      // diagnostico temporario: o proxy do CRM roda em servidor proprio e
-      // pode ter o IP liberado no Lemit, ao contrario do Vercel
-      try {
-        const cpf = String(req.body?.cpf || '').replace(/\D/g, '');
-        const alvo = req.body?.url || `https://server-hotline.appsi.online/api-lemit/?cpf=${cpf}`;
-        const r = await fetch(alvo, { headers: { Accept: 'application/json' } });
-        const t = await r.text();
-        return res.json({ status: r.status, corpo: t.slice(0, 600) });
-      } catch (e) {
-        return res.json({ erro: String(e.message || e) });
-      }
-    }
-
     if (type === 'consulta_cliente') {
       // tres fontes em cascata; detalhes em _consultaCliente.js.
       // Fica aqui, no POST, porque e assim que o modal chama -- no bloco GET

@@ -40,10 +40,12 @@ const vazio = () => ({
 })
 
 // ---------- Nova Vida (SOAP) ----------
-async function novaVidaToken(client) {
-  const guardado = await client.query(
-    "select token from api_tokens where servico='novavida' and expira_em > now()")
-  if (guardado.rows.length) return guardado.rows[0].token
+async function novaVidaToken(client, { renovar = false } = {}) {
+  if (!renovar) {
+    const guardado = await client.query(
+      "select token from api_tokens where servico='novavida' and expira_em > now()")
+    if (guardado.rows.length) return guardado.rows[0].token
+  }
 
   const usuario = process.env.NOVAVIDA_USUARIO
   const senha = process.env.NOVAVIDA_SENHA
@@ -80,8 +82,8 @@ async function novaVidaToken(client) {
   return token
 }
 
-async function consultaNovaVida(client, cpf) {
-  const token = await novaVidaToken(client)
+async function consultaNovaVida(client, cpf, { renovar = false } = {}) {
+  const token = await novaVidaToken(client, { renovar })
   const corpo = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
@@ -102,6 +104,15 @@ async function consultaNovaVida(client, cpf) {
 
   const d = vazio()
   d.payload = { xml: xml.slice(0, 8000) }
+
+  // A Nova Vida pode invalidar o token antes das 23h que guardamos (outro
+  // login, inatividade). Nesse caso ela responde TOKEN EXPIRADO e o codigo
+  // seguia mandando o token velho pra sempre. Agora gera outro e repete uma vez.
+  if (/token\s*expirado/i.test(xml) && !renovar) {
+    await client.query("delete from api_tokens where servico='novavida'")
+    return consultaNovaVida(client, cpf, { renovar: true })
+  }
+
   if (!/\<CADASTRO\>/i.test(xml)) {
     // guarda o inicio do XML: o erro da Nova Vida vem no proprio envelope
     const falha = tag(bruto, 'faultstring') || tag(xml, 'MENSAGEM') || tag(xml, 'ERRO')
@@ -169,11 +180,35 @@ async function consultaNovaVida(client, cpf) {
 }
 
 // ---------- Lemit ----------
+// O Lemit trava por IP e o servidor do Vercel nao esta liberado -- de la a
+// resposta e 403 "Acesso fora do local permitido". Por isso a chamada sai
+// pelo n8n, cujo IP a empresa ja liberou. Direto so em ambiente onde o IP
+// esteja autorizado (LEMIT_DIRETO=1).
 async function consultaLemit(cpf) {
   const token = process.env.LEMIT_TOKEN
+  const viaN8n = process.env.LEMIT_WEBHOOK
   const d = vazio()
-  if (!token) { d.mensagem = 'token do Lemit ausente'; return d }
 
+  if (viaN8n && process.env.LEMIT_DIRETO !== '1') {
+    const r = await fetch(viaN8n, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cpf, chave: process.env.CONSULTA_CHAVE || '' }),
+    })
+    const bruto = await r.text()
+    let j = null
+    try { j = JSON.parse(bruto) } catch { /* nao veio json */ }
+    d.payload = j || { bruto: bruto.slice(0, 500) }
+    const p = j?.pessoa || j?.data?.pessoa
+    if (!p) {
+      d.mensagem = `Lemit (via n8n) HTTP ${r.status}: ${
+        j?.erro || j?.errors ? JSON.stringify(j.erro || j.errors) : bruto.slice(0, 160) || 'resposta vazia'}`
+      return d
+    }
+    return preencherLemit(d, p)
+  }
+
+  if (!token) { d.mensagem = 'token do Lemit ausente'; return d }
   const r = await fetch(`${LEMIT_URL}/${cpf}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   })
@@ -183,12 +218,16 @@ async function consultaLemit(cpf) {
   d.payload = j || { bruto: bruto.slice(0, 500) }
   const p = j?.pessoa
   if (!p) {
-    // o motivo importa: 401 e token, 404 e CPF sem cadastro, 5xx e a API
+    // o motivo importa: 401 e token, 403 e IP, 404 e CPF sem cadastro
     d.mensagem = `Lemit HTTP ${r.status}: ${
       j?.errors ? JSON.stringify(j.errors) : bruto.slice(0, 160) || 'resposta vazia'}`
     return d
   }
+  return preencherLemit(d, p)
+}
 
+// o formato do Lemit e o mesmo vindo direto ou pelo n8n
+function preencherLemit(d, p) {
   d.ok = true
   d.nome = p.nome || null
   d.nome_mae = p.nome_mae || null
