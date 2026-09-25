@@ -79,12 +79,13 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     const t = setInterval(ver, 3000)
     return () => clearInterval(t)
   }, [])
+  const [dispensadoAte, setDispensadoAte] = useState(0)
   useEffect(() => {
-    if (!painel) return
+    const fechaTudo = () => { setPainel(false); setDispensadoAte(Date.now() + 5 * 60 * 1000) }
     const foraDaqui = (e) => {
-      if (raizRef.current && !raizRef.current.contains(e.target)) setPainel(false)
+      if (raizRef.current && !raizRef.current.contains(e.target)) fechaTudo()
     }
-    const esc = (e) => { if (e.key === 'Escape') setPainel(false) }
+    const esc = (e) => { if (e.key === 'Escape') fechaTudo() }
     // captura para pegar o clique antes de a pagina tratar
     document.addEventListener('mousedown', foraDaqui, true)
     document.addEventListener('keydown', esc)
@@ -92,7 +93,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
       document.removeEventListener('mousedown', foraDaqui, true)
       document.removeEventListener('keydown', esc)
     }
-  }, [painel])
+  }, [])
 
   const carregar = useCallback(async () => {
     if (!vendedor) return
@@ -157,6 +158,17 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     return () => window.removeEventListener('storage', ouvir)
   }, [carregar])
 
+  // pendencia nova cancela a dispensa: esconder um lembrete que acabou de
+  // chegar seria pior que nao mostrar
+  const ultimaChave = useRef('')
+  useEffect(() => {
+    const chave = `${nota?.id || ''}|${vencidas.map((t) => t.id).join(',')}`
+    if (chave !== ultimaChave.current) {
+      ultimaChave.current = chave
+      if (chave.replace(/[|,]/g, '')) setDispensadoAte(0)
+    }
+  }, [nota, vencidas])
+
   const acaoTarefa = async (id, acao, minutos) => {
     try { await postJson('tarefa_acao', { id, acao, minutos }) } catch { /* segue */ }
     avisarAbas()
@@ -189,7 +201,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const conteudo = (
     <>
       {/* balao: so aparece quando ha algo a dizer */}
-      {aFalar && !painel && (
+      {aFalar && !painel && Date.now() >= dispensadoAte && (
         <div className="mascote-balao">
           {nota ? (
             <>
