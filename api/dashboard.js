@@ -167,6 +167,23 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { type } = req.query;
 
+    if (type === 'consulta_cliente') {
+      // tres fontes em cascata; detalhes em _consultaCliente.js.
+      // Fica aqui, no POST, porque e assim que o modal chama -- no bloco GET
+      // a rota nunca era alcancada.
+      try {
+        const client = getPool();
+        const r = await consultarCliente(client, req.body?.cpf, {
+          forcar: !!req.body?.forcar,
+          por: req.body?.vendedor || null,
+        });
+        if (r?.erro) return res.status(400).json({ error: r.erro });
+        return res.json(r);
+      } catch (e) {
+        return res.status(500).json({ error: e.message || 'falha na consulta' });
+      }
+    }
+
     if (type === 'auth_login') {
       const senha = (req.body?.senha || '').toString().trim();
       // Fonte unica: vendedoras_login. As credenciais que viviam no mapa
@@ -1405,14 +1422,6 @@ export default async function handler(req, res) {
   } else if (type === 'vendas_participacao') {
     sql = 'select * from dashboard_vendas_participacao($1::date,$2::date)';
     params = [req.query.date_from || null, req.query.date_to || null];
-  } else if (type === 'consulta_cliente') {
-    // tres fontes em cascata; detalhes em _consultaCliente.js
-    const r = await consultarCliente(client, req.body?.cpf || req.query.cpf, {
-      forcar: !!req.body?.forcar,
-      por: req.body?.vendedor || null,
-    });
-    if (r?.erro) return res.status(400).json({ error: r.erro });
-    return res.json(r);
   } else if (type === 'meta_vendedoras') {
     // callApi manda por query string (GET), nao no body
     // p_dia: periodos com base 'dia' tem uma meta por dia
