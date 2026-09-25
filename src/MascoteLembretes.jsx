@@ -141,11 +141,25 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const responder = async (resposta) => {
     if (!nota) return
     try { await postJson('notificacao_responder', { id: nota.id, resposta }) } catch { /* segue */ }
+    avisarAbas()
     setNota(null)
   }
 
+  // avisa as outras abas do dashboard: concluir numa deixava a tarefa na tela
+  // das outras ate o proximo ciclo
+  const avisarAbas = () => {
+    try { localStorage.setItem('esq_acao', String(Date.now())) } catch { /* sem storage */ }
+  }
+
+  useEffect(() => {
+    const ouvir = (e) => { if (e.key === 'esq_acao') carregar() }
+    window.addEventListener('storage', ouvir)
+    return () => window.removeEventListener('storage', ouvir)
+  }, [carregar])
+
   const acaoTarefa = async (id, acao, minutos) => {
     try { await postJson('tarefa_acao', { id, acao, minutos }) } catch { /* segue */ }
+    avisarAbas()
     carregar()
   }
 
@@ -161,6 +175,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
         quando: minutos ? null : (quandoCustom || null),
       })
       setTitulo(''); setQuandoCustom(''); setMinutosLivres('')
+      avisarAbas()
       carregar()
       tituloRef.current?.focus()
     } catch { /* segue */ }
