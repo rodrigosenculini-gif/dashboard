@@ -162,7 +162,9 @@ export default async function handler(req, res) {
         metodo: 'PUT',
         corpo: {
           name: w.name, nodes: w.nodes, connections: w.connections,
-          settings: w.settings || {},
+          // a API recusa campos extras em settings (ela devolve mais do que
+          // aceita de volta): manda so executionOrder
+          settings: { executionOrder: w.settings?.executionOrder || 'v1' },
         },
       });
       return res.status(200).json({ ok: true, id: salvo.id, no, atualizado: true });
