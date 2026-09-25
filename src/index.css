@@ -2386,7 +2386,12 @@ body {
   color:var(--muted); border:1px solid var(--border); border-radius:20px; padding:3px 9px;
 }
 
-.consulta-cards{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+/* align-items:start: cada card com a altura do proprio conteudo, em vez de
+   esticar ate o vizinho mais alto e deixar um vazio embaixo */
+.consulta-cards{
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:10px; align-items:start;
+}
 .consulta-card{
   background:var(--surface-2); border:1px solid var(--border); border-radius:11px;
   padding:12px 13px; min-width:0;
@@ -2398,7 +2403,10 @@ body {
   margin:0 0 9px; font-size:10px; color:var(--muted);
   text-transform:uppercase; letter-spacing:.06em;
 }
-.consulta-lista{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; }
+.consulta-lista{
+  list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px;
+  max-height:170px; overflow-y:auto;
+}
 .consulta-lista li{ display:flex; align-items:center; gap:8px; min-width:0; }
 .consulta-valor{ font-family:var(--font-mono); font-size:13px; color:var(--text); }
 .consulta-email{ font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

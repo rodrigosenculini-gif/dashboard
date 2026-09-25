@@ -4025,6 +4025,13 @@ function ConsultaClienteModal({ vendedorFixo, onClose }) {
   const mails = dados?.emails || []
   const ends = dados?.enderecos || []
 
+  // A grade tem 2 colunas. Com numero impar de cards pequenos sobrava meia
+  // linha vazia -- o ultimo passa a ocupar a largura toda.
+  const pequenos = [zaps.length > 0, outros.length > 0, mails.length > 0].filter(Boolean).length
+  const esticaUltimo = pequenos % 2 === 1
+  const classeCard = (ehUltimoPequeno) =>
+    `consulta-card${ehUltimoPequeno && esticaUltimo ? ' largo' : ''}`
+
   return (
     <div className="funil-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="funil-modal consulta-modal">
@@ -4070,7 +4077,7 @@ function ConsultaClienteModal({ vendedorFixo, onClose }) {
             <div className="consulta-cards">
               {/* contatos com WhatsApp primeiro: e o que serve pra abordagem */}
               {zaps.length > 0 && (
-                <div className="consulta-card destaque">
+                <div className={`${classeCard(outros.length === 0 && mails.length === 0)} destaque`}>
                   <p className="consulta-card-label">WhatsApp</p>
                   <ul className="consulta-lista">
                     {zaps.map((t, i) => (
@@ -4087,7 +4094,7 @@ function ConsultaClienteModal({ vendedorFixo, onClose }) {
               )}
 
               {outros.length > 0 && (
-                <div className="consulta-card">
+                <div className={classeCard(mails.length === 0)}>
                   <p className="consulta-card-label">Outros telefones</p>
                   <ul className="consulta-lista">
                     {outros.map((t, i) => (
@@ -4105,7 +4112,7 @@ function ConsultaClienteModal({ vendedorFixo, onClose }) {
               )}
 
               {mails.length > 0 && (
-                <div className="consulta-card">
+                <div className={classeCard(true)}>
                   <p className="consulta-card-label">E-mail</p>
                   <ul className="consulta-lista">
                     {mails.map((m, i) => (
