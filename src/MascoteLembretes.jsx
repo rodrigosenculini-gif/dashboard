@@ -43,7 +43,6 @@ const fmtQuando = (iso) => {
  * Clicar no mascote abre o painel, onde ela cadastra tarefas novas.
  */
 export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
-  const [nota, setNota] = useState(null)      // lembrete da gestao
   const [tarefas, setTarefas] = useState([])
   const [painel, setPainel] = useState(false)
   const [titulo, setTitulo] = useState('')
@@ -59,11 +58,12 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const [regras, setRegras] = useState([])
   const [novaRegra, setNovaRegra] = useState({
     mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00',
+    aplica_a: [],   // vazio = toda a equipe
   })
 
   const vencidas = tarefas.filter((t) => t.vencida && !t.feita)
-  const aFalar = nota || vencidas[0] || null
-  const pendencias = (nota ? 1 : 0) + vencidas.length
+  const aFalar = vencidas[0] || null
+  const pendencias = vencidas.length
 
   // clicar fora fecha o painel: antes so o proprio mascote fechava
   const raizRef = useRef(null)
@@ -102,18 +102,14 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
         (escopo === 'gestao'
           ? getJson('tarefas_gestao', { com_feitas: '1' })
           : getJson('tarefas_pendentes', { vendedor, com_feitas: '1' })).catch(() => []),
-        nota ? Promise.resolve(null) : getJson('notificacao_pendente', { vendedor, escopo }).catch(() => null),
+        // o dashboard NAO mostra lembrete periodico: quem avisa e a extensao,
+        // que segue a vendedora em qualquer site. Aqui fica o registro:
+        // criar tarefa, marcar feito e ver o que passou e o que vem.
+        Promise.resolve(null),
       ])
       setTarefas(Array.isArray(tf) ? tf : [])
-      const n = Array.isArray(nt) ? nt[0] : null
-      if (n?.regra_id && !nota) {
-        // grava que foi mostrada antes de exibir: se fechar a aba, o
-        // "nao respondeu" fica registrado
-        const m = await postJson('notificacao_mostrada', { regra_id: n.regra_id, vendedor })
-        setNota({ id: m?.r ?? m, mensagem: n.mensagem })
-      }
     } catch { /* o mascote nunca atrapalha a tela */ }
-  }, [vendedor, escopo, nota])
+  }, [vendedor, escopo])
 
   useEffect(() => {
     carregar()
@@ -139,12 +135,6 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     return () => { clearInterval(t); document.title = original }
   }, [pendencias])
 
-  const responder = async (resposta) => {
-    if (!nota) return
-    try { await postJson('notificacao_responder', { id: nota.id, resposta }) } catch { /* segue */ }
-    avisarAbas()
-    setNota(null)
-  }
 
   // avisa as outras abas do dashboard: concluir numa deixava a tarefa na tela
   // das outras ate o proximo ciclo
@@ -173,12 +163,12 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   // chegar seria pior que nao mostrar
   const ultimaChave = useRef('')
   useEffect(() => {
-    const chave = `${nota?.id || ''}|${vencidas.map((t) => t.id).join(',')}`
+    const chave = vencidas.map((t) => t.id).join(',')
     if (chave !== ultimaChave.current) {
       ultimaChave.current = chave
       if (chave.replace(/[|,]/g, '')) setDispensadoAte(0)
     }
-  }, [nota, vencidas])
+  }, [vencidas])
 
   const acaoTarefa = async (id, acao, minutos) => {
     try { await postJson('tarefa_acao', { id, acao, minutos }) } catch { /* segue */ }
@@ -214,15 +204,6 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
       {/* balao: so aparece quando ha algo a dizer */}
       {aFalar && !painel && Date.now() >= dispensadoAte && (
         <div className="mascote-balao">
-          {nota ? (
-            <>
-              <p>{nota.mensagem}</p>
-              <div className="mascote-acoes">
-                <button type="button" className="mascote-btn sim" onClick={() => responder('sim')}>Sim</button>
-                <button type="button" className="mascote-btn nao" onClick={() => responder('nao')}>N&atilde;o</button>
-              </div>
-            </>
-          ) : (
             <>
               <p className="mascote-chamada">chegou a hora</p>
               <p><strong>{vencidas[0].titulo}</strong></p>
@@ -235,7 +216,6 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                 <button type="button" className="mascote-btn" onClick={() => acaoTarefa(vencidas[0].id, 'adiar', 10)}>+10 min</button>
               </div>
             </>
-          )}
         </div>
       )}
 
@@ -282,13 +262,28 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                        onChange={(e) => setNovaRegra({ ...novaRegra, hora_fim: e.target.value })} />
               </label>
             </div>
+            <div className="mascote-linha-campos">
+              <label style={{ flexDirection: 'column', alignItems: 'stretch', gap: 3 }}>
+                quem recebe
+                <select multiple size={3} value={novaRegra.aplica_a}
+                        onChange={(e) => setNovaRegra({
+                          ...novaRegra,
+                          aplica_a: Array.from(e.target.selectedOptions, (o) => o.value),
+                        })}>
+                  {vendedoras.map((v) => <option key={v.vendedor} value={v.vendedor}>{v.vendedor}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="mascote-sub" style={{ margin: 0 }}>
+              {novaRegra.aplica_a.length ? `${novaRegra.aplica_a.length} selecionada(s)` : 'nenhuma selecionada = toda a equipe'}
+            </p>
             <button type="button" className="mascote-chip" style={{ alignSelf: 'flex-start' }}
                     disabled={!novaRegra.mensagem.trim() || salvando}
                     onClick={async () => {
                       setSalvando(true)
                       try {
                         await postJson('regra_salvar', { ...novaRegra, escopo: 'vendedora' })
-                        setNovaRegra({ mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00' })
+                        setNovaRegra({ mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00', aplica_a: [] })
                         const r = await getJson('regras_listar')
                         setRegras(Array.isArray(r) ? r : [])
                       } finally { setSalvando(false) }
@@ -301,7 +296,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                   <div>
                     <span className="mascote-tit">{r.mensagem}</span>
                     <span className="mascote-hora">
-                      a cada {r.intervalo_min} min · {String(r.hora_ini).slice(0,5)}–{String(r.hora_fim).slice(0,5)} · {r.escopo}
+                      a cada {r.intervalo_min} min · {String(r.hora_ini).slice(0,5)}–{String(r.hora_fim).slice(0,5)} · {r.alvo}
                     </span>
                   </div>
                   <div className="mascote-linha-acoes">

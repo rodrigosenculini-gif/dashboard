@@ -2463,6 +2463,13 @@ body {
   font-size:10.5px; color:var(--muted);
 }
 .mascote-linha-campos input{ flex:1; min-width:0; }
+.mascote-linha-campos select[multiple]{
+  background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+  padding:4px; font-family:inherit; font-size:11px; color:var(--text);
+  outline:none; color-scheme:dark; width:100%;
+}
+.mascote-linha-campos select[multiple]:focus{ border-color:var(--gold); }
+.mascote-linha-campos select[multiple] option:checked{ background:var(--border); color:var(--lime); }
 .mascote-chip{
   padding:6px 9px; border-radius:7px; cursor:pointer; white-space:nowrap;
   background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
