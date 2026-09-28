@@ -5347,6 +5347,10 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
           <button ref={tourAddRef} className="refresh-btn" onClick={() => setShowAdd(true)} title="Adicionar adesão">
             + Adicionar adesão
           </button>
+          <button className="refresh-btn" onClick={() => setShowConsultaCliente(true)}
+                  title="Consulta Cliente: contatos, endereço e dados cadastrais pelo CPF">
+            Consulta Cliente
+          </button>
           <button className="refresh-btn" onClick={() => load({ forcar: true })} disabled={loading} title="Atualizar agora">
             &#8635; Atualizar
           </button>
