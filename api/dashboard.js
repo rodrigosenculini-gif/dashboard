@@ -388,6 +388,24 @@ export default async function handler(req, res) {
       try {
         const { banco, adesao, cpf, valor } = req.body || {};
         if (!banco || !adesao) return res.status(400).json({ error: 'Informe banco e adesão.' });
+        // Sempre Facil: a busca e feita no banco (sf_consulta_proposta), que acha o
+        // id interno pelo codigo SPF/CPF e consulta a API JoinBank ao vivo com a
+        // chave do Vault. Devolve no mesmo formato dos outros bancos.
+        if (/SEMPRE/i.test(String(banco))) {
+          const client = getPool();
+          const r = await client.query('select sf_consulta_proposta($1) as d', [String(adesao).trim()]);
+          const d = r.rows[0]?.d || {};
+          if (!d.encontrado) {
+            // proposta antiga (antes da API) ou fora da lista: libera o manual
+            return res.status(200).json({ encontrado: false, indisponivel: true, mensagem: d.erro || 'Proposta não disponível pela API.' });
+          }
+          return res.status(200).json({
+            encontrado: true, fonte: d.fonte,
+            cpf_banco: d.cpf, nome_banco: d.nome, valor_banco: d.valor, tabela_banco: d.tabela,
+            parcelas_banco: d.parcelas, status_banco: d.status, situacao: d.situacao,
+            adesao_numero: d.code, contrato: d.contrato, data_pagamento: d.data_pagamento,
+          });
+        }
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
         let resp;

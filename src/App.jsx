@@ -2115,13 +2115,13 @@ const FGTSV8_TABELAS = [
 
 // Todos os outros bancos suportados hoje calculam o peso por parcela + seguro
 const BANCOS_VENDA = ['FACTA', 'CREFAZ', 'PAN', 'MERCANTIL', 'PRESENÇA', 'SOMA', 'V8', 'FGTSV8', 'NOVO SAQUE', 'C6', 'SEMPRE FACIL']
-// Sem pontuação por enquanto: calc_peso_vendas devolve 0 para este banco.
-const BANCOS_SEM_PONTUACAO = ['SEMPRE FACIL']
+// Bancos ainda sem tabela de pontuacao (Sempre Facil ja pontua desde set/26).
+const BANCOS_SEM_PONTUACAO = []
 
 // Bancos com API instalada pra consulta de adesão (webhook n8n
 // consulta-adesao-banco): pra esses, o formulário não pede tabela/parcelas
 // — só a adesão, que é buscada e preenchida direto da API do banco.
-const BANCOS_COM_API = ['FACTA', 'SOMA', 'PRESENÇA', 'C6', 'PAN']
+const BANCOS_COM_API = ['FACTA', 'SOMA', 'PRESENÇA', 'C6', 'PAN', 'SEMPRE FACIL']
 
 const FACTA_CODIGOS = [
   // Tabela nova (valida a partir de 14/09/2026) -- pesos variam por prazo
@@ -2826,7 +2826,11 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
 
   // Status que significam "pago" nos bancos com API. Fora disso, a vendedora
   // ve o status e decide se preenche a mao (nao gravamos venda nao paga).
-  const STATUS_PAGO_RE = /pag[oa]|integrad|liquidat|contrato pago|credit|desembols/i
+  // "Etapa de Pagamento" (Soma), "Processando/Aguardando Pagamento" (Sempre
+  // Facil) e "AGUARDA PAGAMENTO" (Facta) casavam com pag[oa] e gravavam como pago.
+  const STATUS_PAGO_RE = /\bpag[oa]\b|integrad|liquidat|contrato pago|credited|creditad|desembols/i
+  const STATUS_NAO_PAGO_RE = /an[aá]lise|aguard|pend|etapa|process|cancel/i
+  const statusPago = (st) => STATUS_PAGO_RE.test(st) && !STATUS_NAO_PAGO_RE.test(st)
 
   const [c6Opcoes, setC6Opcoes] = useState([])
 
@@ -2887,6 +2891,11 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
       if (d?.error) { setAddMsg(d.error); return }
       setBuscaResultado(d)
 
+      if (!d.encontrado && d.indisponivel) {
+        setManualApesarDeApi(true)
+        setAddMsg(`${d.mensagem || 'Proposta não disponível pela API.'} Preencha os dados manualmente.`)
+        return
+      }
       if (!d.encontrado) {
         // Nao achou no banco. Duas situacoes bem diferentes:
         //  - a consulta falhou (token expirado, API fora): da pra tentar de novo
@@ -2914,6 +2923,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
 
       const preenchido = {
         ...addForm,
+        adesao: addForm.banco === 'SEMPRE FACIL' && d.adesao_numero ? String(d.adesao_numero) : addForm.adesao,
         cpf: d.cpf_banco || addForm.cpf,
         nome: d.nome_banco || addForm.nome,
         valor: d.valor_banco != null ? String(d.valor_banco) : addForm.valor,
@@ -2924,7 +2934,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
       }
       setAddForm(preenchido)
 
-      const pago = STATUS_PAGO_RE.test(String(d.status_banco || ''))
+      const pago = statusPago(String(d.status_banco || ''))
       const completo = !!(preenchido.cpf && preenchido.nome && preenchido.valor)
       const precisaTabelaManual = BANCOS_TABELA_SEMPRE_MANUAL.includes(addForm.banco)
 
@@ -2988,7 +2998,9 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
     if (buscando || buscaResultado) return
     if (!(vendedorFixo || addForm.vendedorSel)) return
     const a = (addForm.adesao || '').trim()
-    const pronto = addForm.banco === 'SOMA' ? UUID_RE.test(a) : /^\d{6,}$/.test(a)
+    const pronto = addForm.banco === 'SOMA' ? UUID_RE.test(a)
+      : addForm.banco === 'SEMPRE FACIL' ? /^(SPF)?\d{3,}$/i.test(a)
+      : /^\d{6,}$/.test(a)
     if (!pronto) return
     const t = setTimeout(() => { buscarNaApi() }, 700)
     return () => clearTimeout(t)
