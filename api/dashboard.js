@@ -1481,6 +1481,10 @@ export default async function handler(req, res) {
   } else if (type === 'metas_progresso') {
     sql = 'select * from dashboard_metas_progresso($1)';
     params = [req.query.vendedor || null];
+  } else if (type === 'sf_sync_status') {
+    // estado da sincronizacao com a API da Sempre Facil (JoinBank), feita no banco por pg_cron
+    sql = 'select sf_sync_status() as status';
+    params = [];
   } else if (type === 'filtros') {
     sql = 'select * from dashboard_filtros()';
     params = [];

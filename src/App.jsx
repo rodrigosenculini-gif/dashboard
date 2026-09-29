@@ -3429,6 +3429,64 @@ function PanTabela({ titulo, linhas, mostrarVendedor, onSimular }) {
 
 const PAN_INTERVALO_MS = 5 * 60 * 1000 // atualiza sozinho a cada 5 min
 
+// Estado da rotina que espelha a API da Sempre Facil (JoinBank) no banco.
+// A sincronizacao roda no Supabase (pg_cron); aqui so mostra se esta em dia.
+function SempreFacilStatusModal({ onClose }) {
+  const [st, setSt] = useState(null)
+  const [erro, setErro] = useState('')
+  const [carregando, setCarregando] = useState(false)
+
+  const carregar = useCallback(async () => {
+    setCarregando(true); setErro('')
+    try {
+      const rows = await callApi('sf_sync_status', {}, { forcar: true })
+      setSt(rows?.[0]?.status || null)
+    } catch (e) {
+      setErro(e.message || 'Erro ao consultar')
+    } finally {
+      setCarregando(false)
+    }
+  }, [])
+
+  useEffect(() => { carregar() }, [carregar])
+
+  const hora = (v) => v ? new Date(v).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+  const pausado = st?.pausado_ate && new Date(st.pausado_ate) > new Date()
+  const situacao = !st ? '' : st.atrasado
+    ? 'Atrasada: a última resposta da API tem mais de 15 minutos.'
+    : pausado ? `Pausada até ${hora(st.pausado_ate)} (limite de requisições da API).`
+    : 'Em dia: novas propostas a cada 5 min e acompanhamento das em aberto.'
+
+  return (
+    <div className="funil-overlay" onClick={onClose}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760 }}>
+        <div className="funil-header">
+          <div><h2>Sempre Fácil — API</h2></div>
+          <button className="funil-close" onClick={onClose}>&times;</button>
+        </div>
+
+        {erro && <p className="state-msg" style={{ color: '#e08585' }}>{erro}</p>}
+
+        {st && (
+          <>
+            <div className="ia-kpis">
+              <div className="ia-kpi"><span>Em aberto</span><strong>{st.em_aberto}</strong></div>
+              <div className="ia-kpi"><span>Integradas</span><strong>{st.integradas}</strong></div>
+              <div className="ia-kpi"><span>Canceladas</span><strong>{st.canceladas}</strong></div>
+              <div className={`ia-kpi${st.atrasado ? ' ia-kpi-alerta' : ''}`}><span>Última sincronização</span><strong>{hora(st.ultimo_ok)}</strong></div>
+            </div>
+            <p className="state-msg">{situacao}</p>
+          </>
+        )}
+
+        <button type="button" className="refresh-btn" onClick={carregar} disabled={carregando}>
+          {carregando ? 'Atualizando...' : '⟳ Atualizar'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function PanModal({ vendedorFixo, onClose }) {
   const dialogo = useDialogo()
   const [busca, setBusca] = useState('')
@@ -5579,6 +5637,7 @@ function VendedorasView({ ferramentas = null }) {
   const [syncMsg, setSyncMsg] = useState('')
   const [showRanking, setShowRanking] = useState(false)
   const [showFacta, setShowFacta] = useState(false)
+  const [showSfStatus, setShowSfStatus] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [showNovoSaque, setShowNovoSaque] = useState(false)
   const [showConsultaCliente, setShowConsultaCliente] = useState(false)
@@ -5802,6 +5861,7 @@ function VendedorasView({ ferramentas = null }) {
           <button className="banco-btn" onClick={() => setShowSomaJornada(true)} title="Soma: margem, simulação e cadastro de proposta">SOMA</button>
           <button className="banco-btn" onClick={() => setShowPresenca(true)} title="Presença: esteira de pendências, documentos e reapresentação">PRE</button>
           <button className="banco-btn" onClick={() => setShowFacta(true)} title="Facta: consulta de proposta por CPF ou código AF">FAC</button>
+          <button className="banco-btn" onClick={() => setShowSfStatus(true)} title="Sempre Fácil: estado da sincronização com a API">SF</button>
         </div>
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
@@ -6025,6 +6085,7 @@ function VendedorasView({ ferramentas = null }) {
 
       {showRanking && <RankingOverlay onClose={() => setShowRanking(false)} />}
       {showFacta && <FactaConsultaOverlay onClose={() => setShowFacta(false)} />}
+      {showSfStatus && <SempreFacilStatusModal onClose={() => setShowSfStatus(false)} />}
       {showAdd && (
         <AddVendaModal
           vendedoresDisponiveis={vendedores}
