@@ -1738,6 +1738,17 @@ function N8nExecucoes() {
 
 const VENDEDOR_CORES = ['#d99089', '#d9b877', '#7fa8d9', '#8fd97f', '#c17fd9', '#d9d17f', '#7fd9c1', '#d97fa8']
 
+// Rotulo de total no topo das barras: compacto para caber na largura da barra
+// (o valor por extenso, "R$ 352.218,09", invadia as barras vizinhas).
+// O valor exato continua no tooltip.
+function fmtRotuloCurto(v) {
+  const n = Math.abs(Number(v) || 0)
+  if (n >= 1e6) return `${(n / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`
+  if (n >= 1e4) return `${Math.round(n / 1e3)} mil`
+  if (n >= 1e3) return `${(n / 1e3).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil`
+  return String(Math.round(n))
+}
+
 function fmtMoeda(n) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0)
 }
@@ -5921,7 +5932,7 @@ function VendedorasView({ ferramentas = null }) {
                     dataKey="__total"
                     position="top"
                     style={{ fill: '#8a978f', fontSize: 10, fontFamily: 'IBM Plex Mono' }}
-                    formatter={(v) => (modo === 'ponto' ? `${fmtInt(Math.round(v || 0))} pts` : fmtMoeda(v || 0))}
+                    formatter={(v) => fmtRotuloCurto(v)}
                   />
                 )}
               </Bar>
