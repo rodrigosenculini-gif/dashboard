@@ -25,6 +25,11 @@ const ATALHOS = [
   { rotulo: '2 h', min: 120 },
 ]
 
+const hojeISO = () => {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+}
+
 const fmtQuando = (iso) => {
   const d = new Date(iso)
   const hoje = new Date()
@@ -60,7 +65,9 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   const [novaEquipe, setNovaEquipe] = useState({ nome: '', membros: [] })
   const [verEquipes, setVerEquipes] = useState(false)
   const [novaRegra, setNovaRegra] = useState({
-    mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00',
+    mensagem: '', tipo: 'intervalo',
+    intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00',
+    horarios: [], novoHorario: '', data_unica: '',
     aplica_a: [], equipes: [],   // vazio nos dois = toda a equipe
   })
 
@@ -280,26 +287,88 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
             <input className="mascote-input" value={novaRegra.mensagem} maxLength={200}
                    placeholder="pergunta do lembrete"
                    onChange={(e) => setNovaRegra({ ...novaRegra, mensagem: e.target.value })} />
-            <div className="mascote-linha-campos">
-              <label>a cada
-                <input type="number" min="1" value={novaRegra.intervalo_min}
-                       onChange={(e) => setNovaRegra({ ...novaRegra, intervalo_min: e.target.value })} />
-              </label>
-              <label>reforço
-                <input type="number" min="1" value={novaRegra.reforco_min}
-                       onChange={(e) => setNovaRegra({ ...novaRegra, reforco_min: e.target.value })} />
-              </label>
+            {/* dois jeitos de repetir: de tempos em tempos, ou em hora marcada */}
+            <div className="home-toggle mascote-abas">
+              <button type="button" className={novaRegra.tipo === 'intervalo' ? 'on' : ''}
+                      onClick={() => setNovaRegra({ ...novaRegra, tipo: 'intervalo' })}>
+                de tempos em tempos
+              </button>
+              <button type="button" className={novaRegra.tipo === 'horarios' ? 'on' : ''}
+                      onClick={() => setNovaRegra({ ...novaRegra, tipo: 'horarios' })}>
+                hora marcada
+              </button>
             </div>
-            <div className="mascote-linha-campos">
-              <label>das
-                <input type="time" value={novaRegra.hora_ini}
-                       onChange={(e) => setNovaRegra({ ...novaRegra, hora_ini: e.target.value })} />
-              </label>
-              <label>até
-                <input type="time" value={novaRegra.hora_fim}
-                       onChange={(e) => setNovaRegra({ ...novaRegra, hora_fim: e.target.value })} />
-              </label>
-            </div>
+
+            {novaRegra.tipo === 'intervalo' ? (
+              <>
+                <div className="mascote-linha-campos">
+                  <label>a cada
+                    <input type="number" min="1" value={novaRegra.intervalo_min}
+                           onChange={(e) => setNovaRegra({ ...novaRegra, intervalo_min: e.target.value })} />
+                  </label>
+                  <label>reforço
+                    <input type="number" min="1" value={novaRegra.reforco_min}
+                           onChange={(e) => setNovaRegra({ ...novaRegra, reforco_min: e.target.value })} />
+                  </label>
+                </div>
+                <div className="mascote-linha-campos">
+                  <label>das
+                    <input type="time" value={novaRegra.hora_ini}
+                           onChange={(e) => setNovaRegra({ ...novaRegra, hora_ini: e.target.value })} />
+                  </label>
+                  <label>até
+                    <input type="time" value={novaRegra.hora_fim}
+                           onChange={(e) => setNovaRegra({ ...novaRegra, hora_fim: e.target.value })} />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* varias horas no mesmo dia: adiciona uma a uma */}
+                <div className="mascote-linha-campos">
+                  <label>horário
+                    <input type="time" value={novaRegra.novoHorario}
+                           onChange={(e) => setNovaRegra({ ...novaRegra, novoHorario: e.target.value })} />
+                  </label>
+                  <button type="button" className="mascote-chip"
+                          disabled={!novaRegra.novoHorario || novaRegra.horarios.includes(novaRegra.novoHorario)}
+                          onClick={() => setNovaRegra({
+                            ...novaRegra,
+                            horarios: [...novaRegra.horarios, novaRegra.novoHorario].sort(),
+                            novoHorario: '',
+                          })}>+ add</button>
+                </div>
+                {novaRegra.horarios.length > 0 && (
+                  <div className="mascote-atalhos">
+                    {novaRegra.horarios.map((h) => (
+                      <button key={h} type="button" className="mascote-chip" title="Remover"
+                              onClick={() => setNovaRegra({
+                                ...novaRegra,
+                                horarios: novaRegra.horarios.filter((x) => x !== h),
+                              })}>{h} &times;</button>
+                    ))}
+                  </div>
+                )}
+                <label className="mascote-campo">
+                  <span>repetir</span>
+                  <select value={novaRegra.data_unica ? 'uma' : 'todo'}
+                          onChange={(e) => setNovaRegra({
+                            ...novaRegra,
+                            data_unica: e.target.value === 'uma' ? hojeISO() : '',
+                          })}>
+                    <option value="todo">todo dia (nos dias úteis)</option>
+                    <option value="uma">só uma vez, numa data</option>
+                  </select>
+                </label>
+                {novaRegra.data_unica && (
+                  <label className="mascote-campo">
+                    <span>no dia</span>
+                    <input type="date" value={novaRegra.data_unica}
+                           onChange={(e) => setNovaRegra({ ...novaRegra, data_unica: e.target.value })} />
+                  </label>
+                )}
+              </>
+            )}
             <label className="mascote-campo">
               <span>equipe que recebe</span>
               <select multiple size={Math.min(equipes.length || 1, 3)} value={novaRegra.equipes.map(String)}
@@ -329,12 +398,15 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                 : 'nada selecionado = toda a equipe de vendas'}
             </p>
             <button type="button" className="mascote-chip" style={{ alignSelf: 'flex-start' }}
-                    disabled={!novaRegra.mensagem.trim() || salvando}
+                    disabled={!novaRegra.mensagem.trim() || salvando
+                              || (novaRegra.tipo === 'horarios' && novaRegra.horarios.length === 0)}
                     onClick={async () => {
                       setSalvando(true)
                       try {
                         await postJson('regra_salvar', { ...novaRegra, escopo: 'vendedora' })
-                        setNovaRegra({ mensagem: '', intervalo_min: 10, reforco_min: 5, hora_ini: '08:00', hora_fim: '18:00', aplica_a: [], equipes: [] })
+                        setNovaRegra({ mensagem: '', tipo: 'intervalo', intervalo_min: 10, reforco_min: 5,
+                                       hora_ini: '08:00', hora_fim: '18:00', horarios: [], novoHorario: '',
+                                       data_unica: '', aplica_a: [], equipes: [] })
                         const r = await getJson('regras_listar')
                         setRegras(Array.isArray(r) ? r : [])
                       } finally { setSalvando(false) }
@@ -347,7 +419,7 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
                   <div>
                     <span className="mascote-tit">{r.mensagem}</span>
                     <span className="mascote-hora">
-                      a cada {r.intervalo_min} min · {String(r.hora_ini).slice(0,5)}–{String(r.hora_fim).slice(0,5)} · {r.alvo}
+                      {r.quando} · {r.alvo}
                     </span>
                   </div>
                   <div className="mascote-linha-acoes">
