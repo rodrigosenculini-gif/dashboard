@@ -197,12 +197,49 @@ export default async function handler(req, res) {
         if (result.rows[0]) {
           // cadastros antigos ainda guardam texto plano: troca por hash agora
           client.query('select login_promove_hash($1)', [senha]).catch(() => {});
-          return res.status(200).json(result.rows[0]);
+          const sessao = { ...result.rows[0] };
+          // gestao: ja entra com o acesso da view IA — Configuracao (sessao de 30 dias,
+          // so o hash do token fica no banco; migracoes 154/155 do projeto da IA)
+          if (sessao.role === 'geral') {
+            try {
+              const c = await client.query('select public.config_entrar($1) as r', [senha]);
+              if (c.rows[0]?.r?.ok) sessao.config_token = c.rows[0].r.token;
+            } catch { /* sem o token a view pede a senha de novo */ }
+          }
+          return res.status(200).json(sessao);
         }
       } catch (e) {
         return res.status(500).json({ error: 'Nao foi possivel validar o acesso agora.' });
       }
       return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+
+    // View IA — Configuracao. Toda validacao e o historico ficam no banco
+    // (public.config_ler / public.config_salvar); aqui so repassa.
+    if (type === 'config') {
+      const b = req.body || {};
+      try {
+        const client = getPool();
+        if (b.acao === 'entrar') {
+          const r = await client.query('select public.config_entrar($1) as r', [String(b.senha || '').slice(0, 200)]);
+          return res.json(r.rows[0].r);
+        }
+        const token = String(b.token || '');
+        if (!/^[a-f0-9]{48}$/.test(token)) return res.json({ ok: false, motivo: 'sessao' });
+        if (b.acao === 'ler') {
+          const r = await client.query('select public.config_ler($1) as r', [token]);
+          return res.json(r.rows[0].r);
+        }
+        if (b.acao === 'salvar') {
+          const dados = b.dados && typeof b.dados === 'object' ? b.dados : {};
+          const r = await client.query('select public.config_salvar($1, $2, $3::jsonb) as r',
+            [token, String(b.tipo || ''), JSON.stringify(dados)]);
+          return res.json(r.rows[0].r);
+        }
+        return res.status(400).json({ ok: false, motivo: 'acao' });
+      } catch (e) {
+        return res.status(500).json({ ok: false, motivo: 'erro' });
+      }
     }
 
     if (type === 'metas_set') {

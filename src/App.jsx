@@ -9,6 +9,7 @@ import RefinButton from './RefinLeads'
 import PresencaEsteiraModal from './PresencaEsteira'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
+import IAConfiguracao from './IAConfiguracao'
 import Trello from './Trello'
 import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
 import MetaComemoracao from './MetaComemoracao'
@@ -97,6 +98,7 @@ const VIEWS = [
   { id: 'vendedoras', label: 'Vendedoras' },
   { id: 'vendas', label: 'Vendas' },
   { id: 'ia', label: 'IA — Treinamento' },
+  { id: 'ia_config', label: 'IA — Configuração' },
 ]
 
 // Passa pelo cache: devolve na hora o que ja foi carregado, congela
@@ -7138,6 +7140,7 @@ function Dashboard({ permitidas, onLogout }) {
       {view === 'vendedoras' && podeVer('vendedoras') && <VendedorasView ferramentas={acoesVendedoras} />}
       {view === 'vendas' && podeVer('vendas') && <VendasView />}
       {view === 'ia' && podeVer('ia') && <IATreinamento />}
+      {view === 'ia_config' && podeVer('ia_config') && <IAConfiguracao onVoltar={() => changeView('inicio')} />}
       {view === 'trello' && podeVer('trello') && <Trello onVoltar={() => changeView('inicio')} />}
       {view === 'chips' && podeVer('chips') && <Chips onVoltar={() => changeView('inicio')} />}
     </div>
