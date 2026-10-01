@@ -6488,6 +6488,7 @@ function PropostasView() {
   const [produtoSel, setProdutoSel] = useState([])
   const [bancoSel, setBancoSel] = useState([])
   const [situacaoSel, setSituacaoSel] = useState([])
+  const [statusSel, setStatusSel] = useState([])
   const [rapido, setRapido] = useState('')
   const [buscaTexto, setBuscaTexto] = useState('')
   const [busca, setBusca] = useState('')
@@ -6521,9 +6522,9 @@ function PropostasView() {
   // proposta antiga atualizada hoje
   const corpo = useMemo(() => ({
     date_from: rapido ? '' : dataInicio, date_to: rapido ? '' : dataFim,
-    produtos: produtoSel, bancos: bancoSel, situacoes: situacaoSel,
+    produtos: produtoSel, bancos: bancoSel, situacoes: situacaoSel, status: statusSel,
     rapido, busca, ordem: ordem.col, dir: ordem.dir,
-  }), [dataInicio, dataFim, produtoSel, bancoSel, situacaoSel, rapido, busca, ordem])
+  }), [dataInicio, dataFim, produtoSel, bancoSel, situacaoSel, statusSel, rapido, busca, ordem])
 
   // filtro novo volta para a primeira pagina
   useEffect(() => { setPagina(0) }, [corpo])
@@ -6576,7 +6577,7 @@ function PropostasView() {
 
   const redefinir = () => {
     setDataInicio(mesAtual.from); setDataFim(mesAtual.to)
-    setProdutoSel([]); setBancoSel([]); setSituacaoSel([]); setRapido(''); setBuscaTexto(''); setBusca('')
+    setProdutoSel([]); setBancoSel([]); setSituacaoSel([]); setStatusSel([]); setRapido(''); setBuscaTexto(''); setBusca('')
     setOrdem({ col: 'criado_em', dir: 'desc' })
   }
 
@@ -6606,6 +6607,8 @@ function PropostasView() {
         <MultiSelect value={produtoSel} onChange={setProdutoSel} options={filtros.produtos || []} label="produto" />
         <MultiSelect value={bancoSel} onChange={setBancoSel} options={filtros.bancos || []} label="banco" />
         <MultiSelect value={situacaoSel} onChange={setSituacaoSel} options={PROP_SITUACOES} label="situação" />
+        {/* status original de cada banco (a situacao agrupa estes em 5) */}
+        <MultiSelect value={statusSel} onChange={setStatusSel} options={filtros.status || []} label="status" />
       </div>
       <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
 
