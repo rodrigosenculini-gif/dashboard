@@ -850,6 +850,10 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ranking-principal small { font-size: 12px; color: var(--muted); font-weight: 400; }
+/* meta: abaixo de 100% sai em dourado, batida fica verde */
+.ranking-principal.abaixo { color: var(--gold); }
+.ranking-cartao .bar-track { flex: none; height: 6px; margin-top: -4px; background: var(--surface); }
+.ranking-cartao .bar-fill.batida { background: var(--lime); }
 .ranking-cartao-linhas {
   display: grid; grid-template-columns: auto 1fr; gap: 5px 12px;
   font-size: 11.5px; padding-top: 10px; border-top: 1px solid var(--border);

@@ -1944,7 +1944,7 @@ function RankingOverlay({ onClose }) {
 
   return (
     <div className="funil-overlay" onClick={onClose}>
-      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: aba === 'ranking' ? 920 : 640 }}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 920 }}>
         <div className="funil-header">
           <div>
             <h2>{aba === 'ranking' ? 'Ranking de Vendedoras' : 'Meta por Vendedora'}</h2>
@@ -2037,25 +2037,34 @@ function RankingOverlay({ onClose }) {
                 {metas[0].periodo_descricao} &middot; alvo {fmtInt(metas[0].alvo_pontos)} pontos
               </p>
             )}
-            <div className="ranking-list">
-              {metas.map((m) => (
-                <div className="ranking-card" key={m.vendedor}>
-                  <span className="ranking-pos">{m.posicao}&ordm;</span>
-                  <div className="ranking-info">
-                    <p className="ranking-nome">{m.vendedor}</p>
-                    <div className="ranking-stats">
-                      <span><strong>{Number(m.pct_meta).toFixed(1)}%</strong> da meta</span>
-                      <span>{fmtInt(m.pontos)} pontos</span>
-                      <span>{fmtInt(m.qtd)} vendas</span>
+            {/* mesmos cards do ranking (dono, 01/10): % da meta em destaque */}
+            <div className="ranking-grade">
+              {metas.map((m) => {
+                const pct = Number(m.pct_meta) || 0
+                const bateu = pct >= 100
+                return (
+                  <div className={`ranking-cartao ${m.posicao <= 3 ? 'podio p' + m.posicao : ''}`} key={m.vendedor}>
+                    <div className="ranking-cartao-topo">
+                      <span className="ranking-pos">{m.posicao}&ordm;</span>
+                      <p className="ranking-nome">{m.vendedor}</p>
                     </div>
+                    <p className={`ranking-principal ${bateu ? '' : 'abaixo'}`}>
+                      {pct.toFixed(1).replace('.', ',')}% <small>{bateu ? 'meta batida' : 'da meta'}</small>
+                    </p>
                     {/* mesma barra da meta coletiva (bar-track/bar-fill) */}
-                    <div className="bar-track" style={{ marginTop: 6 }}>
-                      <div className="bar-fill"
-                        style={{ width: `${Math.min(100, Number(m.pct_meta) || 0)}%` }} />
+                    <div className="bar-track">
+                      <div className={`bar-fill ${bateu ? 'batida' : ''}`} style={{ width: `${Math.min(100, pct)}%` }} />
+                    </div>
+                    <div className="ranking-cartao-linhas">
+                      <span>Pontos</span><b>{fmtInt(Math.round(Number(m.pontos) || 0))}</b>
+                      <span>Faltam</span>
+                      <b>{bateu ? '-' : fmtInt(Math.max(0, Math.round(Number(m.alvo_pontos) - Number(m.pontos))))}</b>
+                      <span>Valor</span><b>{fmtMoeda(m.valor)}</b>
+                      <span>Vendas</span><b>{fmtInt(m.qtd)}</b>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </>
         )}
