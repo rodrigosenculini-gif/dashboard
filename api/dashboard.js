@@ -1131,6 +1131,42 @@ export default async function handler(req, res) {
       }
     }
 
+    // ---------------------------------------------------------------
+    // Propostas: todas as propostas de propostas_bancos (view Propostas).
+    // Filtros vao no corpo; a lista ja traz indicadores e total filtrado.
+    // ---------------------------------------------------------------
+    if (type === 'propostas_lista') {
+      try {
+        const client = getPool();
+        const result = await client.query('select dashboard_propostas_lista($1::jsonb) as r', [JSON.stringify(req.body || {})]);
+        return res.status(200).json(result.rows[0]?.r || { total: 0, kpis: {}, linhas: [] });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    if (type === 'propostas_filtros') {
+      try {
+        const client = getPool();
+        const result = await client.query('select dashboard_propostas_filtros() as r');
+        return res.status(200).json(result.rows[0]?.r || {});
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    if (type === 'proposta_detalhe') {
+      try {
+        const id = Number(req.body?.id);
+        if (!Number.isFinite(id)) return res.status(400).json({ error: 'Informe o id da proposta.' });
+        const client = getPool();
+        const result = await client.query('select dashboard_proposta_detalhe($1::bigint) as r', [id]);
+        return res.status(200).json(result.rows[0]?.r || null);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     return res.status(400).json({ error: `type inválido para POST: ${type}` });
   }
 

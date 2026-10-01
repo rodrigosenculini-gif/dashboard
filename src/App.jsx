@@ -98,6 +98,7 @@ const VIEWS = [
   { id: 'produtos', label: 'Entradas LP' },
   { id: 'n8n', label: 'n8n — Execuções' },
   { id: 'vendedoras', label: 'Vendedoras' },
+  { id: 'propostas', label: 'Propostas' },
   { id: 'vendas', label: 'Vendas' },
   { id: 'ia', label: 'IA — Treinamento' },
 ]
@@ -796,7 +797,7 @@ function CampanhaDetalhadoList({ items, loading }) {
 const NAV_GRUPOS = [
   ['Visão geral', ['inicio', 'painel']],
   ['Captação', ['disparos', 'leilao', 'produtos']],
-  ['Vendas', ['vendas', 'vendedoras']],
+  ['Vendas', ['propostas', 'vendas', 'vendedoras']],
   ['Sistema', ['n8n', 'ia']],
 ]
 const NAV_ICONE = {
@@ -805,6 +806,7 @@ const NAV_ICONE = {
   disparos: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
   leilao: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
   produtos: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+  propostas: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5',
   vendas: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
   vendedoras: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
   n8n: 'M22 12h-4l-3 9L9 3l-3 9H2',
@@ -6182,6 +6184,519 @@ function VendedorasView({ ferramentas = null }) {
 
 const VENDAS_CORES = ['#a9d97f', '#d99089', '#7fa8d9', '#d9b877', '#c17fd9', '#7fd9c1']
 
+// ================================================================ PROPOSTAS
+// Todas as propostas (propostas_bancos), como a lista do VendeAI: filtros da
+// tela de Vendas + situacao, busca, colunas escolhidas/ordenadas pela pessoa e
+// detalhe da proposta e do lead ao clicar na linha (dono, 01/10).
+const PROP_SITUACOES = ['Pago', 'Aguardando assinatura', 'Em processamento', 'Pendente', 'Cancelado']
+const PROP_SIT_COR = {
+  Pago: '#a9d97f', 'Aguardando assinatura': '#7ea6e0', 'Em processamento': '#d9b877',
+  Pendente: '#e0a46a', Cancelado: '#d99089',
+}
+const fmtCpf = (c) => {
+  const d = String(c || '').replace(/\D/g, '')
+  return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : (c || '-')
+}
+const fmtDataHoraBR = (d) => {
+  if (!d) return '-'
+  const dt = new Date(d)
+  return isNaN(dt.getTime()) ? '-' : dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+const fmtTaxa = (n) => (n == null || n === '' ? '-' : `${(Number(n) * 100).toFixed(2).replace('.', ',')}%`)
+const fmtMoedaOuTraco = (n) => (n == null || n === '' ? '-' : fmtMoeda(n))
+
+// id, rotulo, ordenacao no servidor (quando da) e como mostrar/exportar
+const PROP_COLUNAS = [
+  { id: 'codigo', label: 'Código', ord: 'codigo', val: (r) => r.proposal_number || r.proposal_id },
+  { id: 'produto', label: 'Produto', ord: 'produto', val: (r) => (r.produto || '').toUpperCase(), tipo: 'chip' },
+  { id: 'cliente', label: 'Cliente', ord: 'cliente', val: (r) => r.nome },
+  { id: 'banco', label: 'Banco', ord: 'banco', val: (r) => r.banco },
+  { id: 'valor', label: 'Valor', ord: 'valor', val: (r) => r.valor, fmt: fmtMoedaOuTraco, num: true },
+  { id: 'situacao', label: 'Situação', ord: 'situacao', val: (r) => r.status_nome, tipo: 'situacao' },
+  { id: 'data_situacao', label: 'Data Situação', ord: 'atualizado_em', val: (r) => r.atualizado_em, fmt: fmtDataHoraBR },
+  { id: 'cpf', label: 'CPF', ord: 'cpf', val: (r) => r.cpf, fmt: fmtCpf },
+  { id: 'id_proposta', label: 'ID Proposta', val: (r) => r.proposal_id },
+  { id: 'ade', label: 'Nº Proposta (ADE)', val: (r) => r.proposal_number },
+  { id: 'parcelas', label: 'Parcelas', ord: 'parcelas', val: (r) => r.parcelas, num: true },
+  { id: 'valor_parcela', label: 'Valor Parcela', val: (r) => r.valor_parcela, fmt: fmtMoedaOuTraco, num: true },
+  { id: 'tabela', label: 'Tabela', ord: 'tabela', val: (r) => r.tabela_nome },
+  { id: 'vendedor', label: 'Vendedor', val: (r) => r.vendedor },
+  { id: 'telefone', label: 'Telefone', val: (r) => r.telefone },
+  { id: 'email', label: 'Email', val: (r) => r.email },
+  { id: 'valor_face', label: 'Valor Face', val: (r) => r.valor_face, fmt: fmtMoedaOuTraco, num: true },
+  { id: 'taxa_mensal', label: 'Taxa Mensal', val: (r) => r.taxa_mensal, fmt: fmtTaxa, num: true },
+  { id: 'cet_mensal', label: 'CET Mensal', val: (r) => r.cet_mensal, fmt: fmtTaxa, num: true },
+  { id: 'criado_em', label: 'Criado em', ord: 'criado_em', val: (r) => r.criado_em, fmt: fmtDataHoraBR },
+  { id: 'motivo', label: 'Motivo', val: (r) => r.motivo },
+  { id: 'chat_id', label: 'Chat ID', val: (r) => r.chat_id },
+  { id: 'origem', label: 'Origem', val: (r) => r.origem },
+  { id: 'campanha', label: 'Campanha', val: (r) => r.campanha },
+  { id: 'primeiro_vencimento', label: 'Primeiro Vencimento', val: (r) => r.primeiro_vencimento, fmt: fmtDataBR },
+  { id: 'status_anterior', label: 'Situação anterior', val: (r) => r.status_anterior },
+]
+const PROP_COL_MAP = Object.fromEntries(PROP_COLUNAS.map((c) => [c.id, c]))
+const PROP_COLUNAS_PADRAO = ['codigo', 'produto', 'cliente', 'banco', 'valor', 'situacao', 'data_situacao', 'cpf',
+  'id_proposta', 'ade', 'parcelas', 'valor_parcela', 'tabela', 'vendedor']
+const PROP_COLUNAS_KEY = 'propostas_colunas'
+const PROP_POR_PAGINA = 50
+
+const textoCelula = (c, r) => {
+  const v = c.val(r)
+  if (v == null || v === '') return '-'
+  return c.fmt ? c.fmt(v) : String(v)
+}
+
+function SituacaoChip({ situacao, texto }) {
+  const cor = PROP_SIT_COR[situacao] || 'var(--muted)'
+  return (
+    <span className="prop-sit" style={{ color: cor, borderColor: cor + '66', background: cor + '1a' }} title={situacao}>
+      {texto || situacao}
+    </span>
+  )
+}
+
+function PropostasColunas({ visiveis, setVisiveis, onFechar }) {
+  const [arrastando, setArrastando] = useState(null)
+  const disponiveis = PROP_COLUNAS.filter((c) => !visiveis.includes(c.id))
+  const mover = (de, para) => {
+    if (de === para || de == null) return
+    const n = [...visiveis]
+    const [x] = n.splice(de, 1)
+    n.splice(para, 0, x)
+    setVisiveis(n)
+  }
+  return (
+    <>
+      <div className="prop-pop-fundo" onClick={onFechar} />
+      <div className="prop-colunas">
+        <p className="prop-colunas-tit">Visíveis · arraste para ordenar</p>
+        <ul>
+          {visiveis.map((id, i) => (
+            <li key={id} draggable
+                className={arrastando === i ? 'arrastando' : ''}
+                onDragStart={() => setArrastando(i)}
+                onDragOver={(e) => { e.preventDefault(); if (arrastando !== null && arrastando !== i) { mover(arrastando, i); setArrastando(i) } }}
+                onDragEnd={() => setArrastando(null)}>
+              <span className="prop-alca" aria-hidden="true">⋮⋮</span>
+              <span className="prop-colunas-nome">{PROP_COL_MAP[id]?.label}</span>
+              <button type="button" title="Ocultar" disabled={visiveis.length <= 1}
+                      onClick={() => setVisiveis(visiveis.filter((x) => x !== id))}>&times;</button>
+            </li>
+          ))}
+        </ul>
+        <p className="prop-colunas-tit">Disponíveis</p>
+        <ul>
+          {disponiveis.length === 0 && <li className="vazio">todas as colunas já estão visíveis</li>}
+          {disponiveis.map((c) => (
+            <li key={c.id} className="disp" onClick={() => setVisiveis([...visiveis, c.id])}>
+              <span className="prop-colunas-nome">{c.label}</span>
+              <span className="prop-add">+</span>
+            </li>
+          ))}
+        </ul>
+        <button type="button" className="reset-btn" style={{ width: '100%', marginTop: 8 }}
+                onClick={() => setVisiveis(PROP_COLUNAS_PADRAO)}>Restaurar padrão</button>
+      </div>
+    </>
+  )
+}
+
+// etapas do historico, no mesmo espirito da tela do VendeAI
+const PROP_ETAPAS = ['Digitada', 'Aguardando assinatura', 'Em processamento', 'Pago']
+
+function PropostaDetalhe({ id, onFechar }) {
+  const [d, setD] = useState(null)
+  const [erro, setErro] = useState('')
+  const [verBruto, setVerBruto] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    setD(null); setErro('')
+    postApi('proposta_detalhe', { id })
+      .then((r) => { if (vivo) { if (r?.error) setErro(r.error); else setD(r) } })
+      .catch((e) => vivo && setErro(e.message || 'Erro ao carregar.'))
+    return () => { vivo = false }
+  }, [id])
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onFechar() }
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [onFechar])
+
+  const p = d?.proposta
+  const sim = d?.simulacao
+  const det = sim?.detalhes || {}
+  const contato = sim?.contato || {}
+  const cancelada = p?.situacao === 'Cancelado'
+  // paga = todas concluidas; em processamento = assinatura ja passou
+  const etapaAtual = !p ? 0 : p.situacao === 'Pago' ? PROP_ETAPAS.length : p.situacao === 'Em processamento' ? 2 : 1
+  const linha = (rot, val) => (
+    <div className="prop-linha"><span>{rot}</span><b>{val == null || val === '' ? '-' : val}</b></div>
+  )
+
+  return (
+    <>
+      <div className="prop-det-fundo" onClick={onFechar} />
+      <aside className="prop-det" aria-label="Detalhe da proposta">
+        <div className="prop-det-topo">
+          <div className="prop-det-tit">
+            <b>{p?.banco || 'Proposta'}</b>
+            {p && <span className="prop-det-cod">Código: <b>{p.proposal_number || p.proposal_id}</b></span>}
+            {p && <SituacaoChip situacao={p.situacao} texto={p.status_nome} />}
+            {p?.produto && <span className="prop-chip">{String(p.produto).toUpperCase()}</span>}
+          </div>
+          <button type="button" className="prop-fechar" onClick={onFechar} title="Fechar (Esc)">&times;</button>
+        </div>
+
+        {erro && <div className="state-msg error">Erro: {erro}</div>}
+        {!d && !erro && <div className="state-msg">Carregando proposta...</div>}
+
+        {p && (
+          <div className="prop-det-corpo">
+            <section className="prop-card">
+              <p className="prop-card-tit">Histórico das etapas</p>
+              <div className={`prop-etapas ${cancelada ? 'cancelada' : ''}`}>
+                {PROP_ETAPAS.map((e, i) => (
+                  <div key={e} className={`prop-etapa ${i < etapaAtual ? 'feita' : ''} ${i === etapaAtual ? 'atual' : ''}`}>
+                    <span className="prop-etapa-ponto">{i < etapaAtual ? '✓' : ''}</span>
+                    <span className="prop-etapa-nome">{e}</span>
+                  </div>
+                ))}
+              </div>
+              {cancelada && <p className="prop-aviso">Proposta cancelada: {p.status_nome}</p>}
+            </section>
+
+            <div className="prop-det-grade">
+              <section className="prop-card">
+                <p className="prop-card-tit">Cliente</p>
+                {linha('Nome', p.nome)}
+                {linha('CPF', fmtCpf(p.cpf))}
+                {linha('Telefone', p.telefone)}
+                {linha('Email', contato.email)}
+                {linha('Nascimento', contato.birth_date ? fmtDataBR(contato.birth_date) : null)}
+                {linha('Nome da mãe', contato.mother_name)}
+                {linha('Vendedor', p.vendedor || d.venda?.vendedor)}
+                {linha('Origem', p.origem)}
+                {linha('Campanha', p.campanha)}
+              </section>
+              <section className="prop-card">
+                <p className="prop-card-tit">Valores do empréstimo</p>
+                {linha('Valor liberado', fmtMoedaOuTraco(p.valor))}
+                {linha('Valor face', fmtMoedaOuTraco(sim?.valor_face ?? det.gross_value))}
+                {linha('Valor da parcela', fmtMoedaOuTraco(sim?.valor_parcela ?? det.installment_value))}
+                {linha('Taxa mensal', fmtTaxa(det.monthly_interest_rate))}
+                {linha('CET mensal', fmtTaxa(det.monthly_cet))}
+                {linha('Tabela', p.tabela_nome)}
+                {linha('Parcelas', p.parcelas ?? det.number_of_payments)}
+                {linha('Primeiro vencimento', det.first_payment_date ? fmtDataBR(det.first_payment_date) : null)}
+                {linha('Data da digitação', fmtDataHoraBR(p.criado_em))}
+                {!sim && <p className="prop-vazio">Sem simulação do VendeAI ligada a esta proposta.</p>}
+              </section>
+              <section className="prop-card">
+                <p className="prop-card-tit">Venda</p>
+                {d.venda ? (
+                  <>
+                    {linha('Pago em', fmtDataBR(d.venda.data))}
+                    {linha('Valor', fmtMoedaOuTraco(d.venda.valor))}
+                    {linha('Tabela', d.venda.tabela)}
+                    {linha('Peso / ponto', `${d.venda.peso ?? '-'} / ${d.venda.ponto != null ? fmtInt(Math.round(d.venda.ponto)) : '-'}`)}
+                    {linha('Vendedor', d.venda.vendedor)}
+                  </>
+                ) : <p className="prop-vazio">Ainda não está em vendas (o banco não confirmou o pagamento).</p>}
+                {d.analise?.length > 0 && (
+                  <p className="prop-mini">Lançada pela vendedora: {d.analise.map((a) => a.vendedor).join(', ')}</p>
+                )}
+              </section>
+            </div>
+
+            <div className="prop-det-grade dois">
+              <section className="prop-card">
+                <p className="prop-card-tit">Lead · disparos e entradas</p>
+                {d.disparos?.length === 0 && d.lp?.length === 0 && (
+                  <p className="prop-vazio">Nenhum disparo ou entrada de LP encontrado para este telefone/CPF.</p>
+                )}
+                {d.disparos?.map((x) => (
+                  <div key={'d' + x.id} className="prop-hist">
+                    <span>{fmtDataHoraBR(x.reenvio || x.realizado)}</span>
+                    <b>{x.campanha || 'sem campanha'}</b>
+                    <small>{[x.origem, x.tipo_envio, x.interacao ? 'interagiu' : null, x.pagas ? 'paga' : null].filter(Boolean).join(' · ')}</small>
+                  </div>
+                ))}
+                {d.lp?.map((x) => (
+                  <div key={'l' + x.id} className="prop-hist">
+                    <span>{fmtDataHoraBR(x.created_at)}</span>
+                    <b>LP · {x.campanha || x.produto || '-'}</b>
+                    <small>{[x.origem, x.aprovadas ? 'aprovada' : null, x.pagas ? 'paga' : null].filter(Boolean).join(' · ')}</small>
+                  </div>
+                ))}
+              </section>
+              <section className="prop-card">
+                <p className="prop-card-tit">Consultas no banco e eventos</p>
+                {d.consultas?.length === 0 && d.eventos?.length === 0 && (
+                  <p className="prop-vazio">Sem consultas registradas.</p>
+                )}
+                {d.eventos?.map((e, i) => (
+                  <div key={'e' + i} className="prop-hist">
+                    <span>{fmtDataHoraBR(e.recebido_em)}</span>
+                    <b>VendeAI · {e.status || e.evento}</b>
+                    {e.anterior && <small>antes: {e.anterior}</small>}
+                  </div>
+                ))}
+                {d.consultas?.map((c, i) => (
+                  <div key={'c' + i} className="prop-hist">
+                    <span>{fmtDataHoraBR(c.criado_em)}</span>
+                    <b>{c.status_banco || 'não encontrada'}</b>
+                    <small>{[c.origem, c.valor_banco != null ? fmtMoeda(c.valor_banco) : null, c.parcelas_banco ? `${c.parcelas_banco}x` : null].filter(Boolean).join(' · ')}</small>
+                  </div>
+                ))}
+              </section>
+            </div>
+
+            <section className="prop-card">
+              <p className="prop-card-tit">Metadados</p>
+              <div className="prop-meta">
+                {linha('ID da proposta (banco)', p.proposal_id)}
+                {linha('Nº proposta (ADE)', p.proposal_number)}
+                {linha('ID da tabela', p.tabela_id)}
+                {linha('Chat ID', p.chat_id)}
+                {linha('Conversa', p.conversation_id)}
+                {linha('Situação anterior', p.status_anterior)}
+                {linha('Criada em', fmtDataHoraBR(p.criado_em))}
+                {linha('Última atualização', fmtDataHoraBR(p.atualizado_em))}
+                {linha('Última consulta no banco', fmtDataHoraBR(p.ultima_consulta_em))}
+                {linha('Lançada em vendas', p.lancado_em_vendas ? `sim · ${fmtDataHoraBR(p.lancado_em)}` : 'não')}
+              </div>
+              {d.resposta_banco && (
+                <>
+                  <button type="button" className="iac-link" onClick={() => setVerBruto((v) => !v)}>
+                    {verBruto ? 'ocultar resposta do banco' : 'ver resposta completa do banco'}
+                  </button>
+                  {verBruto && <pre className="prop-bruto">{JSON.stringify(d.resposta_banco, null, 2)}</pre>}
+                </>
+              )}
+            </section>
+          </div>
+        )}
+      </aside>
+    </>
+  )
+}
+
+function PropostasView() {
+  const mesAtual = presetRange('este_mes')
+  const [dataInicio, setDataInicio] = useState(mesAtual.from)
+  const [dataFim, setDataFim] = useState(mesAtual.to)
+  const [produtoSel, setProdutoSel] = useState([])
+  const [bancoSel, setBancoSel] = useState([])
+  const [situacaoSel, setSituacaoSel] = useState([])
+  const [rapido, setRapido] = useState('')
+  const [buscaTexto, setBuscaTexto] = useState('')
+  const [busca, setBusca] = useState('')
+  const [ordem, setOrdem] = useState({ col: 'criado_em', dir: 'desc' })
+  const [pagina, setPagina] = useState(0)
+  const [filtros, setFiltros] = useState({ bancos: [], produtos: [] })
+  const [dados, setDados] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [lastUpdate, setLastUpdate] = useState(null)
+  const [verColunas, setVerColunas] = useState(false)
+  const [baixando, setBaixando] = useState(false)
+  const [detalheId, setDetalheId] = useState(null)
+  const [colunas, setColunasState] = useState(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem(PROP_COLUNAS_KEY) || 'null')
+      const ok = Array.isArray(s) ? s.filter((id) => PROP_COL_MAP[id]) : []
+      return ok.length ? ok : PROP_COLUNAS_PADRAO
+    } catch { return PROP_COLUNAS_PADRAO }
+  })
+  const setColunas = (c) => {
+    setColunasState(c)
+    try { localStorage.setItem(PROP_COLUNAS_KEY, JSON.stringify(c)) } catch { /* ignora */ }
+  }
+
+  useEffect(() => {
+    postApi('propostas_filtros', {}).then((f) => f && !f.error && setFiltros(f)).catch(() => {})
+  }, [])
+
+  // filtro rapido olha so o dia de hoje: ignora o periodo para nao esconder
+  // proposta antiga atualizada hoje
+  const corpo = useMemo(() => ({
+    date_from: rapido ? '' : dataInicio, date_to: rapido ? '' : dataFim,
+    produtos: produtoSel, bancos: bancoSel, situacoes: situacaoSel,
+    rapido, busca, ordem: ordem.col, dir: ordem.dir,
+  }), [dataInicio, dataFim, produtoSel, bancoSel, situacaoSel, rapido, busca, ordem])
+
+  // filtro novo volta para a primeira pagina
+  useEffect(() => { setPagina(0) }, [corpo])
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null)
+    try {
+      const r = await postApi('propostas_lista', { ...corpo, limite: PROP_POR_PAGINA, offset: pagina * PROP_POR_PAGINA })
+      if (r?.error) throw new Error(r.error)
+      setDados(r); setLastUpdate(new Date())
+    } catch (e) {
+      setError(e.message || 'Erro ao carregar propostas.')
+    } finally {
+      setLoading(false)
+    }
+  }, [corpo, pagina])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const t = setInterval(load, REFRESH_MS)
+    return () => clearInterval(t)
+  }, [load])
+
+  const ordenar = (c) => {
+    if (!c.ord) return
+    setOrdem((o) => (o.col === c.ord ? { col: c.ord, dir: o.dir === 'asc' ? 'desc' : 'asc' } : { col: c.ord, dir: c.num ? 'desc' : 'asc' }))
+  }
+
+  const baixarCsv = async () => {
+    setBaixando(true)
+    try {
+      const r = await postApi('propostas_lista', { ...corpo, limite: 20000, offset: 0 })
+      if (r?.error) throw new Error(r.error)
+      const cols = colunas.map((id) => PROP_COL_MAP[id])
+      const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+      const linhas = [cols.map((c) => esc(c.label)).join(';')]
+      for (const row of r.linhas || []) linhas.push(cols.map((c) => esc(textoCelula(c, row))).join(';'))
+      const blob = new Blob(['﻿' + linhas.join('\n')], { type: 'text/csv;charset=utf-8' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `propostas_${todayISO()}.csv`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch (e) {
+      setError('Erro ao baixar: ' + (e.message || ''))
+    } finally {
+      setBaixando(false)
+    }
+  }
+
+  const redefinir = () => {
+    setDataInicio(mesAtual.from); setDataFim(mesAtual.to)
+    setProdutoSel([]); setBancoSel([]); setSituacaoSel([]); setRapido(''); setBuscaTexto(''); setBusca('')
+    setOrdem({ col: 'criado_em', dir: 'desc' })
+  }
+
+  const k = dados?.kpis || {}
+  const total = Number(dados?.total || 0)
+  const porSit = k.por_situacao || {}
+  const totalSit = PROP_SITUACOES.reduce((s, x) => s + (porSit[x] || 0), 0)
+  const linhas = dados?.linhas || []
+  const cols = colunas.map((id) => PROP_COL_MAP[id]).filter(Boolean)
+  const ini = total ? pagina * PROP_POR_PAGINA + 1 : 0
+  const fim = Math.min(total, (pagina + 1) * PROP_POR_PAGINA)
+
+  return (
+    <>
+      <div className="topbar">
+        <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
+        <div className="topbar-right">
+          <button className="reset-btn" onClick={redefinir} title="Redefinir filtros">&#10226; Redefinir filtros</button>
+          <button className="refresh-btn" onClick={baixarCsv} disabled={baixando} title="Baixar as propostas filtradas, com as colunas visíveis">
+            {baixando ? 'Gerando...' : '↓ Download CSV'}
+          </button>
+          <button className="refresh-btn" onClick={load} disabled={loading}>&#8635; Atualizar</button>
+        </div>
+      </div>
+
+      <div className="filters">
+        <MultiSelect value={produtoSel} onChange={setProdutoSel} options={filtros.produtos || []} label="produto" />
+        <MultiSelect value={bancoSel} onChange={setBancoSel} options={filtros.bancos || []} label="banco" />
+        <MultiSelect value={situacaoSel} onChange={setSituacaoSel} options={PROP_SITUACOES} label="situação" />
+      </div>
+      <DateRangeFilter dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} />
+
+      <div className="prop-kpis">
+        <div className="prop-kpi">
+          <p className="kpi-label">Total de propostas</p>
+          <p className="kpi-value">{fmtInt(k.total)}</p>
+          <div className="prop-barra" title={PROP_SITUACOES.map((s) => `${s}: ${fmtInt(porSit[s] || 0)}`).join(' · ')}>
+            {PROP_SITUACOES.map((s) => (porSit[s] ? (
+              <span key={s} style={{ flex: porSit[s], background: PROP_SIT_COR[s] }} />
+            ) : null))}
+          </div>
+          <p className="kpi-sub">{totalSit ? PROP_SITUACOES.filter((s) => porSit[s]).map((s) => `${s} ${fmtInt(porSit[s])}`).join(' · ') : 'todas as situações'}</p>
+        </div>
+        <div className="prop-kpi">
+          <p className="kpi-label">Valor total liberado</p>
+          <p className="kpi-value">{fmtMoeda(k.valor_total)}</p>
+          <p className="kpi-sub">soma do valor liberado</p>
+        </div>
+        <div className="prop-kpi">
+          <p className="kpi-label">Pendente</p>
+          <p className="kpi-value" style={{ color: PROP_SIT_COR.Pendente }}>{fmtMoeda(k.pendente_valor)}</p>
+          <p className="kpi-sub">{fmtInt(k.pendente_qtd)} propostas</p>
+        </div>
+        <div className="prop-kpi">
+          <p className="kpi-label">Pago</p>
+          <p className="kpi-value accent">{fmtMoeda(k.pago_valor)}</p>
+          <p className="kpi-sub">{fmtInt(k.pago_qtd)} propostas</p>
+        </div>
+      </div>
+
+      <div className="prop-barra-acoes">
+        <span className="prop-rot">Filtros rápidos:</span>
+        {[['digitadas_hoje', 'Digitadas hoje'], ['atualizadas_hoje', 'Atualizadas hoje']].map(([id, rot]) => (
+          <button key={id} type="button" className={`prop-rapido ${rapido === id ? 'on' : ''}`}
+                  onClick={() => setRapido((r) => (r === id ? '' : id))}>☆ {rot}</button>
+        ))}
+        <form className="prop-busca" onSubmit={(e) => { e.preventDefault(); setBusca(buscaTexto.trim()) }}>
+          <input value={buscaTexto} onChange={(e) => setBuscaTexto(e.target.value)} placeholder="CPF, código, nome ou telefone" />
+          <button type="submit" className="refresh-btn">Buscar</button>
+          {busca && <button type="button" className="reset-btn" onClick={() => { setBuscaTexto(''); setBusca('') }}>limpar</button>}
+        </form>
+        <div style={{ position: 'relative' }}>
+          <button type="button" className="refresh-btn" onClick={() => setVerColunas((v) => !v)}>▥ Colunas</button>
+          {verColunas && <PropostasColunas visiveis={colunas} setVisiveis={setColunas} onFechar={() => setVerColunas(false)} />}
+        </div>
+      </div>
+
+      {error && <div className="state-msg error">Erro: {error}</div>}
+
+      <div className="prop-tabela-caixa">
+        <table className="prop-tabela">
+          <thead>
+            <tr>
+              {cols.map((c) => (
+                <th key={c.id} className={`${c.ord ? 'ordena' : ''} ${c.num ? 'num' : ''}`} onClick={() => ordenar(c)}>
+                  {c.label}
+                  {c.ord && <span className="prop-seta">{ordem.col === c.ord ? (ordem.dir === 'asc' ? '▲' : '▼') : '⇅'}</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && linhas.length === 0 && (
+              <tr><td colSpan={cols.length} className="prop-vazio-linha">Nenhuma proposta com esses filtros.</td></tr>
+            )}
+            {linhas.map((r) => (
+              <tr key={r.id} onClick={() => setDetalheId(r.id)} title="Ver detalhes da proposta">
+                {cols.map((c) => (
+                  <td key={c.id} className={c.num ? 'num' : ''}>
+                    {c.tipo === 'situacao' ? <SituacaoChip situacao={r.situacao} texto={r.status_nome} />
+                      : c.tipo === 'chip' ? (r.produto ? <span className="prop-chip">{textoCelula(c, r)}</span> : '-')
+                      : textoCelula(c, r)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="prop-paginacao">
+        <span>{fmtInt(ini)}–{fmtInt(fim)} de {fmtInt(total)}</span>
+        <button type="button" className="reset-btn" disabled={pagina === 0 || loading} onClick={() => setPagina((p) => p - 1)}>‹ anterior</button>
+        <button type="button" className="reset-btn" disabled={fim >= total || loading} onClick={() => setPagina((p) => p + 1)}>próxima ›</button>
+      </div>
+
+      {detalheId != null && <PropostaDetalhe id={detalheId} onFechar={() => setDetalheId(null)} />}
+    </>
+  )
+}
+
 function VendasView() {
   const revisaoCache = useRevisaoCache()
   const mesAtual = presetRange('este_mes')
@@ -7217,6 +7732,7 @@ function Dashboard({ permitidas, onLogout }) {
       {view === 'produtos' && podeVer('produtos') && <EntradasLP />}
       {view === 'n8n' && podeVer('n8n') && <N8nExecucoes />}
       {view === 'vendedoras' && podeVer('vendedoras') && <VendedorasView ferramentas={acoesVendedoras} />}
+      {view === 'propostas' && podeVer('propostas') && <PropostasView />}
       {view === 'vendas' && podeVer('vendas') && <VendasView />}
       {view === 'ia' && podeVer('ia') && <IATreinamento />}
       {view === 'painel' && podeVer('painel') && <IAConfiguracao onVoltar={() => changeView('inicio')} />}
