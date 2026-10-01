@@ -1863,8 +1863,33 @@ function RankingOverlay({ onClose }) {
   const [ranking, setRanking] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  // duas telas no mesmo overlay: ranking (por valor) e meta por vendedora
+  // duas telas no mesmo overlay: ranking e meta por vendedora
   const [aba, setAba] = useState('ranking')
+  // ranking em pontos ou em valor; sempre abre em pontos (dono, 01/10)
+  const [modo, setModo] = useState('pontos')
+  const emPontos = modo === 'pontos'
+  const rankingOrdenado = useMemo(
+    () => [...ranking].sort((a, b) =>
+      Number(emPontos ? b.pontos_total : b.valor_total) - Number(emPontos ? a.pontos_total : a.valor_total)),
+    [ranking, emPontos])
+
+  // relatorio so do ranking, na ordem da tela, com o periodo no arquivo
+  const baixarRanking = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const num = (n) => String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ',')
+    const linhas = [
+      [`Ranking de Vendedoras - ${fmtDataBR(dataInicio)} a ${fmtDataBR(dataFim)} - ordenado por ${emPontos ? 'pontos' : 'valor'}`].map(esc).join(';'),
+      ['Posição', 'Vendedora', 'Pontos', 'Valor (R$)', 'Propostas', 'Banco mais usado'].map(esc).join(';'),
+      ...rankingOrdenado.map((r, i) => [i + 1, r.vendedor, num(r.pontos_total), num(r.valor_total), r.qtd_total, r.banco_top || '']
+        .map(esc).join(';')),
+    ]
+    const blob = new Blob(['﻿' + linhas.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `ranking_vendedoras_${dataInicio || 'inicio'}_${dataFim || 'fim'}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
   const [metas, setMetas] = useState([])
   const [periodos, setPeriodos] = useState([])
   const [periodoSel, setPeriodoSel] = useState(null)   // null = meta atual
@@ -1917,13 +1942,13 @@ function RankingOverlay({ onClose }) {
 
   return (
     <div className="funil-overlay" onClick={onClose}>
-      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+      <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: aba === 'ranking' ? 920 : 640 }}>
         <div className="funil-header">
           <div>
             <h2>{aba === 'ranking' ? 'Ranking de Vendedoras' : 'Meta por Vendedora'}</h2>
             <p className="subtitle">
               {aba === 'ranking'
-                ? 'Ordenado por valor total \u00b7 somente leitura'
+                ? `Ordenado por ${emPontos ? 'pontos' : 'valor total'} \u00b7 somente leitura`
                 : 'Atingimento da meta \u00b7 do maior para o menor'}
             </p>
           </div>
@@ -1938,6 +1963,17 @@ function RankingOverlay({ onClose }) {
             <button type="button" className={aba === 'meta' ? 'on' : ''}
               onClick={() => setAba('meta')}>Meta vendedoras</button>
           </div>
+          {aba === 'ranking' && (
+            <div className="home-toggle" role="group" aria-label="Ordenar por">
+              <button type="button" className={emPontos ? 'on' : ''} onClick={() => setModo('pontos')}>Pontos</button>
+              <button type="button" className={!emPontos ? 'on' : ''} onClick={() => setModo('valor')}>Valor</button>
+            </div>
+          )}
+          {aba === 'ranking' && (
+            <button type="button" className="refresh-btn" style={{ marginLeft: 'auto' }}
+                    disabled={!rankingOrdenado.length} onClick={baixarRanking}
+                    title="Baixar o ranking do período, na ordem da tela">&#8595; Relatório</button>
+          )}
           {aba === 'meta' && periodos.length > 0 && (
             <select value={periodoSel ?? ''} onChange={(e) => setPeriodoSel(e.target.value || null)}
               title="Per&iacute;odo da meta">
@@ -1963,17 +1999,24 @@ function RankingOverlay({ onClose }) {
             {!loading && ranking.length === 0 && !error && (
               <div className="state-msg">Nenhuma venda no per&iacute;odo selecionado.</div>
             )}
-            <div className="ranking-list">
-              {ranking.map((r, i) => (
-                <div className="ranking-card" key={r.vendedor}>
-                  <span className="ranking-pos">{i + 1}&ordm;</span>
-                  <div className="ranking-info">
+            {/* cards em grade, na ordem do ranking (dono, 01/10) */}
+            <div className="ranking-grade">
+              {rankingOrdenado.map((r, i) => (
+                <div className={`ranking-cartao ${i < 3 ? 'podio p' + (i + 1) : ''}`} key={r.vendedor}>
+                  <div className="ranking-cartao-topo">
+                    <span className="ranking-pos">{i + 1}&ordm;</span>
                     <p className="ranking-nome">{r.vendedor}</p>
-                    <div className="ranking-stats">
-                      <span><strong>{fmtMoeda(r.valor_total)}</strong> total</span>
-                      <span>{fmtInt(r.qtd_total)} propostas</span>
-                      <span>{r.banco_top || '-'} (banco mais usado)</span>
-                    </div>
+                  </div>
+                  <p className="ranking-principal">
+                    {emPontos
+                      ? <>{fmtInt(Math.round(Number(r.pontos_total) || 0))} <small>pontos</small></>
+                      : fmtMoeda(r.valor_total)}
+                  </p>
+                  <div className="ranking-cartao-linhas">
+                    <span>{emPontos ? 'Valor' : 'Pontos'}</span>
+                    <b>{emPontos ? fmtMoeda(r.valor_total) : fmtInt(Math.round(Number(r.pontos_total) || 0))}</b>
+                    <span>Propostas</span><b>{fmtInt(r.qtd_total)}</b>
+                    <span>Banco mais usado</span><b>{r.banco_top || '-'}</b>
                   </div>
                 </div>
               ))}

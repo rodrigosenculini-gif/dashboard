@@ -824,6 +824,39 @@ body {
 }
 .ranking-stats strong { color: var(--lime); font-size: 13px; }
 
+/* Ranking em cards (01/10): grade na ordem do ranking, podio destacado */
+.ranking-grade {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.ranking-cartao {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px;
+}
+.ranking-cartao.podio.p1 { border-color: rgba(217,184,119,.65); }
+.ranking-cartao.podio.p2 { border-color: rgba(200,205,210,.4); }
+.ranking-cartao.podio.p3 { border-color: rgba(205,150,110,.45); }
+.ranking-cartao-topo { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ranking-cartao-topo .ranking-pos { min-width: 0; font-size: 18px; }
+.ranking-cartao .ranking-nome { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-principal {
+  margin: 0; font-family: var(--font-mono); font-size: 24px; font-weight: 500; color: var(--lime);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ranking-principal small { font-size: 12px; color: var(--muted); font-weight: 400; }
+.ranking-cartao-linhas {
+  display: grid; grid-template-columns: auto 1fr; gap: 5px 12px;
+  font-size: 11.5px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.ranking-cartao-linhas span { color: var(--muted); }
+.ranking-cartao-linhas b { font-weight: 500; text-align: right; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* --- Overlay do Funil de Disparos --- */
 .funil-overlay {
   position: fixed;
