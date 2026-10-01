@@ -1834,20 +1834,36 @@ function RankingOverlay({ onClose }) {
   const [periodoSel, setPeriodoSel] = useState(null)   // null = meta atual
   const [loadingMeta, setLoadingMeta] = useState(false)
 
+  // chave de um periodo da lista: "id|dia" (metas diarias tem uma opcao por dia)
+  const chavePeriodo = (p) => `${p.id}|${p.dia || ''}`
+
+  // 1) carrega a lista de periodos e ja seleciona o que aparece na tela
+  //    (o atual; se nenhum for o atual -- ex.: meta diaria de ontem --, o primeiro).
+  //    Antes ficava null e a API devolvia a meta "de hoje", enquanto o seletor
+  //    mostrava outro periodo: "Nenhuma venda" ate trocar e voltar.
   useEffect(() => {
-    if (aba !== 'meta') return
+    if (aba !== 'meta' || periodos.length) return
     setLoadingMeta(true)
-    Promise.all([
-      // forcar: o periodo muda a leitura inteira e o usuario espera ver a
-      // troca na hora -- cache aqui so confunde
-      // periodoSel guarda "id|dia" para metas diarias (uma opcao por dia)
-      callApi('meta_vendedoras', periodoSel
-        ? { periodo_id: String(periodoSel).split('|')[0],
-            ...(String(periodoSel).split('|')[1] ? { dia: String(periodoSel).split('|')[1] } : {}) }
-        : {}, { forcar: true }),
-      periodos.length ? Promise.resolve(periodos) : callApi('meta_periodos', {}, { forcar: true }),
-    ])
-      .then(([m, p]) => { setMetas(m ?? []); if (!periodos.length) setPeriodos(p ?? []) })
+    callApi('meta_periodos', {}, { forcar: true })
+      .then((p) => {
+        const lista = p ?? []
+        setPeriodos(lista)
+        if (!periodoSel) {
+          const padrao = lista.find((x) => x.atual) || lista[0]
+          setPeriodoSel(padrao ? chavePeriodo(padrao) : 'atual')
+        }
+      })
+      .catch((e) => { setError(e.message || 'Erro ao carregar metas.'); setLoadingMeta(false) })
+  }, [aba])
+
+  // 2) busca a meta SEMPRE do periodo selecionado (sem depender da data de hoje)
+  useEffect(() => {
+    if (aba !== 'meta' || !periodoSel) return
+    setLoadingMeta(true)
+    const [id, dia] = String(periodoSel).split('|')
+    // forcar: o periodo muda a leitura inteira e o usuario espera ver a troca na hora
+    callApi('meta_vendedoras', periodoSel === 'atual' ? {} : { periodo_id: id, ...(dia ? { dia } : {}) }, { forcar: true })
+      .then((m) => setMetas(m ?? []))
       .catch((e) => setError(e.message || 'Erro ao carregar metas.'))
       .finally(() => setLoadingMeta(false))
   }, [aba, periodoSel])
@@ -1889,10 +1905,9 @@ function RankingOverlay({ onClose }) {
           {aba === 'meta' && periodos.length > 0 && (
             <select value={periodoSel ?? ''} onChange={(e) => setPeriodoSel(e.target.value || null)}
               title="Per&iacute;odo da meta">
-              {/* o periodo atual JA e a opcao padrao: marca ele em vez de
-                  repetir "meta atual" + a mesma janela logo abaixo */}
+              {/* toda opcao tem o valor real do periodo; o atual so ganha a marca */}
               {periodos.map((p) => (
-                <option key={`${p.id}|${p.dia || ''}`} value={p.atual ? '' : `${p.id}|${p.dia || ''}`}>
+                <option key={chavePeriodo(p)} value={chavePeriodo(p)}>
                   {p.descricao}{p.atual ? ' (atual)' : ''}
                 </option>
               ))}
