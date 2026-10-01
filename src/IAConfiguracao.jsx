@@ -779,6 +779,217 @@ function SecaoEscalada({ d, salvar }) {
   )
 }
 
+// ---------------------------------------------------------------- páginas da LP (/c/<campanha>, migração 160)
+// Dono, 01/10: além da LP atual (link que a IA manda, sem mudança), duas páginas novas para campanhas:
+// "devolve" (consulta na hora e, aprovado, manda ao disparo) e "prende" (aprovado: botão do WhatsApp; sem clique na
+// espera, manda ao disparo). Cada campanha usa uma página e tem o seu link.
+const DISPARO_ARARA = 'https://hotnwh.querosacarfgts.com.br/webhook/disparo-arara'
+const NOME_MODO = { devolve: 'Devolve ao disparo', prende: 'Prende na página' }
+const AJUDA_MODO = {
+  devolve: 'Consulta na hora. Aprovou: o cliente vê "em instantes você recebe no WhatsApp" e vai para o disparo.',
+  prende: 'Consulta com o cliente na página. Aprovou: botão para falar no WhatsApp; se não tocar na espera, vai para o disparo.',
+}
+const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos: [{ url: DISPARO_ARARA, source: 'lp' }], whatsapp: [], espera_s: 120, ativa: true })
+
+function EditorPagina({ inicial, salvar, onFechar }) {
+  const [p, setP] = useState(() => ({ ...paginaVazia(), ...inicial }))
+  const [salvando, setSalvando] = useState(false)
+  const set = (k, v) => setP((x) => ({ ...x, [k]: v }))
+  const setDestino = (i, k, v) => set('destinos', p.destinos.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
+  async function ok() {
+    setSalvando(true)
+    const dados = { ...p, nome: p.nome.trim(), espera_s: Number(p.espera_s) || 120,
+      destinos: p.destinos.filter((x) => x.url.trim()).map((x) => ({ url: x.url.trim(), source: (x.source || 'lp').trim() })),
+      whatsapp: p.whatsapp.map((x) => x.trim()).filter(Boolean) }
+    for (const k of ['criado_em', 'atualizado_em']) delete dados[k]
+    const r = await salvar('lp_pagina', dados, inicial?.id ? 'Página salva' : 'Página criada')
+    setSalvando(false)
+    if (r) onFechar()
+  }
+  return (
+    <div className="panel iac-texto-ed" style={{ marginTop: 0 }}>
+      <Linha titulo="Nome da página" ajuda="Só para vocês (ex.: Leilão Arara - devolve).">
+        <input className="chip-input" value={p.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Nome" />
+      </Linha>
+      <Linha titulo="Como funciona" ajuda={AJUDA_MODO[p.modo]}>
+        <div className="chip-opcoes">
+          {Object.entries(NOME_MODO).map(([k, t]) => (
+            <button key={k} className={`chip-opcao ${p.modo === k ? 'on' : ''}`} onClick={() => set('modo', k)}>{t}</button>
+          ))}
+        </div>
+      </Linha>
+      <Linha titulo="Produto" ajuda="CLT reprovado oferece o FGTS na própria página.">
+        <div className="chip-opcoes">
+          {[['clt', 'CLT'], ['fgts', 'FGTS']].map(([k, t]) => (
+            <button key={k} className={`chip-opcao ${p.produto === k ? 'on' : ''}`} onClick={() => set('produto', k)}>{t}</button>
+          ))}
+        </div>
+      </Linha>
+      <div>
+        <b>Disparo (para onde vai o aprovado)</b>
+        <p className="iac-miudo">Recebe {'{phone, name, campaign_id, source, lead_id}'}. Com mais de um, todos recebem.</p>
+        {p.destinos.map((x, i) => (
+          <div key={i} className="iac-filtros" style={{ marginBottom: 6 }}>
+            <input className="chip-input" style={{ flex: 3, minWidth: 220 }} value={x.url} placeholder="https://…/webhook/…"
+                   onChange={(e) => setDestino(i, 'url', e.target.value)} />
+            <input className="chip-input" style={{ flex: 1, minWidth: 90 }} value={x.source} placeholder="source"
+                   onChange={(e) => setDestino(i, 'source', e.target.value)} title="valor de source" />
+            <button className="iac-link" onClick={() => set('destinos', p.destinos.filter((_, j) => j !== i))}>remover</button>
+          </div>
+        ))}
+        <button className="iac-link" onClick={() => set('destinos', [...p.destinos, { url: '', source: 'lp' }])}>+ outro disparo</button>
+      </div>
+      {p.modo === 'prende' && (
+        <>
+          <div>
+            <b>WhatsApp do botão</b>
+            <p className="iac-miudo">Links wa.me (com a mensagem, se quiser). Com mais de um, os clientes vão em rodízio.</p>
+            {p.whatsapp.map((x, i) => (
+              <div key={i} className="iac-filtros" style={{ marginBottom: 6 }}>
+                <input className="chip-input" style={{ flex: 1, minWidth: 220 }} value={x} placeholder="https://wa.me/5511…"
+                       onChange={(e) => set('whatsapp', p.whatsapp.map((y, j) => (j === i ? e.target.value : y)))} />
+                <button className="iac-link" onClick={() => set('whatsapp', p.whatsapp.filter((_, j) => j !== i))}>remover</button>
+              </div>
+            ))}
+            <button className="iac-link" onClick={() => set('whatsapp', [...p.whatsapp, ''])}>+ número</button>
+          </div>
+          <Linha titulo="Esperar o clique por" ajuda="Sem tocar no botão nesse tempo, o cliente vai para o disparo.">
+            <Numero valor={Math.round(p.espera_s / 60 * 10) / 10} min={0.5} max={60} passo={0.5} sufixo="min"
+                    onChange={(n) => set('espera_s', Math.round(Number(n) * 60))} />
+          </Linha>
+        </>
+      )}
+      {inicial?.id && (
+        <Linha titulo="Página ativa" ajuda="Desligada, os links das campanhas dela não abrem a consulta.">
+          <Chave ligado={!!p.ativa} rotulo="Página ativa" onChange={(v) => set('ativa', v)} />
+        </Linha>
+      )}
+      <span className="iac-rascunho">
+        <button className="chip-salvar iac-btn-p" onClick={ok} disabled={salvando || !p.nome.trim()}>{salvando ? 'Salvando…' : 'Salvar página'}</button>
+        <button className="reset-btn" onClick={onFechar} disabled={salvando}>Cancelar</button>
+      </span>
+    </div>
+  )
+}
+
+function EditorCampanha({ inicial, paginas, salvar, onFechar }) {
+  const [c, setC] = useState(() => ({ slug: '', nome: '', pagina_id: paginas[0]?.id || '', campaign_id: '', produto: '', ativa: true, ...inicial }))
+  const [salvando, setSalvando] = useState(false)
+  const set = (k, v) => setC((x) => ({ ...x, [k]: v }))
+  const novo = !inicial?.slug
+  async function ok() {
+    setSalvando(true)
+    const r = await salvar('lp_campanha', { slug: c.slug, nome: c.nome, pagina_id: Number(c.pagina_id), campaign_id: c.campaign_id || '',
+      produto: c.produto || '', ativa: !!c.ativa }, novo ? 'Campanha criada' : 'Campanha salva')
+    setSalvando(false)
+    if (r) onFechar()
+  }
+  return (
+    <div className="panel iac-texto-ed" style={{ marginTop: 0 }}>
+      <Linha titulo="Nome" ajuda="Só para vocês.">
+        <input className="chip-input" value={c.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Leilão Arara 01/10" />
+      </Linha>
+      <Linha titulo="Código no link" ajuda="Letras minúsculas, números e hífen. Não muda depois de criada.">
+        <input className="chip-input" value={c.slug} disabled={!novo} placeholder="leilao-arara-01-10"
+               onChange={(e) => set('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} />
+      </Linha>
+      <Linha titulo="Página" ajuda={AJUDA_MODO[paginas.find((p) => p.id === Number(c.pagina_id))?.modo] || ''}>
+        <select className="chip-input" value={c.pagina_id} onChange={(e) => set('pagina_id', e.target.value)}>
+          {paginas.map((p) => <option key={p.id} value={p.id}>{p.nome} ({NOME_MODO[p.modo]})</option>)}
+        </select>
+      </Linha>
+      <Linha titulo="Produto" ajuda="Vazio: o da página.">
+        <div className="chip-opcoes">
+          {[['', 'O da página'], ['clt', 'CLT'], ['fgts', 'FGTS']].map(([k, t]) => (
+            <button key={k} className={`chip-opcao ${(c.produto || '') === k ? 'on' : ''}`} onClick={() => set('produto', k)}>{t}</button>
+          ))}
+        </div>
+      </Linha>
+      <Linha titulo="campaign_id no disparo" ajuda="Vazio: vai o código do link.">
+        <input className="chip-input" value={c.campaign_id || ''} onChange={(e) => set('campaign_id', e.target.value)} placeholder={c.slug || 'campaign_id'} />
+      </Linha>
+      {!novo && (
+        <Linha titulo="Campanha ativa" ajuda="Desligada, o link mostra que a campanha terminou.">
+          <Chave ligado={!!c.ativa} rotulo="Campanha ativa" onChange={(v) => set('ativa', v)} />
+        </Linha>
+      )}
+      <span className="iac-rascunho">
+        <button className="chip-salvar iac-btn-p" onClick={ok} disabled={salvando || c.slug.length < 2 || !c.pagina_id}>{salvando ? 'Salvando…' : 'Salvar campanha'}</button>
+        <button className="reset-btn" onClick={onFechar} disabled={salvando}>Cancelar</button>
+      </span>
+    </div>
+  )
+}
+
+function SecaoPaginas({ d, salvar }) {
+  const lp = d.lp || { paginas: [], campanhas: [] }
+  const [ed, setEd] = useState(null)   // { tipo: 'pagina'|'campanha', v }
+  const [copiado, setCopiado] = useState('')
+  const linkDe = (slug) => `${lp.base || ''}${slug}`
+  const copiar = async (t, k) => {
+    try { await navigator.clipboard.writeText(t); setCopiado(k); setTimeout(() => setCopiado(''), 1800) } catch { /* sem área de transferência */ }
+  }
+  const pagina = (id) => lp.paginas.find((p) => p.id === id)
+  return (
+    <>
+      <p className="iac-intro">
+        Páginas para campanhas. A LP atual (o link que a IA manda na conversa) continua igual; aqui ficam as duas novas,
+        cada campanha com o seu link. No disparo, acrescente <code>&amp;id=</code> com o id de cada cliente para a página já
+        abrir a consulta dele; sem id, ela pede CPF e celular.
+      </p>
+
+      <section className="iac-bloco">
+        <p className="section-label">Páginas</p>
+        {ed?.tipo === 'pagina'
+          ? <EditorPagina inicial={ed.v} salvar={salvar} onFechar={() => setEd(null)} />
+          : (
+            <div className="iac-bancos">
+              {lp.paginas.map((p) => (
+                <div key={p.id} className="iac-banco" style={{ borderLeftColor: p.ativa ? 'var(--lime)' : 'var(--muted)' }}>
+                  <div className="iac-banco-topo"><b>{p.nome}</b><span className="iac-tag">{p.ativa ? nomeProduto(p.produto) : 'desligada'}</span></div>
+                  <small className="iac-miudo" style={{ margin: 0 }}>{NOME_MODO[p.modo]}{p.modo === 'prende' ? ` · espera ${Math.round(p.espera_s / 6) / 10} min · ${(p.whatsapp || []).length} WhatsApp` : ''}</small>
+                  <small className="iac-miudo" style={{ margin: 0 }}>Disparo: {(p.destinos || []).map((x) => x.url.replace(/^https:\/\/[^/]+/, '')).join(', ') || 'nenhum'}</small>
+                  <div className="iac-banco-acoes"><button className="iac-link" onClick={() => setEd({ tipo: 'pagina', v: p })}>Editar</button></div>
+                </div>
+              ))}
+              <button className="iac-banco iac-kpi" onClick={() => setEd({ tipo: 'pagina', v: null })} style={{ alignItems: 'center', justifyContent: 'center' }}>
+                <b>+ Nova página</b><small className="iac-miudo" style={{ margin: 0 }}>Devolve ao disparo ou prende na página</small>
+              </button>
+            </div>
+          )}
+      </section>
+
+      <section className="iac-bloco">
+        <p className="section-label">Campanhas e links</p>
+        {ed?.tipo === 'campanha'
+          ? <EditorCampanha inicial={ed.v} paginas={lp.paginas} salvar={salvar} onFechar={() => setEd(null)} />
+          : (
+            <div className="panel">
+              {!lp.paginas.length && <p className="iac-miudo" style={{ marginTop: 0 }}>Crie uma página primeiro.</p>}
+              {lp.campanhas.map((c) => (
+                <div key={c.slug} className="iac-linha">
+                  <div className="iac-linha-txt">
+                    <b>{c.nome} {!c.ativa && <span className="iac-tag">desligada</span>}</b>
+                    <small>{pagina(c.pagina_id)?.nome || '—'} · {nomeProduto(c.produto || pagina(c.pagina_id)?.produto)} · campaign_id {c.campaign_id || c.slug}</small>
+                    <small>{c.ids} links · {c.abertos} abriram · {c.aprovados} aprovados · {c.cliques} tocaram no WhatsApp · {c.entregues} enviados ao disparo</small>
+                    <small style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>{linkDe(c.slug)}&amp;id=…</small>
+                  </div>
+                  <div className="iac-linha-ctl" style={{ gap: 10 }}>
+                    <button className="chip-salvar iac-btn-p" onClick={() => copiar(linkDe(c.slug), c.slug)}>{copiado === c.slug ? 'Copiado ✓' : 'Copiar link'}</button>
+                    <button className="iac-link" onClick={() => setEd({ tipo: 'campanha', v: c })}>Editar</button>
+                  </div>
+                </div>
+              ))}
+              {lp.paginas.length > 0 && (
+                <button className="iac-link" style={{ marginTop: 10 }} onClick={() => setEd({ tipo: 'campanha', v: null })}>+ Nova campanha</button>
+              )}
+            </div>
+          )}
+      </section>
+    </>
+  )
+}
+
 // ---------------------------------------------------------------- histórico
 const NOME_PARAM = {
   lembrete_silencio: 'horário de silêncio', reativacao: 'retomada de conversas', flow_ativo: 'WhatsApp Flow',
@@ -945,6 +1156,7 @@ function indiceBusca(d) {
   r.push({ secao: 'escalada', t: 'Clientes sem resposta', s: 'Escalada', k: 'vendedora supervisor aviso escalada demora' })
   r.push({ secao: 'ofertas', t: 'Rodadas de negociação', s: 'Produtos', k: 'negociar produto fgts clt teto' })
   r.push({ secao: 'historico', t: 'Histórico de mudanças', s: 'Histórico', k: 'quem mudou alteração log' })
+  r.push({ secao: 'paginas', t: 'Páginas da LP e links de campanha', s: 'Campanhas', k: 'lp pagina link campanha disparo devolve prende whatsapp arara' })
   return r
 }
 
@@ -959,11 +1171,13 @@ const IC = {
   ofertas: 'M20 12l-8 8-9-9V3h8zM7.5 7.5h.01',
   escalada: 'M16 11a4 4 0 1 0-8 0M3 21a9 9 0 0 1 18 0M19 4v4M21 6h-4',
   historico: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 3',
+  paginas: 'M4 4h16v16H4zM4 9h16M9 9v11',
 }
 const GRUPOS = [
   ['Visão geral', [['resumo', 'Resumo'], ['analises', 'Análises']]],
   ['Ajustes da IA', [['bancos', 'Bancos'], ['mensagens', 'Mensagens'], ['lembretes', 'Lembretes'],
                      ['ofertas', 'Ofertas e jornada'], ['escalada', 'Clientes sem resposta']]],
+  ['Campanhas', [['paginas', 'Páginas da LP']]],
   ['Registro', [['historico', 'Histórico']]],
 ]
 const Icone = ({ k }) => (
@@ -1119,6 +1333,7 @@ export default function IAConfiguracao({ onVoltar }) {
             {secao === 'lembretes' && <SecaoLembretes d={d} salvar={salvar} param={param} irPara={irPara} />}
             {secao === 'ofertas' && <SecaoOfertas d={d} salvar={salvar} param={param} />}
             {secao === 'escalada' && <SecaoEscalada d={d} salvar={salvar} />}
+            {secao === 'paginas' && <SecaoPaginas d={d} salvar={salvar} />}
             {secao === 'historico' && <SecaoHistorico d={d} />}
           </div>
         </>
