@@ -789,41 +789,72 @@ function CampanhaDetalhadoList({ items, loading }) {
   )
 }
 
-function ViewSwitcher({ view, setView, permitidas }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+// Menu lateral (dono, 01/10: o seletor no topo escondia as telas). Mesmo
+// desenho do menu do Painel: grupos com titulo, icone + nome, item ativo em
+// verde. Recolhe para so icones (botao no rodape, lembrado no navegador); no
+// celular vira gaveta aberta pelo botao de menu do cabecalho.
+const NAV_GRUPOS = [
+  ['Visão geral', ['inicio', 'painel']],
+  ['Captação', ['disparos', 'leilao', 'produtos']],
+  ['Vendas', ['vendas', 'vendedoras']],
+  ['Sistema', ['n8n', 'ia']],
+]
+const NAV_ICONE = {
+  inicio: 'M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10',
+  painel: 'M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM9 4v16M12.5 14l2-3 2 2 2.5-4',
+  disparos: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
+  leilao: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
+  produtos: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+  vendas: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+  vendedoras: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  n8n: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  ia: 'M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
+  recolher: 'M11 17l-5-5 5-5M18 17l-5-5 5-5',
+  menu: 'M3 6h18M3 12h18M3 18h18',
+}
+const NavIcone = ({ k, size = 17 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8"
+       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={NAV_ICONE[k]} /></svg>
+)
+
+function MenuLateral({ view, setView, permitidas, recolhida, onRecolher }) {
   // permitidas = undefined -> acesso completo (gestao)
-  const lista = permitidas ? VIEWS.filter((v) => permitidas.includes(v.id)) : VIEWS
-  const current = lista.find((v) => v.id === view)
-
-  useEffect(() => {
-    function onClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
-
+  const pode = (id) => !permitidas || permitidas.includes(id)
+  const rotulo = Object.fromEntries(VIEWS.map((v) => [v.id, v.label]))
   return (
-    <div className="view-switcher" ref={ref}>
-      <button className="view-switcher-btn" onClick={() => setOpen((v) => !v)}>
-        {current?.label}
-        <span className={`chevron ${open ? 'open' : ''}`}>&#9662;</span>
-      </button>
-      {open && (
-        <div className="view-menu">
-          {lista.map((v) => (
-            <button
-              key={v.id}
-              className={`view-menu-item ${v.id === view ? 'active' : ''}`}
-              onClick={() => { setView(v.id); setOpen(false) }}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+    <aside className="dash-lateral" aria-label="Menu do dashboard">
+      <div className="dash-lat-topo">
+        <img src="/tiger-icon.png" alt="" className="app-logo" />
+        <span className="dash-lat-marca">Hotline</span>
+      </div>
+      <nav className="dash-lat-nav">
+        {NAV_GRUPOS.map(([titulo, ids]) => {
+          const itens = ids.filter(pode)
+          if (!itens.length) return null
+          return (
+            <div key={titulo} className="dash-lat-grupo">
+              <p>{titulo}</p>
+              {itens.map((id) => (
+                <button key={id} type="button" title={recolhida ? rotulo[id] : undefined}
+                        className={`dash-lat-item ${view === id ? 'on' : ''}`}
+                        aria-current={view === id ? 'page' : undefined}
+                        onClick={() => setView(id)}>
+                  <NavIcone k={id} />
+                  <span>{rotulo[id]}</span>
+                </button>
+              ))}
+            </div>
+          )
+        })}
+      </nav>
+      {onRecolher && (
+        <button type="button" className="dash-lat-recolher" onClick={onRecolher}
+                title={recolhida ? 'Expandir menu' : 'Recolher menu'}>
+          <NavIcone k="recolher" size={15} />
+          <span>Recolher</span>
+        </button>
       )}
-    </div>
+    </aside>
   )
 }
 
@@ -7081,6 +7112,7 @@ function VisaoGeral() {
 }
 
 const VIEW_STORAGE_KEY = 'disparos_dashboard_view'
+const LATERAL_STORAGE_KEY = 'dash_lateral_recolhida'
 
 // Views que aparecem como atalho na tela Geral (a própria Geral fica de fora)
 const VIEWS_ATALHO = VIEWS.filter((v) => v.id !== 'inicio')
@@ -7111,8 +7143,23 @@ function Dashboard({ permitidas, onLogout }) {
 
   const changeView = (v) => {
     setView(v)
+    setMenuCelular(false)
     try { localStorage.setItem(VIEW_STORAGE_KEY, v) } catch { /* ignora */ }
   }
+
+  // menu lateral: recolhido (so icones) fica lembrado no navegador; no celular
+  // e uma gaveta. Perfil com uma tela so nao tem para onde navegar: sem menu.
+  const [recolhida, setRecolhida] = useState(() => {
+    try { return localStorage.getItem(LATERAL_STORAGE_KEY) === '1' } catch { return false }
+  })
+  const [menuCelular, setMenuCelular] = useState(false)
+  const alternarLateral = () => setRecolhida((r) => {
+    try { localStorage.setItem(LATERAL_STORAGE_KEY, r ? '0' : '1') } catch { /* ignora */ }
+    return !r
+  })
+  const temMenu = !permitidas || permitidas.length > 1
+  // o Painel tem o proprio menu lateral: o global fica so com icones ali
+  const lateralCompacta = recolhida || view === 'painel'
 
   const acoesVendedoras = (
     <>
@@ -7124,28 +7171,27 @@ function Dashboard({ permitidas, onLogout }) {
   )
 
   return (
+    <div className={`dash-shell ${temMenu ? 'com-menu' : ''} ${lateralCompacta ? 'recolhida' : ''} ${menuCelular ? 'menu-aberto' : ''}`}>
+      {temMenu && (
+        <>
+          <MenuLateral view={view} setView={changeView} permitidas={permitidas}
+                       recolhida={lateralCompacta} onRecolher={view === 'painel' ? null : alternarLateral} />
+          <div className="dash-lat-fundo" onClick={() => setMenuCelular(false)} aria-hidden="true" />
+        </>
+      )}
+    <div className="dash-conteudo">
     <div className="app">
       <div className="app-header">
-        <img src="/tiger-icon.png" alt="" className="app-logo" />
-        {view !== 'inicio' && podeVer('inicio') && (
-          <button className="voltar-inicio" onClick={() => changeView('inicio')} title="Voltar para a tela Geral">
-            <span aria-hidden="true">&#8962;</span> Início
+        {temMenu ? (
+          <button type="button" className="dash-menu-btn" onClick={() => setMenuCelular(true)} title="Abrir menu">
+            <NavIcone k="menu" />
           </button>
+        ) : (
+          <img src="/tiger-icon.png" alt="" className="app-logo" />
         )}
-        {/* atalho fixo para o Painel da IA, em qualquer tela (dono, 01/10) */}
-        {podeVer('painel') && (
-          <button className={`voltar-inicio atalho-painel ${view === 'painel' ? 'on' : ''}`}
-                  onClick={() => changeView('painel')} title="Abrir o Painel da IA de atendimento">
-            <svg aria-hidden="true" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M9 4v16M12.5 14l2-3 2 2 2.5-4" />
-            </svg> Painel
-          </button>
-        )}
-        <ViewSwitcher view={view} setView={changeView} permitidas={permitidas} />
-        {/* o "atualizado as" de cada view e renderizado aqui via portal, para
-            ficar na MESMA linha do seletor -- cada view tem seu proprio
-            lastUpdate, entao nao da pra levantar o estado */}
+        {/* o "atualizado as" de cada view e renderizado aqui via portal --
+            cada view tem seu proprio lastUpdate, entao nao da pra levantar o
+            estado */}
         <span id="status-slot" className="status-slot" />
         {/* Refin/Arquivos/Info sairam daqui: agora ficam na barra de acoes da
             propria tela, junto de Redefinir filtros e Adicionar adesao */}
@@ -7176,6 +7222,8 @@ function Dashboard({ permitidas, onLogout }) {
       {view === 'painel' && podeVer('painel') && <IAConfiguracao onVoltar={() => changeView('inicio')} />}
       {view === 'trello' && podeVer('trello') && <Trello onVoltar={() => changeView('inicio')} />}
       {view === 'chips' && podeVer('chips') && <Chips onVoltar={() => changeView('inicio')} />}
+    </div>
+    </div>
     </div>
   )
 }

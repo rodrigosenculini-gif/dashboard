@@ -270,11 +270,6 @@ body {
   flex-shrink: 0;
 }
 
-.view-switcher {
-  position: relative;
-  display: inline-block;
-}
-
 .view-switcher-btn {
   display: flex;
   align-items: center;
@@ -299,34 +294,78 @@ body {
 }
 .chevron.open { transform: rotate(180deg); }
 
-.view-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  z-index: 20;
-  min-width: 220px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
+/* --- Menu lateral do dashboard (01/10) ---
+   Fixo na esquerda; o conteudo anda para o lado pela largura dele (--lat).
+   Recolhido = so icones. Abaixo de 900px vira gaveta sobre a tela. */
+.dash-shell { --lat: 0px; }
+.dash-shell.com-menu { --lat: 228px; }
+.dash-shell.com-menu.recolhida { --lat: 68px; }
+.dash-conteudo { padding-left: var(--lat); transition: padding-left .18s ease; }
 
-.view-menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 10px 14px;
-  background: none;
-  border: none;
-  color: var(--text);
-  font-family: var(--font-display);
-  font-size: 13px;
-  cursor: pointer;
+.dash-lateral {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 40;
+  width: var(--lat);
+  display: flex; flex-direction: column; gap: 22px;
+  padding: 20px 12px 14px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-x: hidden; overflow-y: auto;
+  transition: width .18s ease, transform .2s ease;
 }
+.dash-lat-topo { display: flex; align-items: center; gap: 10px; padding: 0 6px; min-height: 32px; }
+.dash-lat-marca { font-weight: 600; font-size: 15px; letter-spacing: .01em; white-space: nowrap; }
+.dash-lat-nav { display: flex; flex-direction: column; gap: 18px; flex: 1; }
+.dash-lat-grupo { display: flex; flex-direction: column; gap: 2px; }
+.dash-lat-grupo > p {
+  font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); margin: 0 10px 6px; white-space: nowrap;
+}
+.dash-lat-item, .dash-lat-recolher {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  background: none; border: 1px solid transparent; border-radius: 9px;
+  color: var(--muted); padding: 8px 10px; font-family: inherit; font-size: 13px; cursor: pointer;
+  white-space: nowrap; transition: color .12s, background .12s;
+}
+.dash-lat-item:hover, .dash-lat-recolher:hover { color: var(--text); background: var(--surface-2); }
+.dash-lat-item.on { background: rgba(169,217,127,.12); border-color: rgba(169,217,127,.45); color: var(--lime); }
+.dash-lat-item svg, .dash-lat-recolher svg { flex: 0 0 auto; }
+.dash-lat-recolher { font-size: 12px; border-top: 1px solid var(--border); border-radius: 0 0 9px 9px; padding-top: 12px; }
+.dash-lat-recolher svg { transition: transform .18s ease; }
 
-.view-menu-item:hover { background: var(--surface-1); }
-.view-menu-item.active { color: var(--rose); }
+/* recolhido: so os icones, centralizados; titulo do grupo vira um traco */
+.dash-shell.recolhida .dash-lat-marca,
+.dash-shell.recolhida .dash-lat-item span,
+.dash-shell.recolhida .dash-lat-recolher span { display: none; }
+.dash-shell.recolhida .dash-lat-topo { justify-content: center; padding: 0; }
+.dash-shell.recolhida .dash-lat-grupo > p { font-size: 0; height: 1px; margin: 0 12px 8px; background: var(--border); }
+.dash-shell.recolhida .dash-lat-item,
+.dash-shell.recolhida .dash-lat-recolher { justify-content: center; padding: 9px 0; }
+.dash-shell.recolhida .dash-lat-recolher svg { transform: rotate(180deg); }
+
+.dash-menu-btn {
+  display: none; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+}
+.dash-menu-btn:hover { border-color: var(--lime); color: var(--lime); }
+.dash-lat-fundo { display: none; }
+
+@media (max-width: 900px) {
+  .dash-conteudo { padding-left: 0; }
+  .dash-menu-btn { display: inline-flex; }
+  .dash-lateral { width: 248px; transform: translateX(-100%); box-shadow: 8px 0 28px rgba(0,0,0,.45); }
+  .dash-shell.menu-aberto .dash-lateral { transform: none; }
+  .dash-shell.menu-aberto .dash-lat-fundo {
+    display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0,0,0,.45);
+  }
+  /* na gaveta mostra sempre os nomes, mesmo se recolhido no computador */
+  .dash-shell.recolhida .dash-lat-marca,
+  .dash-shell.recolhida .dash-lat-item span { display: inline; }
+  .dash-shell.recolhida .dash-lat-topo { justify-content: flex-start; padding: 0 6px; }
+  .dash-shell.recolhida .dash-lat-grupo > p { font-size: 10.5px; height: auto; margin: 0 10px 6px; background: none; }
+  .dash-shell.recolhida .dash-lat-item { justify-content: flex-start; padding: 8px 10px; }
+  .dash-lat-recolher { display: none; }
+}
 
 /* --- Subtítulo do topbar / painéis --- */
 .subtitle {
@@ -2048,17 +2087,6 @@ body {
 .refin-pago { display: flex; flex-direction: column; gap: 8px; }
 
 /* ================= TELA GERAL (home) ================= */
-.voltar-inicio{
-  display:inline-flex; align-items:center; gap:7px; height:34px; padding:0 13px;
-  background:var(--surface-2); border:1px solid var(--border); color:var(--text);
-  border-radius:10px; font-size:12.5px; font-family:inherit; cursor:pointer;
-  transition:border-color .15s, color .15s;
-}
-.voltar-inicio:hover{ border-color:var(--lime); color:var(--lime); }
-.voltar-inicio span{ font-size:15px; line-height:1; }
-/* atalho fixo do Painel da IA no cabeçalho */
-.voltar-inicio.atalho-painel.on{ border-color:var(--lime); color:var(--lime); background:rgba(169,217,127,.1); }
-
 .home-atalhos{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
 .home-atalho{
   background:var(--surface); border:1px solid var(--border); color:var(--muted);
