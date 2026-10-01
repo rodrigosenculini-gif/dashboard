@@ -129,7 +129,7 @@ function Taxas({ u }) {
 }
 
 // ---------------------------------------------------------------- criar (com sugestões da IA)
-function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado }) {
+function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado, bm }) {
   const [f, setF] = useState(() => ({ ...vazio(), waba: contas[0]?.id || '', ...inicial }))
   const [caso, setCaso] = useState(null)
   const [ideia, setIdeia] = useState('')
@@ -184,7 +184,7 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado }) {
     if (arq.size > 3 * 1024 * 1024) return mostrar('Arquivo de até 3 MB.', 'erro')
     setSubindo(true)
     const base64 = await new Promise((ok, falhou) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = falhou; r.readAsDataURL(arq) })
-    const r = await chamar({ acao: 'midia', midia: { tipo: arq.type, nome: arq.name, base64 } })
+    const r = await chamar({ acao: 'midia', bm, midia: { tipo: arq.type, nome: arq.name, base64 } })
     setSubindo(false)
     if (r.ok) set('midia', { handle: r.handle, nome: arq.name, tipo: f.cabTipo, url: arq.type.startsWith('image/') ? URL.createObjectURL(arq) : null })
     else mostrar(r.motivo || 'A Meta não aceitou o arquivo.', 'erro')
@@ -414,16 +414,28 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
     const u = await api({ acao: 'meta_uso', token, dias: d })
     if (u.ok) { setUso(u); gravarCache({ uso: { ...(lerCache().uso || {}), [d]: u } }) }
   }, [api, token])
-  const carregar = useCallback(async (forcar = true) => {
-    const c = lerCache()
-    if (!forcar && c.contas) { setContasRaw(c.contas); setQuando(c.quando); return buscarUso(dias, false) }
-    setCarregando(true); setErro('')
-    const [l] = await Promise.all([chamar({ acao: 'listar' }), forcar && gravarCache({ uso: {} }), buscarUso(dias, true)])
+  // uma aba por BM (dono, 01/10): cada BM tem o seu token no n8n; contas guardadas por BM
+  const [bms, setBms] = useState(() => lerCache().bms || null)
+  const [bm, setBm] = useState(() => lerCache().bmAtual || 'hotline')
+  const carregar = useCallback(async (forcar = true, qual = bm) => {
+    const c = lerCache(), guardado = (c.porBm || {})[qual]
+    if (!forcar && guardado) { setContasRaw(guardado.contas); setQuando(guardado.quando); return buscarUso(dias, false) }
+    setCarregando(true); setErro(''); setContasRaw(guardado ? guardado.contas : null)
+    const [l, lb] = await Promise.all([chamar({ acao: 'listar', bm: qual }), (forcar || !c.bms) ? chamar({ acao: 'bms' }) : null,
+      forcar && gravarCache({ uso: {} }), buscarUso(dias, forcar)])
     setCarregando(false)
-    if (l.ok) { setContasRaw(l.contas || []); const q = new Date().toISOString(); setQuando(q); gravarCache({ contas: l.contas || [], quando: q }) }
-    else setErro(l.motivo === 'sessao' ? 'Sessão expirada: entre de novo no Painel.' : l.motivo || 'Não foi possível falar com a Meta.')
-  }, [chamar, buscarUso, dias])
+    if (lb && lb.ok) { setBms(lb.bms); gravarCache({ bms: lb.bms }) }
+    if (l.ok) {
+      setContasRaw(l.contas || []); const q = new Date().toISOString(); setQuando(q)
+      gravarCache({ porBm: { ...(lerCache().porBm || {}), [qual]: { contas: l.contas || [], quando: q } } })
+    } else setErro(l.motivo === 'sessao' ? 'Sessão expirada: entre de novo no Painel.' : l.motivo || 'Não foi possível falar com a Meta.')
+  }, [chamar, buscarUso, dias, bm])
   useEffect(() => { carregar(false) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const trocarBm = (b) => {
+    if (b === bm) return
+    setBm(b); gravarCache({ bmAtual: b }); setFiltro({ conta: '', status: '', busca: '' }); setBase(null); setMetricas({}); setErro('')
+    carregar(false, b)
+  }
   useEffect(() => { if (contasRaw) buscarUso(dias, false) }, [dias]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const contas = useMemo(() => (contasRaw || []).filter((c) => !c.erro).map((c) => {
@@ -470,6 +482,14 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
         Os templates de WhatsApp das contas da Meta, com o resultado de cada um nos nossos disparos e retomadas. Para criar,
         a IA sugere textos com base no que mais converte.
       </p>
+      {bms && bms.length > 1 && (
+        <div className="tpl-bms" role="tablist" aria-label="BMs da Meta">
+          {bms.map((x) => (
+            <button key={x.id} role="tab" aria-selected={bm === x.id} className={`tpl-bm ${bm === x.id ? 'on' : ''}`} onClick={() => trocarBm(x.id)}>
+              {x.nome}<small>{x.contas} conta{x.contas === 1 ? '' : 's'}</small></button>
+          ))}
+        </div>
+      )}
       <div className="iac-filtros">
         <div className="chip-opcoes">
           {[['templates', `Templates (${lista.length})`], ['desempenho', 'Desempenho'], ['criar', '+ Criar']].map(([k, t]) => (
@@ -548,7 +568,7 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
       )}
       {contasRaw && aba === 'desempenho' && (uso ? <Desempenho uso={uso} contas={contas} /> : <div className="state-msg">Carregando…</div>)}
       {contasRaw && aba === 'criar' && (contas.length
-        ? <Criar contas={contas} uso={uso} inicial={base} chamar={chamar} dialogo={dialogo} mostrar={mostrar} onCriado={() => { setBase(null); carregar(); setAba('templates') }} />
+        ? <Criar key={bm} bm={bm} contas={contas} uso={uso} inicial={base} chamar={chamar} dialogo={dialogo} mostrar={mostrar} onCriado={() => { setBase(null); carregar(); setAba('templates') }} />
         : <p className="iac-miudo">Nenhuma conta da Meta disponível.</p>)}
     </>
   )

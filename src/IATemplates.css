@@ -77,3 +77,11 @@
 .tpl-bolha-midia.vazio{ background:#2a3942; color:#8696a0; font-size:12.5px; text-align:center; padding:28px 8px; }
 .tpl-arquivo{ position:relative; cursor:pointer; }
 .tpl-arquivo input{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+
+/* abas por BM */
+.tpl-bms{ display:flex; gap:4px; border-bottom:1px solid var(--border); margin:0 0 14px; overflow-x:auto; }
+.tpl-bm{ background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); font:inherit; font-size:14px; font-weight:600;
+  padding:9px 14px 8px; cursor:pointer; display:flex; flex-direction:column; align-items:flex-start; gap:1px; white-space:nowrap; }
+.tpl-bm small{ font-size:11px; font-weight:400; }
+.tpl-bm:hover{ color:var(--text); }
+.tpl-bm.on{ color:var(--lime); border-bottom-color:var(--lime); }
