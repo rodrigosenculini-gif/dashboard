@@ -7132,6 +7132,16 @@ function Dashboard({ permitidas, onLogout }) {
             <span aria-hidden="true">&#8962;</span> Início
           </button>
         )}
+        {/* atalho fixo para o Painel da IA, em qualquer tela (dono, 01/10) */}
+        {podeVer('painel') && (
+          <button className={`voltar-inicio atalho-painel ${view === 'painel' ? 'on' : ''}`}
+                  onClick={() => changeView('painel')} title="Abrir o Painel da IA de atendimento">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M9 4v16M12.5 14l2-3 2 2 2.5-4" />
+            </svg> Painel
+          </button>
+        )}
         <ViewSwitcher view={view} setView={changeView} permitidas={permitidas} />
         {/* o "atualizado as" de cada view e renderizado aqui via portal, para
             ficar na MESMA linha do seletor -- cada view tem seu proprio

@@ -2056,6 +2056,8 @@ body {
 }
 .voltar-inicio:hover{ border-color:var(--lime); color:var(--lime); }
 .voltar-inicio span{ font-size:15px; line-height:1; }
+/* atalho fixo do Painel da IA no cabeçalho */
+.voltar-inicio.atalho-painel.on{ border-color:var(--lime); color:var(--lime); background:rgba(169,217,127,.1); }
 
 .home-atalhos{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
 .home-atalho{
