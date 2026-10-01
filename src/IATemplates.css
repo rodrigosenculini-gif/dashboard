@@ -71,3 +71,9 @@
   .tpl-grade3{ grid-template-columns:1fr; }
   .tpl-previa{ position:static; }
 }
+
+/* cabeçalho com mídia */
+.tpl-bolha-midia{ display:block; width:100%; max-height:180px; object-fit:cover; border-radius:6px; margin-bottom:6px; }
+.tpl-bolha-midia.vazio{ background:#2a3942; color:#8696a0; font-size:12.5px; text-align:center; padding:28px 8px; }
+.tpl-arquivo{ position:relative; cursor:pointer; }
+.tpl-arquivo input{ position:absolute; inset:0; opacity:0; cursor:pointer; }

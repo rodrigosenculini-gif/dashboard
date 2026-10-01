@@ -37,7 +37,10 @@ const CASOS = [
   ['Primeiro contato (leilão)', 'Primeira mensagem para o lead que veio do leilão', 'MARKETING'],
 ]
 
-const vazio = () => ({ waba: '', nome: '', categoria: 'MARKETING', idioma: 'pt_BR', cabecalho: '', corpo: '', exemplos: [], rodape: '', botoes: [] })
+const vazio = () => ({ waba: '', nome: '', categoria: 'MARKETING', idioma: 'pt_BR', cabTipo: 'NENHUM', cabecalho: '', midia: null, corpo: '', exemplos: [], rodape: '', botoes: [] })
+const TIPOS_CAB = [['NENHUM', 'Sem cabeçalho'], ['TEXT', 'Texto'], ['IMAGE', 'Imagem'], ['VIDEO', 'Vídeo'], ['DOCUMENT', 'Documento']]
+const ACEITA = { IMAGE: 'image/jpeg,image/png', VIDEO: 'video/mp4', DOCUMENT: 'application/pdf' }
+const NOME_MIDIA = { IMAGE: 'imagem', VIDEO: 'vídeo', DOCUMENT: 'documento' }
 const varsDe = (t) => [...new Set((String(t).match(/\{\{(\d+)\}\}/g) || []).map((x) => Number(x.replace(/\D/g, ''))))].sort((a, b) => a - b)
 const slug = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60)
 
@@ -45,7 +48,8 @@ function partes(t) {
   const c = t.components || []
   const h = c.find((x) => x.type === 'HEADER'), b = c.find((x) => x.type === 'BODY'), f = c.find((x) => x.type === 'FOOTER')
   const bt = c.find((x) => x.type === 'BUTTONS')
-  return { cabecalho: h ? (h.format === 'TEXT' ? h.text : `[${(h.format || '').toLowerCase()}]`) : '', corpo: b?.text || '',
+  return { formato: h && h.format !== 'TEXT' ? h.format : null, midiaUrl: h?.example?.header_handle?.[0] || null,
+    cabecalho: h && h.format === 'TEXT' ? h.text : '', corpo: b?.text || '',
     exemplos: b?.example?.body_text?.[0] || [], rodape: f?.text || '', botoes: bt?.buttons || [] }
 }
 
@@ -61,7 +65,9 @@ function conferir(f) {
   if (/^\s*\{\{\d+\}\}/.test(f.corpo) || /\{\{\d+\}\}[\s.!?]*$/.test(f.corpo)) e.push('A Meta não aceita variável no começo nem no fim da mensagem.')
   if (/\{\{\d+\}\}\s*\{\{\d+\}\}/.test(f.corpo)) e.push('Duas variáveis seguidas: coloque texto entre elas.')
   if (v.some((n) => !String(f.exemplos[n - 1] || '').trim())) e.push('Cada variável precisa de um exemplo.')
-  if (f.cabecalho.length > 60) e.push('Cabeçalho: até 60 caracteres.')
+  if (f.cabTipo === 'TEXT' && !f.cabecalho.trim()) e.push('Escreva o texto do cabeçalho ou escolha "Sem cabeçalho".')
+  if (f.cabTipo === 'TEXT' && f.cabecalho.length > 60) e.push('Cabeçalho: até 60 caracteres.')
+  if (ACEITA[f.cabTipo] && !f.midia?.handle) e.push(`Envie um arquivo de exemplo (${NOME_MIDIA[f.cabTipo]}) para o cabeçalho.`)
   if (/\{\{/.test(f.cabecalho) || /\{\{/.test(f.rodape)) e.push('Cabeçalho e rodapé sem variáveis.')
   if (f.rodape.length > 60) e.push('Rodapé: até 60 caracteres.')
   const qr = f.botoes.filter((b) => b.tipo === 'QUICK_REPLY').length, url = f.botoes.filter((b) => b.tipo === 'URL').length
@@ -77,7 +83,8 @@ function conferir(f) {
 
 function componentes(f) {
   const c = []
-  if (f.cabecalho.trim()) c.push({ type: 'HEADER', format: 'TEXT', text: f.cabecalho.trim() })
+  if (f.cabTipo === 'TEXT' && f.cabecalho.trim()) c.push({ type: 'HEADER', format: 'TEXT', text: f.cabecalho.trim() })
+  if (ACEITA[f.cabTipo] && f.midia?.handle) c.push({ type: 'HEADER', format: f.cabTipo, example: { header_handle: [f.midia.handle] } })
   const v = varsDe(f.corpo)
   c.push({ type: 'BODY', text: f.corpo.trim(), ...(v.length ? { example: { body_text: [v.map((n) => String(f.exemplos[n - 1]).trim())] } } : {}) })
   if (f.rodape.trim()) c.push({ type: 'FOOTER', text: f.rodape.trim() })
@@ -90,12 +97,14 @@ function componentes(f) {
   return c
 }
 
-function Bolha({ cabecalho, corpo, exemplos = [], rodape, botoes = [], titulo }) {
+function Bolha({ cabecalho, corpo, exemplos = [], rodape, botoes = [], titulo, midia }) {
   const texto = String(corpo || '').replace(/\{\{(\d+)\}\}/g, (m, n) => exemplos[Number(n) - 1] || m)
   return (
     <div className="tpl-zap">
       {titulo && <div className="tpl-zap-topo">{titulo}</div>}
       <div className="tpl-bolha">
+        {midia && (midia.url && midia.tipo === 'IMAGE' ? <img className="tpl-bolha-midia" src={midia.url} alt="" />
+          : <div className="tpl-bolha-midia vazio">{midia.tipo === 'VIDEO' ? '▶ vídeo' : midia.tipo === 'DOCUMENT' ? `📄 ${midia.nome || 'documento'}` : '🖼 imagem'}</div>)}
         {cabecalho && <b className="tpl-bolha-cab">{cabecalho}</b>}
         <p>{texto || <em className="iac-miudo">A mensagem aparece aqui.</em>}</p>
         {rodape && <small>{rodape}</small>}
@@ -153,7 +162,8 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado }) {
     else mostrar(r.motivo || 'Não foi possível sugerir agora.', 'erro')
   }
   function usar(s) {
-    setF((x) => ({ ...x, nome: s.nome, categoria: s.categoria, cabecalho: s.cabecalho?.tipo === 'TEXTO' ? s.cabecalho.texto || '' : '',
+    setF((x) => ({ ...x, nome: s.nome, categoria: s.categoria, cabTipo: s.cabecalho?.tipo === 'TEXTO' && s.cabecalho.texto ? 'TEXT' : 'NENHUM', midia: null,
+      cabecalho: s.cabecalho?.tipo === 'TEXTO' ? s.cabecalho.texto || '' : '',
       corpo: s.corpo, exemplos: s.exemplos || [], rodape: s.rodape || '',
       botoes: (s.botoes || []).map((b) => ({ tipo: ['URL', 'PHONE_NUMBER'].includes(b.tipo) ? b.tipo : 'QUICK_REPLY', texto: b.texto || '', url: b.url || '', telefone: b.telefone || '' })) }))
     window.scrollTo({ top: document.getElementById('tpl-form')?.offsetTop - 80 || 0, behavior: 'smooth' })
@@ -167,6 +177,17 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado }) {
     setEnviando(false)
     if (r.ok) { mostrar(`Enviado: ${NOME_STATUS[r.status] || r.status || 'em análise'}`); onCriado() }
     else mostrar(r.motivo || 'A Meta recusou.', 'erro')
+  }
+  const [subindo, setSubindo] = useState(false)
+  async function subirMidia(arq) {
+    if (!arq) return
+    if (arq.size > 3 * 1024 * 1024) return mostrar('Arquivo de até 3 MB.', 'erro')
+    setSubindo(true)
+    const base64 = await new Promise((ok, falhou) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = falhou; r.readAsDataURL(arq) })
+    const r = await chamar({ acao: 'midia', midia: { tipo: arq.type, nome: arq.name, base64 } })
+    setSubindo(false)
+    if (r.ok) set('midia', { handle: r.handle, nome: arq.name, tipo: f.cabTipo, url: arq.type.startsWith('image/') ? URL.createObjectURL(arq) : null })
+    else mostrar(r.motivo || 'A Meta não aceitou o arquivo.', 'erro')
   }
   const inserirVar = () => {
     const n = (vars[vars.length - 1] || 0) + 1
@@ -235,8 +256,24 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado }) {
                 </select></label>
             </div>
             <p className="iac-miudo" style={{ margin: 0 }}>Utilidade só para algo ligado a um pedido do cliente, sem oferta. A Meta reclassifica: oferta enviada como Utilidade vira Marketing.</p>
-            <label><span className="iac-rot">Cabeçalho (opcional, até 60)</span>
-              <input className="chip-input" value={f.cabecalho} onChange={(e) => set('cabecalho', e.target.value)} placeholder="Sem cabeçalho" /></label>
+            <div>
+              <span className="iac-rot">Cabeçalho</span>
+              <div className="chip-opcoes" style={{ margin: '4px 0 6px' }}>
+                {TIPOS_CAB.map(([k, t]) => (
+                  <button key={k} className={`chip-opcao ${f.cabTipo === k ? 'on' : ''}`}
+                          onClick={() => setF((x) => ({ ...x, cabTipo: k, midia: k === x.cabTipo ? x.midia : null }))}>{t}</button>
+                ))}
+              </div>
+              {f.cabTipo === 'TEXT' && <input className="chip-input" value={f.cabecalho} maxLength={60} onChange={(e) => set('cabecalho', e.target.value)} placeholder="Até 60 caracteres" />}
+              {ACEITA[f.cabTipo] && (
+                <div className="iac-filtros" style={{ margin: 0 }}>
+                  <label className="reset-btn tpl-arquivo">{subindo ? 'Enviando à Meta…' : f.midia?.handle ? `Trocar ${NOME_MIDIA[f.cabTipo]}` : `Escolher ${NOME_MIDIA[f.cabTipo]} de exemplo`}
+                    <input type="file" accept={ACEITA[f.cabTipo]} disabled={subindo} onChange={(e) => subirMidia(e.target.files?.[0])} /></label>
+                  {f.midia?.handle && <small className="iac-miudo" style={{ margin: 0 }}>✓ {f.midia.nome} enviado</small>}
+                  <small className="iac-miudo" style={{ margin: 0 }}>Exemplo para a Meta aprovar (até 3 MB). No envio, cada disparo pode usar outra {NOME_MIDIA[f.cabTipo]}.</small>
+                </div>
+              )}
+            </div>
             <label><span className="iac-rot">Mensagem ({f.corpo.length}/1024)</span>
               <textarea className="chip-input" rows={6} value={f.corpo} onChange={(e) => set('corpo', e.target.value)}
                         placeholder="Olá {{1}}! Aqui é da Hotline. ..." /></label>
@@ -278,8 +315,8 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado }) {
             </span>
           </div>
           <div className="tpl-previa">
-            <Bolha titulo={conta ? `${conta.nome} · como o cliente vai receber` : 'Como o cliente vai receber'} cabecalho={f.cabecalho}
-                   corpo={f.corpo} exemplos={f.exemplos} rodape={f.rodape} botoes={f.botoes} />
+            <Bolha titulo={conta ? `${conta.nome} · como o cliente vai receber` : 'Como o cliente vai receber'} cabecalho={f.cabTipo === 'TEXT' ? f.cabecalho : ''}
+                   midia={ACEITA[f.cabTipo] ? (f.midia || { tipo: f.cabTipo }) : null} corpo={f.corpo} exemplos={f.exemplos} rodape={f.rodape} botoes={f.botoes} />
           </div>
         </div>
       </section>
@@ -420,6 +457,7 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
   const usarComoBase = (t) => {
     const p = partes(t)
     setBase({ waba: t.waba, nome: `${t.name.replace(/_v\d+$/, '')}_v2`.slice(0, 60), categoria: t.category === 'UTILITY' ? 'UTILITY' : 'MARKETING',
+      cabTipo: p.formato || (p.cabecalho ? 'TEXT' : 'NENHUM'), midia: null,
       cabecalho: p.cabecalho.startsWith('[') ? '' : p.cabecalho, corpo: p.corpo, exemplos: p.exemplos, rodape: p.rodape,
       botoes: p.botoes.map((b) => ({ tipo: b.type === 'URL' ? 'URL' : b.type === 'PHONE_NUMBER' ? 'PHONE_NUMBER' : 'QUICK_REPLY', texto: b.text || '', url: b.url || '', telefone: b.phone_number || '' })) })
     setAba('criar')
@@ -489,7 +527,8 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
                     </span>
                   </div>
                   <small className="iac-miudo" style={{ margin: 0 }}>{t.conta.nome} · {t.conta.numero} · {t.language}</small>
-                  <Bolha cabecalho={p.cabecalho} corpo={p.corpo} exemplos={p.exemplos} rodape={p.rodape} botoes={p.botoes} />
+                  <Bolha cabecalho={p.cabecalho} corpo={p.corpo} exemplos={p.exemplos} rodape={p.rodape} botoes={p.botoes}
+                         midia={p.formato ? { tipo: p.formato, url: p.formato === 'IMAGE' ? p.midiaUrl : null } : null} />
                   {t.status === 'REJECTED' && t.rejected_reason && t.rejected_reason !== 'NONE' && <small className="tpl-erro">Motivo da Meta: {t.rejected_reason}</small>}
                   <Taxas u={u} />
                   {ret && <small className="iac-miudo" style={{ margin: 0 }}>Retomadas da IA: {num(ret.enviados)} enviadas · {num(ret.responderam)} responderam</small>}
