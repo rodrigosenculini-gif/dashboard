@@ -1934,7 +1934,9 @@ function RankingOverlay({ onClose }) {
     setError(null)
     // data_status é uma coluna "date" pura, sem hora/fuso — manda o texto
     // exatamente como está no campo (AAAA-MM-DD), sem converter pra ISO/UTC
-    callApi('vendedoras_ranking', { date_from: dataInicio || '', date_to: dataFim || '' })
+    // forcar: o cache guardava a resposta antiga, sem pontos_total, e o
+    // ranking aparecia com 0 pontos (01/10). Consulta leve, so ao abrir.
+    callApi('vendedoras_ranking', { date_from: dataInicio || '', date_to: dataFim || '' }, { forcar: true })
       .then((d) => setRanking(d ?? []))
       .catch((e) => setError(e.message || 'Erro ao carregar ranking.'))
       .finally(() => setLoading(false))
