@@ -5,6 +5,19 @@ import './IATemplates.css'
 // com desempenho (clientes, interação, proposta, pagamento) e sugestões da IA. A Meta só é chamada pelo n8n
 // "Meta - Templates" (o token fica lá); o desempenho vem do banco (public.meta_tpl_uso, migração 161).
 
+// dados da última busca (contas/templates da Meta e desempenho por período): voltar à tela abre na hora
+const CHAVE_CACHE = 'iac_templates_cache'
+let memoria = null
+function lerCache() {
+  if (memoria) return memoria
+  try { memoria = JSON.parse(localStorage.getItem(CHAVE_CACHE) || 'null') || {} } catch { memoria = {} }
+  return memoria
+}
+function gravarCache(parte) {
+  memoria = { ...lerCache(), ...parte }
+  try { localStorage.setItem(CHAVE_CACHE, JSON.stringify(memoria)) } catch { /* sem espaço: fica só na memória */ }
+}
+
 const pct = (a, b) => (b ? Math.round((1000 * a) / b) / 10 : 0)
 const fmtPct = (v) => `${String(v).replace('.', ',')}%`
 const num = (n) => Number(n || 0).toLocaleString('pt-BR')
@@ -355,14 +368,26 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
   const [metricas, setMetricas] = useState({})
 
   const chamar = useCallback((meta) => api({ acao: 'meta', token, meta }), [api, token])
-  const carregar = useCallback(async () => {
+  // Dono, 01/10: voltar à tela não pode ficar carregando. Os dados ficam guardados (memória + localStorage) e só são
+  // buscados de novo no ↻, ao criar um template ou quando um período ainda não foi buscado.
+  const [quando, setQuando] = useState(null)
+  const buscarUso = useCallback(async (d, forcar) => {
+    const c = lerCache()
+    if (!forcar && c.uso?.[d]) { setUso(c.uso[d]); return }
+    const u = await api({ acao: 'meta_uso', token, dias: d })
+    if (u.ok) { setUso(u); gravarCache({ uso: { ...(lerCache().uso || {}), [d]: u } }) }
+  }, [api, token])
+  const carregar = useCallback(async (forcar = true) => {
+    const c = lerCache()
+    if (!forcar && c.contas) { setContasRaw(c.contas); setQuando(c.quando); return buscarUso(dias, false) }
     setCarregando(true); setErro('')
-    const [l, u] = await Promise.all([chamar({ acao: 'listar' }), api({ acao: 'meta_uso', token, dias })])
+    const [l] = await Promise.all([chamar({ acao: 'listar' }), forcar && gravarCache({ uso: {} }), buscarUso(dias, true)])
     setCarregando(false)
-    if (l.ok) setContasRaw(l.contas || []); else setErro(l.motivo === 'sessao' ? 'Sessão expirada: entre de novo no Painel.' : l.motivo || 'Não foi possível falar com a Meta.')
-    if (u.ok) setUso(u)
-  }, [chamar, api, token, dias])
-  useEffect(() => { carregar() }, [carregar])
+    if (l.ok) { setContasRaw(l.contas || []); const q = new Date().toISOString(); setQuando(q); gravarCache({ contas: l.contas || [], quando: q }) }
+    else setErro(l.motivo === 'sessao' ? 'Sessão expirada: entre de novo no Painel.' : l.motivo || 'Não foi possível falar com a Meta.')
+  }, [chamar, buscarUso, dias])
+  useEffect(() => { carregar(false) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (contasRaw) buscarUso(dias, false) }, [dias]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const contas = useMemo(() => (contasRaw || []).filter((c) => !c.erro).map((c) => {
     const n = c.phone_numbers?.data?.[0] || {}
@@ -416,7 +441,8 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
         <div className="chip-opcoes" style={{ marginLeft: 'auto' }}>
           {[7, 30, 90].map((d) => <button key={d} className={`chip-opcao ${dias === d ? 'on' : ''}`} onClick={() => setDias(d)}>{d} dias</button>)}
         </div>
-        <button className="refresh-btn" onClick={carregar} disabled={carregando}>{carregando ? 'atualizando…' : '↻'}</button>
+        {quando && !carregando && <small className="iac-miudo" style={{ margin: 0 }}>atualizado às {new Date(quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>}
+        <button className="refresh-btn" onClick={() => carregar(true)} disabled={carregando} title="Buscar de novo na Meta">{carregando ? 'atualizando…' : '↻ Atualizar'}</button>
       </div>
       {erro && <div className="state-msg error">{erro}</div>}
       {!contasRaw && !erro && <div className="state-msg">Buscando as contas na Meta…</div>}
