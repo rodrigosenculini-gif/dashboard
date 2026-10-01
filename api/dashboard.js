@@ -425,6 +425,33 @@ export default async function handler(req, res) {
       try {
         const { banco, adesao, cpf, valor } = req.body || {};
         if (!banco || !adesao) return res.status(400).json({ error: 'Informe banco e adesão.' });
+        // Venda ja confirmada pelo banco e gravada na base: nao depende da API
+        // (a Facta, por exemplo, so lista o que mudou no periodo consultado e
+        // na virada do mes "esquecia" as pagas do mes anterior). O front segue
+        // o caminho de pago+completo e o add_venda so vincula a vendedora.
+        // Duas consultas separadas (adesao / codigo) pra cada uma usar o indice.
+        {
+          const client = getPool();
+          const chave = String(adesao).trim();
+          const cols = `select cpf, nome, valor, tabela, parcelas, data, vendedor
+                        from vendas_gerais where normalizar_banco(banco) = normalizar_banco($1)`;
+          let vg = null;
+          if (/^\d{1,18}$/.test(chave)) {
+            vg = (await client.query(`${cols} and adesao = $2::bigint order by id desc limit 1`, [banco, chave])).rows[0];
+          }
+          if (!vg) {
+            vg = (await client.query(`${cols} and proposal_id_raw = $2 order by id desc limit 1`, [banco, chave])).rows[0];
+          }
+          if (vg) {
+            return res.status(200).json({
+              encontrado: true, fonte: 'base',
+              cpf_banco: vg.cpf, nome_banco: vg.nome, valor_banco: vg.valor != null ? Number(vg.valor) : null,
+              tabela_banco: vg.tabela, parcelas_banco: vg.parcelas,
+              status_banco: 'CONTRATO PAGO (já confirmado na base)',
+              data_pagamento: vg.data, vendedor_atual: vg.vendedor || null,
+            });
+          }
+        }
         // Sempre Facil: a busca e feita no banco (sf_consulta_proposta), que acha o
         // id interno pelo codigo SPF/CPF e consulta a API JoinBank ao vivo com a
         // chave do Vault. Devolve no mesmo formato dos outros bancos.
