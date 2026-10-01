@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis } from 'recharts'
 import { callApi, useRevisaoCache, TTL_MS } from './dadosCache'
 import PresencaEsteiraModal, { apiPresenca, brlP, tempoNaSituacao, FAIXAS_P, assinarEsteira } from './PresencaEsteira'
+import IAResumoRapido from './IAResumoRapido'
 
 const REFRESH_MS = TTL_MS
 
@@ -76,7 +77,7 @@ function Painel({ titulo, cor, sparkId, serie, onAbrir, children, acao }) {
   )
 }
 
-export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, views, acoes }) {
+export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, onAbrirPainel, views, acoes }) {
   const [dados, setDados] = useState(null)
   const [erro, setErro] = useState(null)
   const [carregando, setCarregando] = useState(true)
@@ -166,7 +167,22 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
         ))}
       </nav>
 
-      <div className="home-blocos">
+      <div className={`home-blocos ${onAbrirPainel ? 'com-painel' : ''}`}>
+        {onAbrirPainel && (
+          <button className="home-bloco home-bloco-painel" onClick={() => onAbrirPainel('resumo')}>
+            <span className="home-bloco-icone" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                <path d="M9 4v16M5.5 8.5h1M5.5 12h1M12.5 14l2-3 2 2 2.5-4" />
+              </svg>
+            </span>
+            <span className="home-bloco-texto">
+              <strong>Painel</strong>
+              <small>IA de atendimento: ajustes e análises</small>
+            </span>
+          </button>
+        )}
+
         <button className="home-bloco home-bloco-trello" onClick={onAbrirTrello}>
           <span className="home-bloco-icone" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
@@ -268,6 +284,8 @@ export default function VisaoInicial({ onIrPara, onAbrirTrello, onAbrirChips, vi
                    sub={fMoney(vnd.projecao_mes)} />
         </Painel>
       </div>
+
+      {onAbrirPainel && <IAResumoRapido onAbrirPainel={onAbrirPainel} />}
 
       {!!esteira.length && (
         <section className="home-painel" style={{ marginTop: 16 }}>

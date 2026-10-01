@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDialogo } from './Dialogo'
+import IAAnalises from './IAAnalises'
 import './IAConfiguracao.css'
 
-// View "IA — Configuração": muda o comportamento da IA de atendimento sem abrir
-// o n8n nem o Supabase. Tudo passa por /api/dashboard?type=config, que so
+// View "Painel" (id 'painel'; antes "IA — Configuração" + "IA — Análises", juntadas em
+// 01/10 a pedido do dono): tudo da IA de atendimento num lugar, com menu lateral.
+// A seção aberta fica em sessionStorage 'iac_secao' (a tela Geral usa isso para
+// abrir direto numa seção). As Análises não precisam do token; os ajustes sim.
+// Muda o comportamento da IA de atendimento sem abrir o n8n nem o Supabase. Tudo passa por /api/dashboard?type=config, que so
 // repassa para public.config_ler / public.config_salvar -- a validacao e o
 // historico (quem, quando, antes e depois) ficam no banco (migracoes 154/155
 // do projeto da IA, C:\hotline\supabase).
@@ -13,7 +17,7 @@ import './IAConfiguracao.css'
 const AUTH_KEY = 'disparos_dashboard_auth'
 const TOKEN_KEY = 'ia_config_token'
 
-function lerToken() {
+export function lerToken() {
   try {
     const t = localStorage.getItem(TOKEN_KEY)
     if (t) return t
@@ -24,7 +28,7 @@ function gravarToken(t) {
   try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY) } catch { /* ignora */ }
 }
 
-async function api(corpo) {
+export async function api(corpo) {
   const r = await fetch('/api/dashboard?type=config', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
   })
@@ -32,7 +36,7 @@ async function api(corpo) {
 }
 
 // ---------------------------------------------------------------- formatos
-const hora = (d) => (d ? new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '')
+export const hora = (d) => (d ? new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '')
 function quando(d) {
   if (!d) return ''
   const dt = new Date(d), min = Math.round((Date.now() - dt) / 60000)
@@ -51,9 +55,9 @@ function duracao(min) {
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`
 
 const NOME_BANCO = { 'NOVO SAQUE': 'Novo Saque', 'PRESENÇA': 'Presença', SOMA: 'Soma', FACTA: 'Facta', 'SEMPRE FACIL': 'Sempre Fácil', C6: 'C6' }
-const nomeBanco = (b) => NOME_BANCO[b] || b
+export const nomeBanco = (b) => NOME_BANCO[b] || b
 const NOME_PRODUTO = { fgts: 'FGTS', clt: 'CLT', energia: 'Energia' }
-const nomeProduto = (p) => NOME_PRODUTO[String(p || '').toLowerCase()] || String(p || '').toUpperCase()
+export const nomeProduto = (p) => NOME_PRODUTO[String(p || '').toLowerCase()] || String(p || '').toUpperCase()
 
 // ---------------------------------------------------------------- textos da IA
 // codigo -> [nome que aparece, quando a IA manda]. Codigo sem entrada aqui
@@ -170,7 +174,7 @@ function etapaDo(m) {
 }
 
 // ---------------------------------------------------------------- pequenos componentes
-function Chave({ ligado, onChange, disabled, rotulo }) {
+export function Chave({ ligado, onChange, disabled, rotulo }) {
   return (
     <button type="button" role="switch" aria-checked={!!ligado} aria-label={rotulo} disabled={disabled}
             className={`iac-chave ${ligado ? 'on' : ''}`} onClick={() => onChange(!ligado)}>
@@ -220,7 +224,7 @@ function Linha({ titulo, ajuda, children, id }) {
 }
 
 // ---------------------------------------------------------------- bancos
-function estadoBanco(b) {
+export function estadoBanco(b) {
   const u = b.uso_24h || {}
   if (!b.ativo && b.pausado_ate) return { cls: 'pausa', txt: `Pausado até ${hora(b.pausado_ate)}` }
   if (!b.ativo) return { cls: 'off', txt: 'Desligado' }
@@ -903,6 +907,7 @@ function SecaoResumo({ d, salvar, irPara, dialogo }) {
         <p className="section-label">O que dá para fazer aqui</p>
         <div className="iac-atalhos">
           {[
+            ['analises', 'Ver como a IA está convertendo', 'funil, onde os clientes param, bancos, tempos e custo'],
             ['bancos', 'Pausar ou desligar um banco', 'quando um banco está falhando'],
             ['mensagens', 'Mudar o que a IA escreve', 'saudação, pedido de CPF, proposta…'],
             ['lembretes', 'Ajustar os lembretes', 'quando e quantas vezes cobrar o cliente'],
@@ -944,10 +949,27 @@ function indiceBusca(d) {
 }
 
 // ---------------------------------------------------------------- tela
-const SECOES = [
-  ['resumo', 'Resumo'], ['bancos', 'Bancos'], ['mensagens', 'Mensagens'], ['lembretes', 'Lembretes'],
-  ['ofertas', 'Ofertas e jornada'], ['escalada', 'Sem resposta'], ['historico', 'Histórico'],
+// Menu lateral do Painel (dono, 01/10: tudo da IA num lugar só, com abas na lateral)
+const IC = {
+  resumo: 'M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 7h6V4h-6z',
+  analises: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  bancos: 'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18',
+  mensagens: 'M4 5h16v11H8l-4 4z',
+  lembretes: 'M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zM18 16V11a6 6 0 1 0-12 0v5l-2 2h16z',
+  ofertas: 'M20 12l-8 8-9-9V3h8zM7.5 7.5h.01',
+  escalada: 'M16 11a4 4 0 1 0-8 0M3 21a9 9 0 0 1 18 0M19 4v4M21 6h-4',
+  historico: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 3',
+}
+const GRUPOS = [
+  ['Visão geral', [['resumo', 'Resumo'], ['analises', 'Análises']]],
+  ['Ajustes da IA', [['bancos', 'Bancos'], ['mensagens', 'Mensagens'], ['lembretes', 'Lembretes'],
+                     ['ofertas', 'Ofertas e jornada'], ['escalada', 'Clientes sem resposta']]],
+  ['Registro', [['historico', 'Histórico']]],
 ]
+const Icone = ({ k }) => (
+  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8"
+       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={IC[k]} /></svg>
+)
 
 function Entrar({ onToken }) {
   const [senha, setSenha] = useState('')
@@ -977,7 +999,12 @@ export default function IAConfiguracao({ onVoltar }) {
   const [d, setD] = useState(null)
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(false)
-  const [secao, setSecao] = useState(() => { try { return sessionStorage.getItem('iac_secao') || 'resumo' } catch { return 'resumo' } })
+  const [secao, setSecao] = useState(() => {
+    try {
+      const s = sessionStorage.getItem('iac_secao')
+      return GRUPOS.some(([, l]) => l.some(([k]) => k === s)) ? s : 'resumo'
+    } catch { return 'resumo' }
+  })
   const [filtroMsg, setFiltroMsg] = useState(null)
   const [busca, setBusca] = useState('')
   const [aviso, setAviso] = useState(null)
@@ -1036,22 +1063,40 @@ export default function IAConfiguracao({ onVoltar }) {
       .filter(Boolean).sort((a, b) => b.pontos - a.pontos).slice(0, 12)
   }, [d, busca])
 
+  const ajustes = secao !== 'analises'
   return (
     <>
       <div className="topbar">
-        <h1><span className="pulse" /> IA &mdash; Configuração</h1>
+        <h1><span className="pulse" /> Painel <span className="iac-titulo-sub">IA de atendimento</span></h1>
         <div className="topbar-right">
-          {d && <span className="status-line">{carregando ? 'atualizando…' : `${d.usuario} · atualizado`}</span>}
+          {d && ajustes && <span className="status-line">{carregando ? 'atualizando…' : `${d.usuario} · atualizado`}</span>}
           {onVoltar && <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>}
-          {token && <button className="refresh-btn" onClick={carregar} disabled={carregando}>&#8635; Atualizar</button>}
+          {token && ajustes && <button className="refresh-btn" onClick={carregar} disabled={carregando}>&#8635; Atualizar</button>}
         </div>
       </div>
 
-      {!token && <Entrar onToken={setToken} />}
-      {token && erro && <div className="state-msg error">{erro}</div>}
-      {token && !d && !erro && <div className="state-msg">Carregando a configuração…</div>}
+      <div className="iac-layout">
+        <aside className="iac-lateral" aria-label="Seções do painel">
+          {GRUPOS.map(([g, itens]) => (
+            <div key={g} className="iac-grupo">
+              <p>{g}</p>
+              {itens.map(([k, t]) => (
+                <button key={k} className={`iac-item ${secao === k ? 'on' : ''}`} onClick={() => irPara(k)}
+                        aria-current={secao === k ? 'page' : undefined}>
+                  <Icone k={k} /><span>{t}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </aside>
 
-      {token && d && (
+        <div className="iac-principal">
+      {!ajustes && <IAAnalises embutido />}
+      {ajustes && !token && <Entrar onToken={setToken} />}
+      {ajustes && token && erro && <div className="state-msg error">{erro}</div>}
+      {ajustes && token && !d && !erro && <div className="state-msg">Carregando a configuração…</div>}
+
+      {ajustes && token && d && (
         <>
           <div className="iac-topo">
             <input className="chip-input iac-busca" value={busca} onChange={(e) => setBusca(e.target.value)}
@@ -1067,11 +1112,6 @@ export default function IAConfiguracao({ onVoltar }) {
             )}
             {busca.trim().length >= 2 && !resultados.length && <div className="iac-resultados"><p className="iac-miudo">Nada encontrado com “{busca}”.</p></div>}
           </div>
-          <nav className="iac-secoes">
-            {SECOES.map(([k, t]) => (
-              <button key={k} className={`iac-secao ${secao === k ? 'on' : ''}`} onClick={() => irPara(k)}>{t}</button>
-            ))}
-          </nav>
           <div className="iac-corpo">
             {secao === 'resumo' && <SecaoResumo d={d} salvar={salvar} irPara={irPara} dialogo={dialogo} />}
             {secao === 'bancos' && <SecaoBancos d={d} salvar={salvar} dialogo={dialogo} />}
@@ -1083,6 +1123,8 @@ export default function IAConfiguracao({ onVoltar }) {
           </div>
         </>
       )}
+        </div>
+      </div>
       {aviso && <div className={`iac-toast ${aviso.tipo}`}>{aviso.texto}</div>}
     </>
   )

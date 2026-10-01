@@ -6,7 +6,7 @@
 .kpi-grid.iaa-kpis{ grid-template-columns:repeat(6, minmax(0, 1fr)); margin-bottom:16px; }
 .iaa-kpis .kpi{ display:flex; flex-direction:column; }
 .iaa-kpis .kpi-label{ margin-bottom:12px; }
-.iaa-kpis .kpi-value{ font-size:22px; margin-top:auto; }
+.iaa-kpis .kpi-value{ font-size:21px; margin-top:auto; white-space:nowrap; }
 .iaa-kpis small{ display:block; text-align:right; color:var(--muted); font-size:11px; margin-top:4px; }
 
 .iaa-bloco{ margin-bottom:16px; }

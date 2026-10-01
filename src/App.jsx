@@ -10,7 +10,6 @@ import PresencaEsteiraModal from './PresencaEsteira'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
 import IAConfiguracao from './IAConfiguracao'
-import IAAnalises from './IAAnalises'
 import Trello from './Trello'
 import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
 import MetaComemoracao from './MetaComemoracao'
@@ -92,6 +91,8 @@ const VISIBLE_DEFAULT = 6
 // Disparos e virou 'disparos' — VIEWS_NAV é o que aparece no menu de views.
 const VIEWS = [
   { id: 'inicio', label: 'Geral' },
+  // Painel da IA de atendimento: configuração e análises juntas, com menu lateral (01/10)
+  { id: 'painel', label: 'Painel' },
   { id: 'disparos', label: 'Disparos' },
   { id: 'leilao', label: 'Meta — Detalhado' },
   { id: 'produtos', label: 'Entradas LP' },
@@ -99,9 +100,9 @@ const VIEWS = [
   { id: 'vendedoras', label: 'Vendedoras' },
   { id: 'vendas', label: 'Vendas' },
   { id: 'ia', label: 'IA — Treinamento' },
-  { id: 'ia_config', label: 'IA — Configuração' },
-  { id: 'ia_analises', label: 'IA — Análises' },
 ]
+// views que viraram seções do Painel: link ou view salva antiga abre o Painel
+const VIEW_ANTIGA = { geral: 'disparos', ia_config: 'painel', ia_analises: 'painel' }
 
 // Passa pelo cache: devolve na hora o que ja foi carregado, congela
 // periodo fechado e so revalida quando o Supabase mudou. `opts.forcar`
@@ -7101,7 +7102,8 @@ function Dashboard({ permitidas, onLogout }) {
       const salvo = localStorage.getItem(VIEW_STORAGE_KEY)
       if (!salvo) return 'inicio'
       // 'geral' era o id antigo do dashboard de Disparos
-      return salvo === 'geral' ? 'disparos' : salvo
+      if (salvo === 'ia_analises') { try { sessionStorage.setItem('iac_secao', 'analises') } catch { /* ignora */ } }
+      return VIEW_ANTIGA[salvo] || salvo
     } catch {
       return 'inicio'
     }
@@ -7148,6 +7150,10 @@ function Dashboard({ permitidas, onLogout }) {
           onIrPara={changeView}
           onAbrirTrello={() => changeView('trello')}
           onAbrirChips={() => changeView('chips')}
+          onAbrirPainel={(secao) => {
+            if (secao) { try { sessionStorage.setItem('iac_secao', secao) } catch { /* ignora */ } }
+            changeView('painel')
+          }}
         />
       )}
       {view === 'disparos' && podeVer('disparos') && <VisaoGeral />}
@@ -7157,8 +7163,7 @@ function Dashboard({ permitidas, onLogout }) {
       {view === 'vendedoras' && podeVer('vendedoras') && <VendedorasView ferramentas={acoesVendedoras} />}
       {view === 'vendas' && podeVer('vendas') && <VendasView />}
       {view === 'ia' && podeVer('ia') && <IATreinamento />}
-      {view === 'ia_config' && podeVer('ia_config') && <IAConfiguracao onVoltar={() => changeView('inicio')} />}
-      {view === 'ia_analises' && podeVer('ia_analises') && <IAAnalises onVoltar={() => changeView('inicio')} />}
+      {view === 'painel' && podeVer('painel') && <IAConfiguracao onVoltar={() => changeView('inicio')} />}
       {view === 'trello' && podeVer('trello') && <Trello onVoltar={() => changeView('inicio')} />}
       {view === 'chips' && podeVer('chips') && <Chips onVoltar={() => changeView('inicio')} />}
     </div>

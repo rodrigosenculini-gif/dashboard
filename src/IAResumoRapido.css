@@ -1,0 +1,38 @@
+/* Bloco "IA de atendimento" da tela Geral (IAResumoRapido.jsx) e o 3º atalho (Painel) ao lado de Trello e Chips */
+.home-blocos.com-painel{ grid-template-columns:repeat(3, 1fr); }
+.home-bloco-painel{ color:var(--rose); } .home-bloco-painel:hover{ border-color:var(--rose); }
+
+.home-ia{ margin-top:16px; }
+.home-ia-links{ display:flex; gap:6px; flex-wrap:wrap; }
+.home-ia-links button{
+  background:var(--surface-2); border:1px solid var(--border); color:var(--muted); border-radius:8px;
+  padding:5px 10px; font:inherit; font-size:11.5px; cursor:pointer;
+}
+.home-ia-links button:hover{ color:var(--text); border-color:var(--lime); }
+.home-ia-grid{ display:grid; grid-template-columns:1.25fr 1fr; gap:20px; margin-top:6px; }
+.home-ia-rotulo{ font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:6px 0 6px; }
+
+.home-ia-ajustes{ border-left:1px solid var(--border); padding-left:20px; min-width:0; }
+.home-ia-bancos{ list-style:none; margin:0 0 6px; padding:0; }
+.home-ia-bancos li{ display:flex; align-items:center; gap:9px; padding:7px 0; border-bottom:1px solid var(--border); font-size:12.5px; }
+.home-ia-dot{ width:8px; height:8px; border-radius:50%; background:var(--muted); flex:0 0 8px; }
+.home-ia-bancos .s-ok .home-ia-dot{ background:var(--lime); }
+.home-ia-bancos .s-aviso .home-ia-dot{ background:var(--gold); }
+.home-ia-bancos .s-ruim .home-ia-dot{ background:var(--rose); }
+.home-ia-nome{ min-width:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.home-ia-nome em{ font-style:normal; font-family:var(--font-mono); font-size:10.5px; color:var(--muted); margin-left:3px; }
+.home-ia-estado{ color:var(--muted); font-size:11.5px; white-space:nowrap; }
+.home-ia-bancos .s-ok .home-ia-estado{ color:var(--lime); }
+.home-ia-bancos .s-aviso .home-ia-estado{ color:var(--gold); }
+.home-ia-bancos .s-ruim .home-ia-estado{ color:var(--rose); }
+.home-ia-bancos .chips-mini{ flex:0 0 auto; }
+.home-ia-linha{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0 2px; font-size:12.5px; cursor:pointer; }
+.home-ia-linha em{ font-style:normal; font-family:var(--font-mono); font-size:11px; color:var(--muted); margin-left:4px; }
+.home-ia-aviso{ color:var(--lime); font-size:12px; margin:8px 0 0; }
+.home-ia-entrar{ display:flex; flex-direction:column; gap:10px; align-items:flex-start; font-size:12.5px; color:var(--muted); padding:10px 0; }
+
+@media (max-width:900px){
+  .home-blocos.com-painel{ grid-template-columns:1fr; }
+  .home-ia-grid{ grid-template-columns:1fr; }
+  .home-ia-ajustes{ border-left:0; padding-left:0; border-top:1px solid var(--border); padding-top:8px; }
+}

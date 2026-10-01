@@ -102,7 +102,8 @@ function Paradas({ paradas }) {
   )
 }
 
-export default function IAAnalises({ onVoltar }) {
+// embutido: dentro do Painel (IAConfiguracao.jsx), sem a barra de título própria
+export default function IAAnalises({ onVoltar, embutido }) {
   const [periodo, setPeriodo] = useState('30')
   const [de, setDe] = useState(diasAtras(29))
   const [ate, setAte] = useState(hojeSP())
@@ -136,14 +137,16 @@ export default function IAAnalises({ onVoltar }) {
 
   return (
     <>
-      <div className="topbar">
-        <h1><span className="pulse" /> IA &mdash; Análises</h1>
-        <div className="topbar-right">
-          <span className="status-line">{carregando ? 'carregando…' : ''}</span>
-          {onVoltar && <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>}
-          <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando}>&#8635; Atualizar</button>
+      {!embutido && (
+        <div className="topbar">
+          <h1><span className="pulse" /> IA &mdash; Análises</h1>
+          <div className="topbar-right">
+            <span className="status-line">{carregando ? 'carregando…' : ''}</span>
+            {onVoltar && <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>}
+            <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando}>&#8635; Atualizar</button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="iaa-filtros">
         <div className="chip-opcoes">
@@ -160,6 +163,11 @@ export default function IAAnalises({ onVoltar }) {
           ))}
           <button className={`chip-opcao ${testes ? 'on' : ''}`} onClick={() => setTestes((x) => !x)}
                   title="Inclui a caixa de teste e os telefones de teste">{testes ? '✓ ' : ''}Incluir testes</button>
+          {embutido && (
+            <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando}>
+              &#8635; {carregando ? 'Carregando…' : 'Atualizar'}
+            </button>
+          )}
         </div>
       </div>
 
