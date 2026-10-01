@@ -1,0 +1,70 @@
+/* ================= IA — ANÁLISES (IAAnalises.jsx) ================= */
+.iaa-filtros{ display:flex; gap:12px; justify-content:space-between; flex-wrap:wrap; margin-bottom:16px; }
+.iaa-datas{ display:inline-flex; align-items:center; gap:6px; margin-left:6px; color:var(--muted); font-size:12px; }
+.iaa-datas .chip-input{ width:auto; padding:5px 8px; font-size:12px; }
+
+.kpi-grid.iaa-kpis{ grid-template-columns:repeat(6, minmax(0, 1fr)); margin-bottom:16px; }
+.iaa-kpis .kpi{ display:flex; flex-direction:column; }
+.iaa-kpis .kpi-label{ margin-bottom:12px; }
+.iaa-kpis .kpi-value{ font-size:22px; margin-top:auto; }
+.iaa-kpis small{ display:block; text-align:right; color:var(--muted); font-size:11px; margin-top:4px; }
+
+.iaa-bloco{ margin-bottom:16px; }
+.iaa-duas{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.iaa-nota{ color:var(--muted); font-size:11.5px; margin:10px 0 0; line-height:1.5; }
+.iaa-rodape{ margin:4px 0 30px; }
+.iaa-cab{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
+.iaa-cab .section-label{ margin:0; }
+
+.iaa-leitura ul{ margin:0; padding-left:18px; display:flex; flex-direction:column; gap:6px; }
+.iaa-leitura li{ font-size:13.5px; line-height:1.5; }
+.iaa-leitura li::marker{ color:var(--gold); }
+
+/* funil */
+.iaa-funil{ display:flex; flex-direction:column; gap:7px; }
+.iaa-funil-linha{ display:grid; grid-template-columns:140px 1fr 46px 40px 92px; align-items:center; gap:10px; font-size:12.5px; }
+.iaa-funil-nome{ color:var(--text); }
+.iaa-funil-barra{ height:16px; background:var(--surface-2); border-radius:5px; overflow:hidden; }
+.iaa-funil-barra i{ display:block; height:100%; background:linear-gradient(90deg, var(--gold), var(--lime)); border-radius:5px; }
+.iaa-funil-n{ font-family:var(--font-mono); text-align:right; }
+.iaa-funil-pct{ font-family:var(--font-mono); color:var(--muted); text-align:right; font-size:11.5px; }
+.iaa-funil-queda{ font-family:var(--font-mono); color:var(--rose); font-size:11px; }
+
+/* paradas */
+.iaa-paradas{ display:flex; flex-direction:column; gap:12px; }
+.iaa-parada-top{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px; }
+.iaa-parada-top span{ font-family:var(--font-mono); }
+.iaa-parada-barra{ display:flex; height:10px; background:var(--surface-2); border-radius:4px; overflow:hidden; }
+.iaa-parada-barra i{ display:block; height:100%; background:#56625b; border-right:1px solid var(--surface); }
+.iaa-parada-barra i.m-parou-de-responder, .iaa-parada-barra i.m-parado-h-mais-de-2-dias{ background:var(--rose); }
+.iaa-parada-barra i.m-passou-para-a-equipe{ background:var(--gold); }
+.iaa-parada-barra i.m-em-andamento{ background:var(--lime); opacity:.6; }
+.iaa-parada-motivos{ display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:5px; font-size:11.5px; color:var(--muted); }
+.iaa-parada-motivos em{ font-style:normal; font-family:var(--font-mono); color:var(--text); margin-left:3px; }
+
+/* tabelas */
+.iaa-tabela-wrap{ overflow-x:auto; }
+.iaa-tabela{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.iaa-tabela th{ text-align:left; font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); font-weight:500; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.iaa-tabela td{ padding:8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.iaa-tabela tr:last-child td{ border-bottom:0; }
+.iaa-tabela em{ font-style:normal; color:var(--muted); font-size:11px; margin-left:4px; }
+.iaa-tabela td.iaa-ruim{ color:var(--rose); }
+
+.iaa-lista{ list-style:none; margin:0; padding:0; font-size:12.5px; }
+.iaa-lista li{ display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--border); }
+.iaa-lista li:last-child{ border-bottom:0; }
+.iaa-lista li b{ font-family:var(--font-mono); font-weight:500; white-space:nowrap; }
+.iaa-lista li.iaa-sub{ padding-left:16px; color:var(--muted); border-bottom-style:dashed; }
+.iaa-lista li.iaa-sub b{ color:var(--text); }
+
+.iaa-grafico{ height:240px; margin-bottom:12px; }
+
+@media (max-width:1100px){ .kpi-grid.iaa-kpis{ grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+@media (max-width:900px){
+  .iaa-duas{ grid-template-columns:1fr; }
+  .iaa-funil-linha{ grid-template-columns:110px 1fr 40px 36px; }
+  .iaa-funil-queda{ display:none; }
+}
+@media (max-width:600px){ .kpi-grid.iaa-kpis{ grid-template-columns:1fr 1fr; } }

@@ -1193,6 +1193,10 @@ export default async function handler(req, res) {
                          args: () => [parseInt(req.query.dias, 10) || 3] },
     trello_quadro:     { sql: 'select dashboard_trello_quadro($1::bigint) as r',
                          args: () => [req.query.quadro_id || null] },
+    // View IA — Analises: funil, paradas, bancos, tempos, equipe e custo da IA de
+    // atendimento (public.ia_analises, migracao 158 do projeto da IA). So contagens.
+    ia_analises:       { sql: 'select public.ia_analises($1::date,$2::date,$3::text,$4::boolean) as r',
+                         args: () => [p_date_from, p_date_to, req.query.produto || null, req.query.testes === '1'] },
   };
   if (RPC_JSON[type]) {
     try {
