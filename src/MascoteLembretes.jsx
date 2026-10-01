@@ -59,7 +59,9 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
   // na gestao da pra escolher pra quem e a tarefa e ver as de todas
   const [paraQuem, setParaQuem] = useState('')
   const [vendedoras, setVendedoras] = useState([])
-  const [aba, setAba] = useState('tarefas')   // tarefas | regras
+  const [aba, setAba] = useState('tarefas')   // tarefas | feitos | regras
+  // historico: as listas de tarefas so trazem as concluidas hoje
+  const [feitas, setFeitas] = useState([])
   const [regras, setRegras] = useState([])
   const [equipes, setEquipes] = useState([])
   const [novaEquipe, setNovaEquipe] = useState({ nome: '', membros: [] })
@@ -133,6 +135,15 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     getJson('regras_listar').then((r) => setRegras(Array.isArray(r) ? r : [])).catch(() => {})
     getJson('equipes_listar').then((r) => setEquipes(Array.isArray(r) ? r : [])).catch(() => {})
   }, [ehGestao, painel])
+
+  const carregarFeitas = useCallback(() => {
+    getJson('tarefas_feitas', ehGestao ? { dias: '30' } : { vendedor, dias: '30' })
+      .then((r) => setFeitas(Array.isArray(r) ? r : [])).catch(() => {})
+  }, [ehGestao, vendedor])
+
+  useEffect(() => {
+    if (painel && aba === 'feitos') carregarFeitas()
+  }, [painel, aba, carregarFeitas])
 
   // com a aba em segundo plano, chama na barra de abas
   useEffect(() => {
@@ -215,16 +226,39 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
             <button type="button" className="mascote-fechar" onClick={() => setPainel(false)}>&times;</button>
           </div>
 
-          {ehGestao && (
-            <div className="home-toggle mascote-abas">
-              <button type="button" className={aba === 'tarefas' ? 'on' : ''}
-                      onClick={() => setAba('tarefas')}>Tarefas</button>
+          <div className="home-toggle mascote-abas">
+            <button type="button" className={aba === 'tarefas' ? 'on' : ''}
+                    onClick={() => setAba('tarefas')}>Tarefas</button>
+            <button type="button" className={aba === 'feitos' ? 'on' : ''}
+                    onClick={() => setAba('feitos')}>Feitos</button>
+            {ehGestao && (
               <button type="button" className={aba === 'regras' ? 'on' : ''}
                       onClick={() => setAba('regras')}>Lembretes</button>
-            </div>
-          )}
+            )}
+          </div>
 
-          {ehGestao && aba === 'regras' ? (
+          {aba === 'feitos' ? (
+            <>
+              <p className="mascote-sub" style={{ margin: 0 }}>concluídos nos últimos 30 dias (os de hoje ficam em Tarefas)</p>
+              <ul className="mascote-lista">
+                {feitas.length === 0 && <li className="vazio">nenhum lembrete feito antes de hoje</li>}
+                {feitas.map((t) => (
+                  <li key={t.id} className="feita">
+                    <div>
+                      <span className="mascote-tit">{t.titulo}</span>
+                      <span className="mascote-hora">
+                        {ehGestao && t.vendedor ? `${t.vendedor} · ` : ''}feito {fmtQuando(t.concluido_em)}
+                      </span>
+                    </div>
+                    <div className="mascote-linha-acoes">
+                      <button type="button" title="Reabrir"
+                              onClick={async () => { await acaoTarefa(t.id, 'reabrir'); carregarFeitas() }}>&#8630;</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : ehGestao && aba === 'regras' ? (
             <>
             {/* equipes: monta o grupo uma vez e usa nos lembretes */}
             <button type="button" className="mascote-chip" style={{ alignSelf: 'flex-start' }}

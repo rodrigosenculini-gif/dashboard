@@ -1462,6 +1462,10 @@ export default async function handler(req, res) {
   } else if (type === 'tarefas_gestao') {
     sql = 'select * from dashboard_tarefas_gestao($1::text,$2::boolean)';
     params = [req.query.vendedor || null, req.query.com_feitas === '1'];
+  } else if (type === 'tarefas_feitas') {
+    // historico: concluidas antes de hoje (as listas acima so trazem as de hoje)
+    sql = 'select * from dashboard_tarefas_feitas($1::text,$2::int)';
+    params = [req.query.vendedor || null, Number(req.query.dias) || 30];
   } else if (type === 'regras_listar') {
     sql = 'select * from dashboard_regras_listar()';
     params = [];
