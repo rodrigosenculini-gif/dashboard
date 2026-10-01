@@ -59,6 +59,7 @@ function setCors(res) {
 // Assim o cron dispara exatamente nos horarios configurados (sem varrer
 // de 15 em 15 min) e a mudanca vale na hora, sem esperar o proximo ciclo.
 const N8N_BASE = 'https://hotn8n.querosacarfgts.com.br';
+const META_TPL_URL = 'https://hotnwh.querosacarfgts.com.br/webhook/meta-templates-1322593894ab1238cac560a4';
 const N8N_LEILAO_WF = 'TKxMAT4NMFgh87zq';
 
 function cronsDaConfig(cfg) {
@@ -235,6 +236,21 @@ export default async function handler(req, res) {
           const r = await client.query('select public.config_salvar($1, $2, $3::jsonb) as r',
             [token, String(b.tipo || ''), JSON.stringify(dados)]);
           return res.json(r.rows[0].r);
+        }
+        // Templates da Meta (migracao 161): conversao por template vem do banco; listar/medir/criar/sugerir vao ao
+        // n8n "Meta - Templates", que confere a sessao e chama a Meta com o token guardado la
+        if (b.acao === 'meta_uso') {
+          const r = await client.query('select public.meta_tpl_uso($1, $2) as r', [token, Number(b.dias) || 30]);
+          return res.json(r.rows[0].r);
+        }
+        if (b.acao === 'meta') {
+          const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
+          const resp = await fetch(META_TPL_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...m, token }), signal: AbortSignal.timeout(170000),
+          });
+          const txt = await resp.text();
+          try { return res.json(JSON.parse(txt)); } catch { return res.json({ ok: false, motivo: 'O n8n não respondeu agora. Tente de novo.' }); }
         }
         return res.status(400).json({ ok: false, motivo: 'acao' });
       } catch (e) {

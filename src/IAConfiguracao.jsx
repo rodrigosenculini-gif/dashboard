@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDialogo } from './Dialogo'
 import IAAnalises from './IAAnalises'
+import SecaoTemplates from './IATemplates'
 import './IAConfiguracao.css'
 
 // View "Painel" (id 'painel'; antes "IA — Configuração" + "IA — Análises", juntadas em
@@ -1157,6 +1158,7 @@ function indiceBusca(d) {
   r.push({ secao: 'ofertas', t: 'Rodadas de negociação', s: 'Produtos', k: 'negociar produto fgts clt teto' })
   r.push({ secao: 'historico', t: 'Histórico de mudanças', s: 'Histórico', k: 'quem mudou alteração log' })
   r.push({ secao: 'paginas', t: 'Páginas da LP e links de campanha', s: 'Campanhas', k: 'lp pagina link campanha disparo devolve prende whatsapp arara' })
+  r.push({ secao: 'templates', t: 'Templates do WhatsApp (Meta)', s: 'Campanhas', k: 'template modelo meta whatsapp criar sugestao conversao disparo aprovado' })
   return r
 }
 
@@ -1172,12 +1174,13 @@ const IC = {
   escalada: 'M16 11a4 4 0 1 0-8 0M3 21a9 9 0 0 1 18 0M19 4v4M21 6h-4',
   historico: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 3',
   paginas: 'M4 4h16v16H4zM4 9h16M9 9v11',
+  templates: 'M4 5h16v11H8l-4 4zM8 9h8M8 12h5',
 }
 const GRUPOS = [
   ['Visão geral', [['resumo', 'Resumo'], ['analises', 'Análises']]],
   ['Ajustes da IA', [['bancos', 'Bancos'], ['mensagens', 'Mensagens'], ['lembretes', 'Lembretes'],
                      ['ofertas', 'Ofertas e jornada'], ['escalada', 'Clientes sem resposta']]],
-  ['Campanhas', [['paginas', 'Páginas da LP']]],
+  ['Campanhas', [['templates', 'Templates WhatsApp'], ['paginas', 'Páginas da LP']]],
   ['Registro', [['historico', 'Histórico']]],
 ]
 const Icone = ({ k }) => (
@@ -1333,6 +1336,7 @@ export default function IAConfiguracao({ onVoltar }) {
             {secao === 'lembretes' && <SecaoLembretes d={d} salvar={salvar} param={param} irPara={irPara} />}
             {secao === 'ofertas' && <SecaoOfertas d={d} salvar={salvar} param={param} />}
             {secao === 'escalada' && <SecaoEscalada d={d} salvar={salvar} />}
+            {secao === 'templates' && <SecaoTemplates token={token} api={api} dialogo={dialogo} mostrar={mostrar} />}
             {secao === 'paginas' && <SecaoPaginas d={d} salvar={salvar} />}
             {secao === 'historico' && <SecaoHistorico d={d} />}
           </div>
