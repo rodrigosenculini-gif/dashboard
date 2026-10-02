@@ -790,17 +790,78 @@ const AJUDA_MODO = {
   devolve: 'Consulta na hora. Aprovou: o cliente vê "em instantes você recebe no WhatsApp" e vai para o disparo.',
   prende: 'Consulta com o cliente na página. Aprovou: botão para falar no WhatsApp; se não tocar na espera, vai para o disparo.',
 }
-const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos: [{ url: DISPARO_ARARA, source: 'lp' }], whatsapp: [], espera_s: 120, ativa: true })
+const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos: [], whatsapp: [], espera_s: 120, ativa: true, envio: null })
+const VARIAVEIS_ENVIO = [['primeiro_nome', 'Primeiro nome'], ['nome', 'Nome completo'], ['valor', 'Maior valor aprovado'], ['produto', 'Produto']]
 
-function EditorPagina({ inicial, salvar, onFechar }) {
+// Envio do aprovado (migração 166): template aprovado de uma das nossas BMs, pelo número escolhido
+function EscolherEnvio({ envio, onChange, token, api }) {
+  const [bms, setBms] = useState(null)
+  const [contas, setContas] = useState({})
+  const e = envio || { bm: 'hotline', variaveis: [] }
+  const bm = e.bm || 'hotline'
+  const chamar = (meta) => api({ acao: 'meta', token, meta })
+  useEffect(() => { chamar({ acao: 'bms' }).then((r) => setBms(r.ok ? r.bms : [])) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (contas[bm]) return
+    let guardado = null
+    try { guardado = JSON.parse(localStorage.getItem('iac_templates_cache') || 'null')?.porBm?.[bm]?.contas } catch { /* sem cache */ }
+    if (guardado) { setContas((c) => ({ ...c, [bm]: guardado })); return }
+    chamar({ acao: 'listar', bm }).then((r) => setContas((c) => ({ ...c, [bm]: r.ok ? r.contas || [] : [] })))
+  }, [bm]) // eslint-disable-line react-hooks/exhaustive-deps
+  const lista = (contas[bm] || []).filter((c) => !c.erro)
+  const conta = lista.find((c) => c.id === e.waba)
+  const aprovados = (conta?.message_templates?.data || []).filter((t) => t.status === 'APPROVED')
+  const tpl = aprovados.find((t) => t.name === e.template)
+  const corpo = tpl?.components?.find((c) => c.type === 'BODY')?.text || ''
+  const nVars = [...new Set((corpo.match(/\{\{(\d+)\}\}/g) || []))].length
+  const mudar = (x) => onChange({ ...e, ...x })
+  return (
+    <div>
+      <b>Envio do aprovado</b>
+      <p className="iac-miudo">Template do WhatsApp aprovado em uma das nossas BMs. Sai pelo número escolhido assim que o cliente for aprovado.</p>
+      <div className="iac-filtros" style={{ marginBottom: 6 }}>
+        <select className="chip-input" value={bm} onChange={(ev) => mudar({ bm: ev.target.value, waba: '', numero_id: '', numero: '', template: '', variaveis: [] })}>
+          {(bms || [{ id: 'hotline', nome: 'Hotline Infbip' }]).map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
+        </select>
+        <select className="chip-input" value={e.waba || ''} disabled={!lista.length}
+                onChange={(ev) => { const c = lista.find((x) => x.id === ev.target.value); const n = c?.phone_numbers?.data?.[0] || {}
+                  mudar({ waba: ev.target.value, numero_id: n.id || '', numero: n.display_phone_number || '', template: '', variaveis: [] }) }}>
+          <option value="">{contas[bm] ? 'Escolha o número' : 'Carregando…'}</option>
+          {lista.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.phone_numbers?.data?.[0]?.display_phone_number || '—'})</option>)}
+        </select>
+        <select className="chip-input" value={e.template || ''} disabled={!conta}
+                onChange={(ev) => { const t = aprovados.find((x) => x.name === ev.target.value)
+                  const n = [...new Set(((t?.components?.find((c) => c.type === 'BODY')?.text || '').match(/\{\{(\d+)\}\}/g) || []))].length
+                  mudar({ template: ev.target.value, idioma: t?.language || 'pt_BR', variaveis: ['primeiro_nome', 'valor', 'produto', 'nome'].slice(0, n) }) }}>
+          <option value="">{conta && !aprovados.length ? 'Nenhum template aprovado' : 'Escolha o template'}</option>
+          {aprovados.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+        </select>
+      </div>
+      {tpl && <p className="tpl-leitura" style={{ margin: '6px 0', whiteSpace: 'pre-wrap' }}>{corpo}</p>}
+      {Array.from({ length: nVars }, (_, i) => (
+        <div key={i} className="iac-filtros" style={{ marginBottom: 6 }}>
+          <span className="iac-rot">{`{{${i + 1}}}`}</span>
+          <select className="chip-input" value={(e.variaveis || [])[i] || 'primeiro_nome'}
+                  onChange={(ev) => { const v = [...(e.variaveis || [])]; v[i] = ev.target.value; mudar({ variaveis: v }) }}>
+            {VARIAVEIS_ENVIO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+          </select>
+        </div>
+      ))}
+      {!e.template && <p className="chip-erro">Sem template escolhido, o aprovado fica esperando (até 3 dias) e só recebe quando o envio for configurado.</p>}
+    </div>
+  )
+}
+
+function EditorPagina({ inicial, salvar, onFechar, token, api }) {
   const [p, setP] = useState(() => ({ ...paginaVazia(), ...inicial }))
   const [salvando, setSalvando] = useState(false)
   const set = (k, v) => setP((x) => ({ ...x, [k]: v }))
   const setDestino = (i, k, v) => set('destinos', p.destinos.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
   async function ok() {
     setSalvando(true)
-    const dados = { ...p, nome: p.nome.trim(), espera_s: Number(p.espera_s) || 120,
-      destinos: p.destinos.filter((x) => x.url.trim()).map((x) => ({ url: x.url.trim(), source: (x.source || 'lp').trim() })),
+    const dados = { ...p, nome: p.nome.trim(), espera_s: Number(p.espera_s) || 120, destinos: [],
+      envio: p.envio && p.envio.template ? { bm: p.envio.bm, waba: p.envio.waba, numero_id: p.envio.numero_id, numero: p.envio.numero,
+        template: p.envio.template, idioma: p.envio.idioma || 'pt_BR', variaveis: p.envio.variaveis || [] } : null,
       whatsapp: p.whatsapp.map((x) => x.trim()).filter(Boolean) }
     for (const k of ['criado_em', 'atualizado_em']) delete dados[k]
     const r = await salvar('lp_pagina', dados, inicial?.id ? 'Página salva' : 'Página criada')
@@ -826,25 +887,12 @@ function EditorPagina({ inicial, salvar, onFechar }) {
           ))}
         </div>
       </Linha>
-      <div>
-        <b>Disparo (para onde vai o aprovado)</b>
-        <p className="iac-miudo">Recebe {'{phone, name, campaign_id, source, lead_id}'}. Com mais de um, todos recebem.</p>
-        {p.destinos.map((x, i) => (
-          <div key={i} className="iac-filtros" style={{ marginBottom: 6 }}>
-            <input className="chip-input" style={{ flex: 3, minWidth: 220 }} value={x.url} placeholder="https://…/webhook/…"
-                   onChange={(e) => setDestino(i, 'url', e.target.value)} />
-            <input className="chip-input" style={{ flex: 1, minWidth: 90 }} value={x.source} placeholder="source"
-                   onChange={(e) => setDestino(i, 'source', e.target.value)} title="valor de source" />
-            <button className="iac-link" onClick={() => set('destinos', p.destinos.filter((_, j) => j !== i))}>remover</button>
-          </div>
-        ))}
-        <button className="iac-link" onClick={() => set('destinos', [...p.destinos, { url: '', source: 'lp' }])}>+ outro disparo</button>
-      </div>
-      {p.modo === 'prende' && (
-        <>
+      <EscolherEnvio envio={p.envio} onChange={(v) => set('envio', v)} token={token} api={api} />
+      <>
           <div>
             <b>WhatsApp do botão</b>
-            <p className="iac-miudo">Links wa.me (com a mensagem, se quiser). Com mais de um, os clientes vão em rodízio.</p>
+            <p className="iac-miudo">{p.modo === 'prende' ? 'Aparece quando o cliente é aprovado.' : 'Aparece depois de 30 s esperando a consulta.'} Links wa.me
+              (com a mensagem, se quiser). Com mais de um, os clientes vão em rodízio.</p>
             {p.whatsapp.map((x, i) => (
               <div key={i} className="iac-filtros" style={{ marginBottom: 6 }}>
                 <input className="chip-input" style={{ flex: 1, minWidth: 220 }} value={x} placeholder="https://wa.me/5511…"
@@ -854,12 +902,13 @@ function EditorPagina({ inicial, salvar, onFechar }) {
             ))}
             <button className="iac-link" onClick={() => set('whatsapp', [...p.whatsapp, ''])}>+ número</button>
           </div>
-          <Linha titulo="Esperar o clique por" ajuda="Sem tocar no botão nesse tempo, o cliente vai para o disparo.">
+          {p.modo === 'prende' && (
+          <Linha titulo="Esperar o clique por" ajuda="Sem tocar no botão nesse tempo, o cliente recebe o template.">
             <Numero valor={Math.round(p.espera_s / 60 * 10) / 10} min={0.5} max={60} passo={0.5} sufixo="min"
                     onChange={(n) => set('espera_s', Math.round(Number(n) * 60))} />
           </Linha>
-        </>
-      )}
+          )}
+      </>
       {inicial?.id && (
         <Linha titulo="Página ativa" ajuda="Desligada, os links das campanhas dela não abrem a consulta.">
           <Chave ligado={!!p.ativa} rotulo="Página ativa" onChange={(v) => set('ativa', v)} />
@@ -922,7 +971,7 @@ function EditorCampanha({ inicial, paginas, salvar, onFechar }) {
   )
 }
 
-function SecaoPaginas({ d, salvar }) {
+function SecaoPaginas({ d, salvar, token, api }) {
   const lp = d.lp || { paginas: [], campanhas: [] }
   const [ed, setEd] = useState(null)   // { tipo: 'pagina'|'campanha', v }
   const [copiado, setCopiado] = useState('')
@@ -935,21 +984,21 @@ function SecaoPaginas({ d, salvar }) {
     <>
       <p className="iac-intro">
         Páginas para campanhas. A LP atual (o link que a IA manda na conversa) continua igual; aqui ficam as duas novas,
-        cada campanha com o seu link. No disparo, acrescente <code>&amp;id=</code> com o id de cada cliente para a página já
-        abrir a consulta dele; sem id, ela pede CPF e celular.
+        cada campanha com o seu link. No template da Arara use o link da campanha: a Arara acrescenta <code>?ref=</code> com
+        o id da mensagem e a página abre a consulta do cliente; sem isso, ela pede CPF e celular.
       </p>
 
       <section className="iac-bloco">
         <p className="section-label">Páginas</p>
         {ed?.tipo === 'pagina'
-          ? <EditorPagina inicial={ed.v} salvar={salvar} onFechar={() => setEd(null)} />
+          ? <EditorPagina inicial={ed.v} salvar={salvar} onFechar={() => setEd(null)} token={token} api={api} />
           : (
             <div className="iac-bancos">
               {lp.paginas.map((p) => (
                 <div key={p.id} className="iac-banco" style={{ borderLeftColor: p.ativa ? 'var(--lime)' : 'var(--muted)' }}>
                   <div className="iac-banco-topo"><b>{p.nome}</b><span className="iac-tag">{p.ativa ? nomeProduto(p.produto) : 'desligada'}</span></div>
                   <small className="iac-miudo" style={{ margin: 0 }}>{NOME_MODO[p.modo]}{p.modo === 'prende' ? ` · espera ${Math.round(p.espera_s / 6) / 10} min · ${(p.whatsapp || []).length} WhatsApp` : ''}</small>
-                  <small className="iac-miudo" style={{ margin: 0 }}>Disparo: {(p.destinos || []).map((x) => x.url.replace(/^https:\/\/[^/]+/, '')).join(', ') || 'nenhum'}</small>
+                  <small className="iac-miudo" style={{ margin: 0 }}>Aprovado recebe: {p.envio?.template ? `${p.envio.template} · ${p.envio.numero || ''}` : 'nada ainda (escolha o template)'}</small>
                   <div className="iac-banco-acoes"><button className="iac-link" onClick={() => setEd({ tipo: 'pagina', v: p })}>Editar</button></div>
                 </div>
               ))}
@@ -973,7 +1022,7 @@ function SecaoPaginas({ d, salvar }) {
                     <b>{c.nome} {!c.ativa && <span className="iac-tag">desligada</span>}</b>
                     <small>{pagina(c.pagina_id)?.nome || '—'} · {nomeProduto(c.produto || pagina(c.pagina_id)?.produto)} · campaign_id {c.campaign_id || c.slug}</small>
                     <small>{c.ids} links · {c.abertos} abriram · {c.aprovados} aprovados · {c.cliques} tocaram no WhatsApp · {c.entregues} enviados ao disparo</small>
-                    <small style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>{linkDe(c.slug)}&amp;id=…</small>
+                    <small style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>{linkDe(c.slug)}</small>
                   </div>
                   <div className="iac-linha-ctl" style={{ gap: 10 }}>
                     <button className="chip-salvar iac-btn-p" onClick={() => copiar(linkDe(c.slug), c.slug)}>{copiado === c.slug ? 'Copiado ✓' : 'Copiar link'}</button>
@@ -1337,7 +1386,7 @@ export default function IAConfiguracao({ onVoltar }) {
             {secao === 'ofertas' && <SecaoOfertas d={d} salvar={salvar} param={param} />}
             {secao === 'escalada' && <SecaoEscalada d={d} salvar={salvar} />}
             {secao === 'templates' && <SecaoTemplates token={token} api={api} dialogo={dialogo} mostrar={mostrar} />}
-            {secao === 'paginas' && <SecaoPaginas d={d} salvar={salvar} />}
+            {secao === 'paginas' && <SecaoPaginas d={d} salvar={salvar} token={token} api={api} />}
             {secao === 'historico' && <SecaoHistorico d={d} />}
           </div>
         </>
