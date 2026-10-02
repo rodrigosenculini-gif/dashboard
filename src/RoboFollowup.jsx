@@ -13,10 +13,12 @@ const NOME_CASO = {
 }
 const NOME_ETAPA = {
   espera: 'aguardando', audio1: '1º áudio enviado', com_vendedora: 'com vendedora', lembrete: 'lembrete enviado',
+  robo_fu: 'fluxo fazendo follow-up',
 }
 const NOME_ACAO = {
   audio: 'Áudio', atribuir: 'Atribuiu', retirar: 'Retirou', nota: 'Nota', lembrete: 'Lembrete',
   email: 'E-mail', encerrar: 'Encerrou', audio_pulado: 'Áudio pulado', lembrete_pulado: 'Lembrete pulado', erro: 'Erro',
+  email_pulado: 'E-mail pulado', assumir_followup: 'Assumiu follow-up', lembrete_ligacao: 'Lembrete de ligação',
 }
 
 async function getResumo() {
