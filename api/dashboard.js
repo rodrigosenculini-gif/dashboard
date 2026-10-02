@@ -1281,8 +1281,9 @@ export default async function handler(req, res) {
   }
 
   // REL CRM: layout fixo pedido pelo CRM (BANCO, ADE, CPF, PESO, PRAZO, SEGURO,
-  // VALOR), decimais com virgula para abrir direto no Excel. Seguro vazio na
-  // venda e deduzido pelo nome da tabela ('COM SEGURO', '|C/seg|').
+  // VALOR), decimais com virgula para abrir direto no Excel. SEGURO e so 'S'
+  // quando tem seguro (sem seguro fica vazio); vazio na venda e deduzido pelo
+  // nome da tabela ('COM SEGURO', '|C/seg|').
   if (type === 'vendas_export_crm') {
     try {
       const p_banco = req.query.banco || null;
@@ -1293,10 +1294,10 @@ export default async function handler(req, res) {
                 coalesce(cpf, '') as "CPF",
                 replace(trim_scale(coalesce(peso, 0))::text, '.', ',') as "PESO",
                 coalesce(parcelas::text, '') as "PRAZO",
-                case when lower(coalesce(seguro, '')) in ('sim', 's', 'true') then 'SIM'
-                     when lower(coalesce(seguro, '')) in ('nao', 'não', 'n', 'false') then 'NAO'
-                     when tabela ~* 'sem seguro|s/ ?seg' then 'NAO'
-                     when tabela ~* 'com seguro|c/ ?seg|seguro' then 'SIM'
+                case when lower(coalesce(seguro, '')) in ('sim', 's', 'true') then 'S'
+                     when lower(coalesce(seguro, '')) in ('nao', 'não', 'n', 'false') then ''
+                     when tabela ~* 'sem seguro|s/ ?seg' then ''
+                     when tabela ~* 'com seguro|c/ ?seg|seguro' then 'S'
                      else '' end as "SEGURO",
                 replace(to_char(coalesce(valor, 0), 'FM999999990.00'), '.', ',') as "VALOR"
          from vendas_gerais
