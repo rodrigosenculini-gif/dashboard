@@ -37,7 +37,7 @@ const CASOS = [
   ['Primeiro contato (leilão)', 'Primeira mensagem para o lead que veio do leilão', 'MARKETING'],
 ]
 
-const vazio = () => ({ waba: '', nome: '', categoria: 'MARKETING', idioma: 'pt_BR', cabTipo: 'NENHUM', cabecalho: '', midia: null, corpo: '', exemplos: [], rodape: '', botoes: [] })
+const vazio = () => ({ contas: [], nome: '', categoria: 'MARKETING', idioma: 'pt_BR', cabTipo: 'NENHUM', cabecalho: '', midia: null, corpo: '', exemplos: [], rodape: '', botoes: [] })
 const TIPOS_CAB = [['NENHUM', 'Sem cabeçalho'], ['TEXT', 'Texto'], ['IMAGE', 'Imagem'], ['VIDEO', 'Vídeo'], ['DOCUMENT', 'Documento']]
 const ACEITA = { IMAGE: 'image/jpeg,image/png', VIDEO: 'video/mp4', DOCUMENT: 'application/pdf' }
 const NOME_MIDIA = { IMAGE: 'imagem', VIDEO: 'vídeo', DOCUMENT: 'documento' }
@@ -56,7 +56,7 @@ function partes(t) {
 // erros que a Meta reprova (conferidos antes de enviar)
 function conferir(f) {
   const e = []
-  if (!f.waba) e.push('Escolha a conta.')
+  if (!f.contas.length) e.push('Escolha ao menos uma conta.')
   if (!/^[a-z0-9_]{1,512}$/.test(f.nome)) e.push('Nome: só letras minúsculas, números e _.')
   if (!f.corpo.trim()) e.push('Escreva a mensagem.')
   if (f.corpo.length > 1024) e.push('A mensagem passa de 1024 caracteres.')
@@ -67,7 +67,7 @@ function conferir(f) {
   if (v.some((n) => !String(f.exemplos[n - 1] || '').trim())) e.push('Cada variável precisa de um exemplo.')
   if (f.cabTipo === 'TEXT' && !f.cabecalho.trim()) e.push('Escreva o texto do cabeçalho ou escolha "Sem cabeçalho".')
   if (f.cabTipo === 'TEXT' && f.cabecalho.length > 60) e.push('Cabeçalho: até 60 caracteres.')
-  if (ACEITA[f.cabTipo] && !f.midia?.handle) e.push(`Envie um arquivo de exemplo (${NOME_MIDIA[f.cabTipo]}) para o cabeçalho.`)
+  if (ACEITA[f.cabTipo] && !f.midia?.arquivo) e.push(`Envie um arquivo de exemplo (${NOME_MIDIA[f.cabTipo]}) para o cabeçalho.`)
   if (/\{\{/.test(f.cabecalho) || /\{\{/.test(f.rodape)) e.push('Cabeçalho e rodapé sem variáveis.')
   if (f.rodape.length > 60) e.push('Rodapé: até 60 caracteres.')
   const qr = f.botoes.filter((b) => b.tipo === 'QUICK_REPLY').length, url = f.botoes.filter((b) => b.tipo === 'URL').length
@@ -81,10 +81,10 @@ function conferir(f) {
   return [...new Set(e)]
 }
 
-function componentes(f) {
+function componentes(f, handle) {
   const c = []
   if (f.cabTipo === 'TEXT' && f.cabecalho.trim()) c.push({ type: 'HEADER', format: 'TEXT', text: f.cabecalho.trim() })
-  if (ACEITA[f.cabTipo] && f.midia?.handle) c.push({ type: 'HEADER', format: f.cabTipo, example: { header_handle: [f.midia.handle] } })
+  if (ACEITA[f.cabTipo] && handle) c.push({ type: 'HEADER', format: f.cabTipo, example: { header_handle: [handle] } })
   const v = varsDe(f.corpo)
   c.push({ type: 'BODY', text: f.corpo.trim(), ...(v.length ? { example: { body_text: [v.map((n) => String(f.exemplos[n - 1]).trim())] } } : {}) })
   if (f.rodape.trim()) c.push({ type: 'FOOTER', text: f.rodape.trim() })
@@ -129,19 +129,29 @@ function Taxas({ u }) {
 }
 
 // ---------------------------------------------------------------- criar (com sugestões da IA)
-function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado, bm }) {
-  const [f, setF] = useState(() => ({ ...vazio(), waba: contas[0]?.id || '', ...inicial }))
+const deInicial = (inicial, bm) => inicial ? { ...inicial, contas: inicial.waba ? [{ id: inicial.waba, bm }] : (inicial.contas || []) } : null
+
+// Criação em lote (dono, 02/10): o mesmo template em várias contas, de qualquer BM; um envio por conta, com o resultado de cada uma
+function Criar({ contas, grupos, carregarBm, uso, inicial, chamar, dialogo, mostrar, onCriado, bm }) {
+  const [f, setF] = useState(() => ({ ...vazio(), contas: contas[0] ? [{ id: contas[0].id, bm }] : [], ...deInicial(inicial, bm) }))
+  const [resultados, setResultados] = useState(null)
   const [caso, setCaso] = useState(null)
   const [ideia, setIdeia] = useState('')
   const [produto, setProduto] = useState('clt')
   const [sug, setSug] = useState(null)
   const [pedindo, setPedindo] = useState(false)
   const [enviando, setEnviando] = useState(false)
-  useEffect(() => { if (inicial) setF((x) => ({ ...x, ...inicial })) }, [inicial])
+  useEffect(() => { if (inicial) setF((x) => ({ ...x, ...deInicial(inicial, bm) })) }, [inicial]) // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
   const erros = conferir(f)
   const vars = varsDe(f.corpo)
-  const conta = contas.find((c) => c.id === f.waba)
+  const todasContas = grupos.flatMap((g) => (g.contas || []).map((c) => ({ ...c, bm: g.id, bmNome: g.nome })))
+  const conta = todasContas.find((c) => c.id === f.contas[0]?.id) || contas.find((c) => c.id === f.contas[0]?.id)
+  const marcada = (id) => f.contas.some((x) => x.id === id)
+  const alternar = (c) => set('contas', marcada(c.id) ? f.contas.filter((x) => x.id !== c.id) : [...f.contas, { id: c.id, bm: c.bm }])
+  const marcarGrupo = (g, sim) => set('contas', sim
+    ? [...f.contas.filter((x) => x.bm !== g.id), ...(g.contas || []).map((c) => ({ id: c.id, bm: g.id }))]
+    : f.contas.filter((x) => x.bm !== g.id))
 
   async function pedirSugestoes() {
     setPedindo(true); setSug(null)
@@ -170,13 +180,34 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado, bm })
   }
   async function enviar() {
     if (erros.length) return
-    if (!await dialogo.confirmar({ titulo: `Enviar "${f.nome}" para a Meta?`, rotuloOk: 'Enviar para análise',
-      texto: `Vai para a conta ${conta?.nome || f.waba} (${conta?.numero || ''}). Depois de aprovado, o template não pode ser editado.` })) return
+    const nomes = f.contas.map((x) => todasContas.find((c) => c.id === x.id)?.nome || x.id)
+    if (!await dialogo.confirmar({ titulo: `Enviar "${f.nome}" para ${f.contas.length} conta${f.contas.length > 1 ? 's' : ''}?`, rotuloOk: 'Enviar para análise',
+      texto: `${nomes.join(', ')}. Depois de aprovado, o template não pode ser editado.` })) return
     setEnviando(true)
-    const r = await chamar({ acao: 'criar', waba: f.waba, template: { name: f.nome, category: f.categoria, language: f.idioma, components: componentes(f) } })
+    const res = f.contas.map((x) => ({ ...x, nome: todasContas.find((c) => c.id === x.id)?.nome || x.id, estado: 'esperando' }))
+    setResultados([...res])
+    const handles = {}
+    for (const r of res) {
+      r.estado = 'enviando'; setResultados([...res])
+      let handle = null
+      if (ACEITA[f.cabTipo]) {
+        // o arquivo de exemplo vale para o app da BM: sobe uma vez por BM
+        if (!handles[r.bm]) {
+          const m = await chamar({ acao: 'midia', bm: r.bm, midia: { tipo: f.midia.arquivo.tipo, nome: f.midia.nome, base64: f.midia.arquivo.base64 } })
+          handles[r.bm] = m.ok ? m.handle : { erro: m.motivo || 'A Meta não aceitou o arquivo.' }
+        }
+        if (typeof handles[r.bm] !== 'string') { r.estado = 'erro'; r.motivo = handles[r.bm].erro; setResultados([...res]); continue }
+        handle = handles[r.bm]
+      }
+      const x = await chamar({ acao: 'criar', waba: r.id, template: { name: f.nome, category: f.categoria, language: f.idioma, components: componentes(f, handle) } })
+      r.estado = x.ok ? 'ok' : 'erro'; r.motivo = x.ok ? (NOME_STATUS[x.status] || x.status || 'em análise') : (x.motivo || 'A Meta recusou.')
+      r.categoria = x.categoria
+      setResultados([...res])
+    }
     setEnviando(false)
-    if (r.ok) { mostrar(`Enviado: ${NOME_STATUS[r.status] || r.status || 'em análise'}`); onCriado() }
-    else mostrar(r.motivo || 'A Meta recusou.', 'erro')
+    const ok = res.filter((r) => r.estado === 'ok').length
+    mostrar(`${ok} de ${res.length} enviados para análise`, ok === res.length ? 'ok' : 'erro')
+    if (ok) onCriado(false)
   }
   const [subindo, setSubindo] = useState(false)
   async function subirMidia(arq) {
@@ -184,10 +215,8 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado, bm })
     if (arq.size > 3 * 1024 * 1024) return mostrar('Arquivo de até 3 MB.', 'erro')
     setSubindo(true)
     const base64 = await new Promise((ok, falhou) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = falhou; r.readAsDataURL(arq) })
-    const r = await chamar({ acao: 'midia', bm, midia: { tipo: arq.type, nome: arq.name, base64 } })
     setSubindo(false)
-    if (r.ok) set('midia', { handle: r.handle, nome: arq.name, tipo: f.cabTipo, url: arq.type.startsWith('image/') ? URL.createObjectURL(arq) : null })
-    else mostrar(r.motivo || 'A Meta não aceitou o arquivo.', 'erro')
+    set('midia', { arquivo: { tipo: arq.type, base64 }, nome: arq.name, tipo: f.cabTipo, url: arq.type.startsWith('image/') ? URL.createObjectURL(arq) : null })
   }
   const inserirVar = () => {
     const n = (vars[vars.length - 1] || 0) + 1
@@ -243,11 +272,28 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado, bm })
         <p className="section-label">Novo template</p>
         <div className="tpl-criar">
           <div className="panel iac-texto-ed" style={{ marginTop: 0 }}>
+            <div>
+              <span className="iac-rot">Contas ({f.contas.length} marcada{f.contas.length === 1 ? '' : 's'})</span>
+              <div className="tpl-lote">
+                {grupos.map((g) => {
+                  const todas = (g.contas || []).length > 0 && (g.contas || []).every((c) => marcada(c.id))
+                  return (
+                    <div key={g.id} className="tpl-lote-bm">
+                      <div className="tpl-lote-topo"><b>{g.nome}</b>
+                        {g.contas ? <button className="iac-link" onClick={() => marcarGrupo(g, !todas)}>{todas ? 'desmarcar todas' : 'marcar todas'}</button>
+                          : <button className="iac-link" onClick={() => carregarBm(g.id)}>carregar contas</button>}</div>
+                      {(g.contas || []).map((c) => (
+                        <label key={c.id} className="tpl-lote-conta">
+                          <input type="checkbox" checked={marcada(c.id)} onChange={() => alternar({ ...c, bm: g.id })} />
+                          <span>{c.nome} <small className="iac-miudo">{c.numero}</small></span>
+                        </label>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
             <div className="tpl-grade3">
-              <label><span className="iac-rot">Conta / número</span>
-                <select className="chip-input" value={f.waba} onChange={(e) => set('waba', e.target.value)}>
-                  {contas.map((c) => <option key={c.id} value={c.id}>{c.nome} ({c.numero})</option>)}
-                </select></label>
               <label><span className="iac-rot">Nome</span>
                 <input className="chip-input" value={f.nome} onChange={(e) => set('nome', slug(e.target.value))} placeholder="clt_oferta_sem_resposta_v1" /></label>
               <label><span className="iac-rot">Categoria</span>
@@ -267,9 +313,9 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado, bm })
               {f.cabTipo === 'TEXT' && <input className="chip-input" value={f.cabecalho} maxLength={60} onChange={(e) => set('cabecalho', e.target.value)} placeholder="Até 60 caracteres" />}
               {ACEITA[f.cabTipo] && (
                 <div className="iac-filtros" style={{ margin: 0 }}>
-                  <label className="reset-btn tpl-arquivo">{subindo ? 'Enviando à Meta…' : f.midia?.handle ? `Trocar ${NOME_MIDIA[f.cabTipo]}` : `Escolher ${NOME_MIDIA[f.cabTipo]} de exemplo`}
+                  <label className="reset-btn tpl-arquivo">{subindo ? 'Lendo o arquivo…' : f.midia?.arquivo ? `Trocar ${NOME_MIDIA[f.cabTipo]}` : `Escolher ${NOME_MIDIA[f.cabTipo]} de exemplo`}
                     <input type="file" accept={ACEITA[f.cabTipo]} disabled={subindo} onChange={(e) => subirMidia(e.target.files?.[0])} /></label>
-                  {f.midia?.handle && <small className="iac-miudo" style={{ margin: 0 }}>✓ {f.midia.nome} enviado</small>}
+                  {f.midia?.arquivo && <small className="iac-miudo" style={{ margin: 0 }}>✓ {f.midia.nome} (vai junto com o template)</small>}
                   <small className="iac-miudo" style={{ margin: 0 }}>Exemplo para a Meta aprovar (até 3 MB). No envio, cada disparo pode usar outra {NOME_MIDIA[f.cabTipo]}.</small>
                 </div>
               )}
@@ -311,8 +357,18 @@ function Criar({ contas, uso, inicial, chamar, dialogo, mostrar, onCriado, bm })
             <span className="iac-rascunho">
               <button className="chip-salvar iac-btn-p" onClick={enviar} disabled={enviando || erros.length > 0}>
                 {enviando ? 'Enviando…' : 'Enviar para análise da Meta'}</button>
-              <button className="reset-btn" onClick={() => setF({ ...vazio(), waba: f.waba })} disabled={enviando}>Limpar</button>
+              <button className="reset-btn" onClick={() => { setF({ ...vazio(), contas: f.contas }); setResultados(null) }} disabled={enviando}>Limpar</button>
             </span>
+            {resultados && (
+              <ul className="tpl-lote-res">
+                {resultados.map((r) => (
+                  <li key={r.id} className={`st-${r.estado}`}>
+                    <b>{r.estado === 'ok' ? '✓' : r.estado === 'erro' ? '✗' : r.estado === 'enviando' ? '…' : '·'}</b> {r.nome}
+                    <small className="iac-miudo"> {r.estado === 'esperando' ? 'na fila' : r.estado === 'enviando' ? 'enviando' : r.motivo}{r.categoria ? ` · ${NOME_CAT[r.categoria] || r.categoria}` : ''}</small>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div className="tpl-previa">
             <Bolha titulo={conta ? `${conta.nome} · como o cliente vai receber` : 'Como o cliente vai receber'} cabecalho={f.cabTipo === 'TEXT' ? f.cabecalho : ''}
@@ -466,6 +522,17 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
     }
     setMetricas((m) => ({ ...m, [conta.id]: soma }))
   }
+  const [, setVersaoCache] = useState(0)
+  const grupos = (bms || [{ id: bm, nome: 'Contas' }]).map((x) => {
+    const lista = x.id === bm ? contasRaw : (lerCache().porBm || {})[x.id]?.contas
+    return { id: x.id, nome: x.nome, contas: lista ? lista.filter((c) => !c.erro).map((c) => ({ id: c.id, nome: c.name, numero: c.phone_numbers?.data?.[0]?.display_phone_number || '—' })) : null }
+  })
+  async function carregarBm(qual) {
+    const l = await chamar({ acao: 'listar', bm: qual })
+    if (!l.ok) return mostrar(l.motivo || 'Não foi possível carregar as contas.', 'erro')
+    gravarCache({ porBm: { ...(lerCache().porBm || {}), [qual]: { contas: l.contas || [], quando: new Date().toISOString() } } })
+    setVersaoCache((v) => v + 1)
+  }
   const usarComoBase = (t) => {
     const p = partes(t)
     setBase({ waba: t.waba, nome: `${t.name.replace(/_v\d+$/, '')}_v2`.slice(0, 60), categoria: t.category === 'UTILITY' ? 'UTILITY' : 'MARKETING',
@@ -568,7 +635,7 @@ export default function SecaoTemplates({ token, api, dialogo, mostrar }) {
       )}
       {contasRaw && aba === 'desempenho' && (uso ? <Desempenho uso={uso} contas={contas} /> : <div className="state-msg">Carregando…</div>)}
       {contasRaw && aba === 'criar' && (contas.length
-        ? <Criar key={bm} bm={bm} contas={contas} uso={uso} inicial={base} chamar={chamar} dialogo={dialogo} mostrar={mostrar} onCriado={() => { setBase(null); carregar(); setAba('templates') }} />
+        ? <Criar key={bm} bm={bm} contas={contas} grupos={grupos} carregarBm={carregarBm} uso={uso} inicial={base} chamar={chamar} dialogo={dialogo} mostrar={mostrar} onCriado={() => { setBase(null); carregar() }} />
         : <p className="iac-miudo">Nenhuma conta da Meta disponível.</p>)}
     </>
   )

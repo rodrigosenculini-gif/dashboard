@@ -85,3 +85,12 @@
 .tpl-bm small{ font-size:11px; font-weight:400; }
 .tpl-bm:hover{ color:var(--text); }
 .tpl-bm.on{ color:var(--lime); border-bottom-color:var(--lime); }
+
+/* criação em lote: contas de todas as BMs */
+.tpl-lote{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; margin-top:6px; }
+.tpl-lote-bm{ border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:var(--surface-2); }
+.tpl-lote-topo{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px; font-size:13px; }
+.tpl-lote-conta{ display:flex !important; flex-direction:row !important; align-items:center; gap:8px; font-size:13px; padding:3px 0; cursor:pointer; }
+.tpl-lote-res{ list-style:none; margin:6px 0 0; padding:0; font-size:13px; }
+.tpl-lote-res li{ padding:3px 0; }
+.tpl-lote-res li.st-ok b{ color:var(--lime); } .tpl-lote-res li.st-erro b{ color:var(--rose); }
