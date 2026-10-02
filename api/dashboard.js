@@ -1147,6 +1147,10 @@ export default async function handler(req, res) {
                                args: (b) => [b.id, b.resposta] },
       robo_modo:             { sql: 'select dashboard_robo_modo($1::text) as r',
                                args: (b) => [b.modo] },
+      robo_config_salvar:    { sql: 'select dashboard_robo_config_salvar($1::text,$2::jsonb) as r',
+                               args: (b) => [b.chave, JSON.stringify(b.valor)] },
+      robo_vendedora_salvar: { sql: 'select dashboard_robo_vendedora_salvar($1::jsonb) as r',
+                               args: (b) => [JSON.stringify(b)] },
       tarefa_criar:          { sql: 'select dashboard_tarefa_criar($1::text,$2::text,$3::int,$4::text) as r',
                                args: (b) => [b.vendedor || null, b.titulo || '', b.minutos ?? null, b.quando || null] },
       tarefa_acao:           { sql: 'select dashboard_tarefa_acao($1::bigint,$2::text,$3::int) as r',
@@ -1278,6 +1282,7 @@ export default async function handler(req, res) {
     chips_opcoes:      { sql: 'select dashboard_chips_opcoes() as r', args: () => [] },
     // robô de follow-up do CRM VendeAI: resumo da aba "Robô follow-up"
     robo_resumo:       { sql: 'select dashboard_robo_resumo() as r', args: () => [] },
+    robo_config:       { sql: 'select dashboard_robo_config() as r', args: () => [] },
     robo_lista:        { sql: 'select dashboard_robo_lista($1::text,$2::text,$3::text) as r',
                          args: () => [req.query.tipo || null, req.query.a || null, req.query.b || null] },
     chips_para_recarga:{ sql: 'select dashboard_chips_para_recarga($1::int) as r',
