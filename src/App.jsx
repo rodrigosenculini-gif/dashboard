@@ -801,7 +801,7 @@ const NAV_GRUPOS = [
   ['Visão geral', ['inicio', 'painel']],
   ['Captação', ['disparos', 'leilao', 'produtos']],
   ['Vendas', ['propostas', 'vendas', 'vendedoras']],
-  ['Sistema', ['n8n', 'ia']],
+  ['Sistema', ['n8n', 'ia', 'robo']],
 ]
 const NAV_ICONE = {
   inicio: 'M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10',
@@ -814,6 +814,7 @@ const NAV_ICONE = {
   vendedoras: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
   n8n: 'M22 12h-4l-3 9L9 3l-3 9H2',
   ia: 'M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
+  robo: 'M12 8V4M8 4h8M5 8h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM9 13h.01M15 13h.01M9 17h6',
   recolher: 'M11 17l-5-5 5-5M18 17l-5-5 5-5',
   menu: 'M3 6h18M3 12h18M3 18h18',
 }
