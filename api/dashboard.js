@@ -498,6 +498,26 @@ export default async function handler(req, res) {
             adesao_numero: d.code, contrato: d.contrato, data_pagamento: d.data_pagamento,
           });
         }
+        // Presenca: a API so aceita o numero da operacao (ex.: 895990). Quando a
+        // vendedora cola o codigo do VendeAI (UUID), troca pelo numero que esta em
+        // propostas_bancos; sem correspondencia, avisa do formato -- antes a tela
+        // dizia "a conexao falhou" (02/10).
+        let adesaoConsulta = String(adesao).trim();
+        if (/PRESEN/i.test(String(banco)) && !/^\d+$/.test(adesaoConsulta)) {
+          const client = getPool();
+          const pr = await client.query(
+            `select proposal_number from propostas_bancos
+              where normalizar_banco(banco) = 'PRESENCA' and proposal_id = $1 and proposal_number ~ '^\\d+$' limit 1`,
+            [adesaoConsulta]
+          );
+          if (!pr.rows[0]) {
+            return res.status(200).json({
+              encontrado: false, formato_invalido: true,
+              mensagem: 'Na Presença a adesão é o número da operação, só com números (ex.: 895990). Esse código não é um número de operação da Presença — confira no portal ou se o banco escolhido está certo.',
+            });
+          }
+          adesaoConsulta = pr.rows[0].proposal_number;
+        }
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
         let resp;
@@ -505,7 +525,7 @@ export default async function handler(req, res) {
           resp = await fetch('https://hotnwh.querosacarfgts.com.br/webhook/consulta-adesao-banco', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ banco, adesao, cpf: cpf || null, valor: valor || null }),
+            body: JSON.stringify({ banco, adesao: adesaoConsulta, cpf: cpf || null, valor: valor || null }),
             signal: controller.signal,
           });
         } finally {
@@ -532,6 +552,7 @@ export default async function handler(req, res) {
             }
           } catch { /* enriquecimento e melhor-esforco */ }
         }
+        if (dados && adesaoConsulta !== String(adesao).trim()) dados.adesao_numero = dados.adesao_numero || adesaoConsulta;
         return res.status(200).json(dados);
       } catch (e) {
         const timeoutMsg = e.name === 'AbortError' ? 'A consulta demorou demais. Tente novamente.' : e.message;

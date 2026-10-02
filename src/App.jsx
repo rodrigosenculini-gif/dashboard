@@ -3022,6 +3022,11 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         setAddMsg(`${d.mensagem || 'Proposta não disponível pela API.'} Preencha os dados manualmente.`)
         return
       }
+      if (!d.encontrado && d.formato_invalido) {
+        setAdesaoInexistente(true)
+        setAddMsg(d.mensagem)
+        return
+      }
       if (!d.encontrado) {
         // Nao achou no banco. Duas situacoes bem diferentes:
         //  - a consulta falhou (token expirado, API fora): da pra tentar de novo
@@ -3049,7 +3054,7 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
 
       const preenchido = {
         ...addForm,
-        adesao: addForm.banco === 'SEMPRE FACIL' && d.adesao_numero ? String(d.adesao_numero) : addForm.adesao,
+        adesao: (addForm.banco === 'SEMPRE FACIL' || /PRESEN/i.test(addForm.banco)) && d.adesao_numero ? String(d.adesao_numero) : addForm.adesao,
         cpf: d.cpf_banco || addForm.cpf,
         nome: d.nome_banco || addForm.nome,
         valor: d.valor_banco != null ? String(d.valor_banco) : addForm.valor,
