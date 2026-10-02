@@ -794,7 +794,7 @@ const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos
 const VARIAVEIS_ENVIO = [['primeiro_nome', 'Primeiro nome'], ['pedido', 'Pedido ("simulação de crédito do trabalhador")'], ['resultado', 'Resultado ("Valor liberado: R$ 4.500,00")'], ['nome', 'Nome completo'], ['valor', 'Maior valor aprovado'], ['produto', 'Produto']]
 
 // Envio do aprovado (migração 166): template aprovado de uma das nossas BMs, pelo número escolhido
-function EscolherEnvio({ envio, onChange, token, api }) {
+function EscolherEnvio({ envio, onChange, token, api, onRemover, n }) {
   const [bms, setBms] = useState(null)
   const [contas, setContas] = useState({})
   const e = envio || { bm: 'hotline', variaveis: [] }
@@ -816,9 +816,8 @@ function EscolherEnvio({ envio, onChange, token, api }) {
   const nVars = [...new Set((corpo.match(/\{\{(\d+)\}\}/g) || []))].length
   const mudar = (x) => onChange({ ...e, ...x })
   return (
-    <div>
-      <b>Envio do aprovado</b>
-      <p className="iac-miudo">Template do WhatsApp aprovado em uma das nossas BMs. Sai pelo número escolhido assim que o cliente for aprovado.</p>
+    <div className="tpl-lote-bm" style={{ marginBottom: 8 }}>
+      <div className="tpl-lote-topo"><b>Opção {n}</b>{onRemover && <button className="iac-link" onClick={onRemover}>remover</button>}</div>
       <div className="iac-filtros" style={{ marginBottom: 6 }}>
         <select className="chip-input" value={bm} onChange={(ev) => mudar({ bm: ev.target.value, waba: '', numero_id: '', numero: '', template: '', variaveis: [] })}>
           {(bms || [{ id: 'hotline', nome: 'Hotline Infbip' }]).map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
@@ -847,7 +846,27 @@ function EscolherEnvio({ envio, onChange, token, api }) {
           </select>
         </div>
       ))}
-      {!e.template && <p className="chip-erro">Sem template escolhido, o aprovado fica esperando (até 3 dias) e só recebe quando o envio for configurado.</p>}
+    </div>
+  )
+}
+
+// Várias opções de envio (dono, 02/10): cada aprovado recebe uma delas, sorteada (migração 170)
+const opcoesDe = (envio) => (envio?.opcoes || (envio?.template ? [envio] : []))
+function EscolherEnvios({ envio, onChange, token, api }) {
+  const ops = opcoesDe(envio).length ? opcoesDe(envio) : [{ bm: 'hotline', variaveis: [] }]
+  const mudar = (lista) => onChange({ opcoes: lista })
+  const prontas = ops.filter((o) => o.template).length
+  return (
+    <div>
+      <b>Envio do aprovado</b>
+      <p className="iac-miudo">Template do WhatsApp aprovado em uma das nossas BMs. Com mais de uma opção, cada aprovado recebe uma delas, sorteada.</p>
+      {ops.map((o, i) => (
+        <EscolherEnvio key={i} n={i + 1} envio={o} token={token} api={api}
+                       onChange={(v) => mudar(ops.map((x, j) => (j === i ? v : x)))}
+                       onRemover={ops.length > 1 ? () => mudar(ops.filter((_, j) => j !== i)) : null} />
+      ))}
+      <button className="iac-link" onClick={() => mudar([...ops, { bm: ops[ops.length - 1]?.bm || 'hotline', variaveis: [] }])}>+ outra opção</button>
+      {!prontas && <p className="chip-erro">Sem template escolhido, o aprovado fica esperando (até 3 dias) e só recebe quando o envio for configurado.</p>}
     </div>
   )
 }
@@ -860,8 +879,11 @@ function EditorPagina({ inicial, salvar, onFechar, token, api }) {
   async function ok() {
     setSalvando(true)
     const dados = { ...p, nome: p.nome.trim(), espera_s: Number(p.espera_s) || 120, destinos: [],
-      envio: p.envio && p.envio.template ? { bm: p.envio.bm, waba: p.envio.waba, numero_id: p.envio.numero_id, numero: p.envio.numero,
-        template: p.envio.template, idioma: p.envio.idioma || 'pt_BR', variaveis: p.envio.variaveis || [] } : null,
+      envio: (() => {
+        const ops = opcoesDe(p.envio).filter((o) => o.template && o.numero_id).map((o) => ({ bm: o.bm, waba: o.waba, numero_id: o.numero_id,
+          numero: o.numero, template: o.template, idioma: o.idioma || 'pt_BR', variaveis: o.variaveis || [] }))
+        return ops.length ? { opcoes: ops } : null
+      })(),
       whatsapp: p.whatsapp.map((x) => x.trim()).filter(Boolean) }
     for (const k of ['criado_em', 'atualizado_em']) delete dados[k]
     const r = await salvar('lp_pagina', dados, inicial?.id ? 'Página salva' : 'Página criada')
@@ -887,7 +909,7 @@ function EditorPagina({ inicial, salvar, onFechar, token, api }) {
           ))}
         </div>
       </Linha>
-      <EscolherEnvio envio={p.envio} onChange={(v) => set('envio', v)} token={token} api={api} />
+      <EscolherEnvios envio={p.envio} onChange={(v) => set('envio', v)} token={token} api={api} />
       <>
           <div>
             <b>WhatsApp do botão</b>
@@ -998,7 +1020,7 @@ function SecaoPaginas({ d, salvar, token, api }) {
                 <div key={p.id} className="iac-banco" style={{ borderLeftColor: p.ativa ? 'var(--lime)' : 'var(--muted)' }}>
                   <div className="iac-banco-topo"><b>{p.nome}</b><span className="iac-tag">{p.ativa ? nomeProduto(p.produto) : 'desligada'}</span></div>
                   <small className="iac-miudo" style={{ margin: 0 }}>{NOME_MODO[p.modo]}{p.modo === 'prende' ? ` · espera ${Math.round(p.espera_s / 6) / 10} min · ${(p.whatsapp || []).length} WhatsApp` : ''}</small>
-                  <small className="iac-miudo" style={{ margin: 0 }}>Aprovado recebe: {p.envio?.template ? `${p.envio.template} · ${p.envio.numero || ''}` : 'nada ainda (escolha o template)'}</small>
+                  <small className="iac-miudo" style={{ margin: 0 }}>Aprovado recebe: {opcoesDe(p.envio).length ? opcoesDe(p.envio).map((o) => `${o.template} · ${o.numero || ''}`).join(' | ') : 'nada ainda (escolha o template)'}</small>
                   <div className="iac-banco-acoes"><button className="iac-link" onClick={() => setEd({ tipo: 'pagina', v: p })}>Editar</button></div>
                 </div>
               ))}
