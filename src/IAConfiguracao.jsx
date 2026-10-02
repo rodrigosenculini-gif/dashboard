@@ -791,7 +791,7 @@ const AJUDA_MODO = {
   prende: 'Consulta com o cliente na página. Aprovou: botão para falar no WhatsApp; se não tocar na espera, vai para o disparo.',
 }
 const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos: [], whatsapp: [], espera_s: 120, ativa: true, envio: null })
-const VARIAVEIS_ENVIO = [['primeiro_nome', 'Primeiro nome'], ['nome', 'Nome completo'], ['valor', 'Maior valor aprovado'], ['produto', 'Produto']]
+const VARIAVEIS_ENVIO = [['primeiro_nome', 'Primeiro nome'], ['pedido', 'Pedido ("simulação de crédito do trabalhador")'], ['resultado', 'Resultado ("Valor liberado: R$ 4.500,00")'], ['nome', 'Nome completo'], ['valor', 'Maior valor aprovado'], ['produto', 'Produto']]
 
 // Envio do aprovado (migração 166): template aprovado de uma das nossas BMs, pelo número escolhido
 function EscolherEnvio({ envio, onChange, token, api }) {
@@ -832,7 +832,7 @@ function EscolherEnvio({ envio, onChange, token, api }) {
         <select className="chip-input" value={e.template || ''} disabled={!conta}
                 onChange={(ev) => { const t = aprovados.find((x) => x.name === ev.target.value)
                   const n = [...new Set(((t?.components?.find((c) => c.type === 'BODY')?.text || '').match(/\{\{(\d+)\}\}/g) || []))].length
-                  mudar({ template: ev.target.value, idioma: t?.language || 'pt_BR', variaveis: ['primeiro_nome', 'valor', 'produto', 'nome'].slice(0, n) }) }}>
+                  mudar({ template: ev.target.value, idioma: t?.language || 'pt_BR', variaveis: (n === 3 ? ['primeiro_nome', 'pedido', 'resultado'] : ['primeiro_nome', 'valor', 'produto', 'nome']).slice(0, n) }) }}>
           <option value="">{conta && !aprovados.length ? 'Nenhum template aprovado' : 'Escolha o template'}</option>
           {aprovados.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
         </select>
