@@ -19,6 +19,7 @@ const NOME_ACAO = {
   audio: 'Áudio', atribuir: 'Atribuiu', retirar: 'Retirou', nota: 'Nota', lembrete: 'Lembrete',
   email: 'E-mail', encerrar: 'Encerrou', audio_pulado: 'Áudio pulado', lembrete_pulado: 'Lembrete pulado', erro: 'Erro',
   email_pulado: 'E-mail pulado', assumir_followup: 'Assumiu follow-up', lembrete_ligacao: 'Lembrete de ligação',
+  etiqueta: 'Etiqueta',
 }
 
 async function getResumo() {
