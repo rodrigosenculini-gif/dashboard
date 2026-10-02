@@ -1112,6 +1112,8 @@ export default async function handler(req, res) {
                                args: (b) => [b.regra_id, b.vendedor || null] },
       notificacao_responder: { sql: 'select dashboard_notificacao_responder($1::bigint,$2::text) as r',
                                args: (b) => [b.id, b.resposta] },
+      robo_modo:             { sql: 'select dashboard_robo_modo($1::text) as r',
+                               args: (b) => [b.modo] },
       tarefa_criar:          { sql: 'select dashboard_tarefa_criar($1::text,$2::text,$3::int,$4::text) as r',
                                args: (b) => [b.vendedor || null, b.titulo || '', b.minutos ?? null, b.quando || null] },
       tarefa_acao:           { sql: 'select dashboard_tarefa_acao($1::bigint,$2::text,$3::int) as r',
@@ -1241,6 +1243,8 @@ export default async function handler(req, res) {
                          args: () => [req.query.busca || null, req.query.status || null,
                                       req.query.plataforma || null, req.query.so_recarga === '1'] },
     chips_opcoes:      { sql: 'select dashboard_chips_opcoes() as r', args: () => [] },
+    // robô de follow-up do CRM VendeAI: resumo da aba "Robô follow-up"
+    robo_resumo:       { sql: 'select dashboard_robo_resumo() as r', args: () => [] },
     chips_para_recarga:{ sql: 'select dashboard_chips_para_recarga($1::int) as r',
                          args: () => [parseInt(req.query.dias, 10) || 3] },
     trello_quadro:     { sql: 'select dashboard_trello_quadro($1::bigint) as r',

@@ -9,6 +9,7 @@ import RefinButton from './RefinLeads'
 import PresencaEsteiraModal from './PresencaEsteira'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
+import RoboFollowup from './RoboFollowup'
 import IAConfiguracao from './IAConfiguracao'
 import Trello from './Trello'
 import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
@@ -101,6 +102,8 @@ const VIEWS = [
   { id: 'propostas', label: 'Propostas' },
   { id: 'vendas', label: 'Vendas' },
   { id: 'ia', label: 'IA — Treinamento' },
+  // robô de follow-up do CRM VendeAI (edge function robo-followup, 02/10)
+  { id: 'robo', label: 'Robô follow-up' },
 ]
 // views que viraram seções do Painel: link ou view salva antiga abre o Painel
 const VIEW_ANTIGA = { geral: 'disparos', ia_config: 'painel', ia_analises: 'painel' }
@@ -7857,6 +7860,7 @@ function Dashboard({ permitidas, onLogout }) {
       {view === 'painel' && podeVer('painel') && <IAConfiguracao onVoltar={() => changeView('inicio')} />}
       {view === 'trello' && podeVer('trello') && <Trello onVoltar={() => changeView('inicio')} />}
       {view === 'chips' && podeVer('chips') && <Chips onVoltar={() => changeView('inicio')} />}
+      {view === 'robo' && podeVer('robo') && <RoboFollowup onVoltar={() => changeView('inicio')} />}
     </div>
     </div>
     </div>

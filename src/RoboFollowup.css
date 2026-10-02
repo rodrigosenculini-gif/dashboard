@@ -1,0 +1,34 @@
+/* View Robô follow-up — mesmas cores/variáveis do resto do dashboard */
+.robo-modo{
+  margin-left:14px; padding:7px 14px; border-radius:6px; font-size:12.5px; font-weight:600; cursor:pointer;
+  border:1px solid var(--border); background:var(--surface-2); color:var(--muted);
+}
+.robo-modo.on{ border-color:var(--lime); color:var(--lime); }
+.robo-modo:disabled{ opacity:.6; cursor:default; }
+
+.robo-grid{ display:grid; grid-template-columns:1.2fr 1fr; gap:18px; margin-top:18px; }
+@media (max-width:900px){ .robo-grid{ grid-template-columns:1fr; } }
+
+.robo-carga{ display:grid; grid-template-columns:140px 1fr 64px; align-items:center; gap:10px; padding:6px 0; font-size:12.5px; }
+.robo-carga-nome{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.robo-barra{ height:6px; background:var(--surface-2); border-radius:3px; overflow:hidden; }
+.robo-barra i{ display:block; height:100%; background:var(--lime); border-radius:3px; }
+.robo-barra.cheia i{ background:var(--rose); }
+.robo-carga-num{ text-align:right; font-variant-numeric:tabular-nums; }
+.robo-carga-num small{ color:var(--muted); }
+
+.robo-linha{ display:flex; justify-content:space-between; padding:6px 0; font-size:12.5px; border-bottom:1px solid var(--border); }
+.robo-linha small{ color:var(--muted); }
+.robo-linha strong{ font-variant-numeric:tabular-nums; }
+.robo-sub{ margin-top:16px; }
+
+.robo-acao{ display:grid; grid-template-columns:48px 110px 80px 1fr; gap:10px; padding:6px 0; font-size:12.5px; border-bottom:1px solid var(--border); }
+.robo-acao a{ color:var(--lime); text-decoration:none; font-variant-numeric:tabular-nums; }
+.robo-acao-hora{ color:var(--muted); font-variant-numeric:tabular-nums; }
+.robo-acao-tipo{ font-weight:600; }
+.robo-acao-det{ color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.robo-acao.falha .robo-acao-tipo, .robo-acao.falha .robo-acao-det{ color:var(--rose); }
+@media (max-width:700px){
+  .robo-acao{ grid-template-columns:44px 90px 1fr; }
+  .robo-acao-det{ grid-column:1 / -1; white-space:normal; }
+}
