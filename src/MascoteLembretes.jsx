@@ -18,6 +18,7 @@ async function postJson(type, body) {
 }
 
 const CHECAGEM_MS = 30 * 1000
+const ehDoRobo = (t) => /crm\.vendeaitecnologia\.com\.br\/app\/accounts\/\d+\/conversations\/\d+\s*$/.test(t?.titulo || '')
 const ATALHOS = [
   { rotulo: '15 min', min: 15 },
   { rotulo: '30 min', min: 30 },
@@ -73,7 +74,9 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
     aplica_a: [], equipes: [],   // vazio nos dois = toda a equipe
   })
 
-  const vencidas = tarefas.filter((t) => t.vencida && !t.feita)
+  // lembretes do robô de follow-up (terminam no link da conversa do CRM) não
+  // notificam aqui: quem avisa é a extensão; no painel continuam na lista
+  const vencidas = tarefas.filter((t) => t.vencida && !t.feita && !ehDoRobo(t))
   const pendencias = vencidas.length
 
   // clicar fora fecha o painel: antes so o proprio mascote fechava
