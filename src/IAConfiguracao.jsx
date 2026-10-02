@@ -822,16 +822,25 @@ function EscolherEnvio({ envio, onChange, token, api, onRemover, n }) {
   const bm = e.bm || 'hotline'
   const chamar = (meta) => api({ acao: 'meta', token, meta })
   useEffect(() => { chamar({ acao: 'bms' }).then((r) => setBms(r.ok ? r.bms : [])) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // lista guardada aparece na hora, mas sempre busca a atual na Meta (02/10: o cache de antes da aprovação escondia os
+  // templates aprovados depois: "Nenhum template aprovado")
+  const [buscando, setBuscando] = useState(false)
+  const buscar = (qual) => {
+    setBuscando(true)
+    chamar({ acao: 'listar', bm: qual }).then((r) => { if (r.ok) setContas((c) => ({ ...c, [qual]: r.contas || [] })) })
+      .finally(() => setBuscando(false))
+  }
   useEffect(() => {
-    if (contas[bm]) return
     let guardado = null
     try { guardado = JSON.parse(localStorage.getItem('iac_templates_cache') || 'null')?.porBm?.[bm]?.contas } catch { /* sem cache */ }
-    if (guardado) { setContas((c) => ({ ...c, [bm]: guardado })); return }
-    chamar({ acao: 'listar', bm }).then((r) => setContas((c) => ({ ...c, [bm]: r.ok ? r.contas || [] : [] })))
+    if (guardado && !contas[bm]) setContas((c) => ({ ...c, [bm]: guardado }))
+    buscar(bm)
   }, [bm]) // eslint-disable-line react-hooks/exhaustive-deps
   const lista = (contas[bm] || []).filter((c) => !c.erro)
   const conta = lista.find((c) => c.id === e.waba)
-  const aprovados = (conta?.message_templates?.data || []).filter((t) => t.status === 'APPROVED')
+  // texto com acento quebrado na Meta ("Ol�", lp_simulacao_*_v1 de 02/10) não aparece: o cliente receberia assim
+  const aprovados = (conta?.message_templates?.data || []).filter((t) => t.status === 'APPROVED'
+    && !(t.components || []).some((c) => String(c.text || '').includes('�')))
   const tpl = aprovados.find((t) => t.name === e.template)
   const corpo = tpl?.components?.find((c) => c.type === 'BODY')?.text || ''
   const nVars = [...new Set((corpo.match(/\{\{(\d+)\}\}/g) || []))].length
@@ -859,9 +868,10 @@ function EscolherEnvio({ envio, onChange, token, api, onRemover, n }) {
                 onChange={(ev) => { const t = aprovados.find((x) => x.name === ev.target.value)
                   const n = [...new Set(((t?.components?.find((c) => c.type === 'BODY')?.text || '').match(/\{\{(\d+)\}\}/g) || []))].length
                   mudar({ template: ev.target.value, idioma: t?.language || 'pt_BR', variaveis: (n === 3 ? ['primeiro_nome', 'pedido', 'resultado'] : ['primeiro_nome', 'valor', 'produto', 'nome']).slice(0, n) }) }}>
-          <option value="">{conta && !aprovados.length ? 'Nenhum template aprovado' : 'Escolha o template'}</option>
+          <option value="">{conta && !aprovados.length ? (buscando ? 'Buscando na Meta…' : 'Nenhum template aprovado') : 'Escolha o template'}</option>
           {aprovados.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
         </select>
+        <button type="button" className="iac-link" disabled={buscando} onClick={() => buscar(bm)}>{buscando ? 'atualizando…' : 'atualizar lista'}</button>
       </div>
       {tpl && <p className="iac-miudo" style={{ margin: '6px 0 2px' }}>Modelo: {corpo}</p>}
       {Array.from({ length: nVars }, (_, i) => {
