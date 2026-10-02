@@ -839,6 +839,12 @@ function EscolherEnvio({ envio, onChange, token, api, onRemover, n }) {
   return (
     <div className="tpl-lote-bm" style={{ marginBottom: 8 }}>
       <div className="tpl-lote-topo"><b>Opção {n}</b>{onRemover && <button className="iac-link" onClick={onRemover}>remover</button>}</div>
+      <div className="chip-opcoes" style={{ marginBottom: 6 }}>
+        <span className="iac-rot">Vale para</span>
+        {PRODUTO_ENVIO.map(([k, t]) => (
+          <button key={k} type="button" className={`chip-opcao ${(e.produto || 'todos') === k ? 'on' : ''}`} onClick={() => mudar({ produto: k })}>{t}</button>
+        ))}
+      </div>
       <div className="iac-filtros" style={{ marginBottom: 6 }}>
         <select className="chip-input" value={bm} onChange={(ev) => mudar({ bm: ev.target.value, waba: '', numero_id: '', numero: '', template: '', variaveis: [] })}>
           {(bms || [{ id: 'hotline', nome: 'Hotline Infbip' }]).map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
@@ -888,10 +894,15 @@ function EscolherEnvio({ envio, onChange, token, api, onRemover, n }) {
 
 // Várias opções de envio (dono, 02/10): cada aprovado recebe uma delas, sorteada (migração 170)
 const opcoesDe = (envio) => (envio?.opcoes || (envio?.template ? [envio] : []))
+// cada opção vale para um produto (migração 179): o aprovado no CLT recebe uma das de "CLT" ou "qualquer"; no FGTS, idem
+const PRODUTO_ENVIO = [['todos', 'Qualquer produto'], ['clt', 'Só CLT'], ['fgts', 'Só FGTS']]
+const NOME_PRODUTO_ENVIO = { todos: '', clt: ' (CLT)', fgts: ' (FGTS)' }
 function EscolherEnvios({ envio, onChange, token, api }) {
   const ops = opcoesDe(envio).length ? opcoesDe(envio) : [{ bm: 'hotline', variaveis: [] }]
   const mudar = (lista) => onChange({ opcoes: lista })
   const prontas = ops.filter((o) => o.template).length
+  const cobre = (p) => ops.some((o) => o.template && ['todos', p].includes(o.produto || 'todos'))
+  const faltam = prontas ? ['clt', 'fgts'].filter((p) => !cobre(p)) : []
   return (
     <div>
       <b>Envio do aprovado</b>
@@ -903,6 +914,7 @@ function EscolherEnvios({ envio, onChange, token, api }) {
       ))}
       <button className="iac-link" onClick={() => mudar([...ops, { bm: ops[ops.length - 1]?.bm || 'hotline', variaveis: [] }])}>+ outra opção</button>
       {!prontas && <p className="chip-erro">Sem template escolhido, o aprovado fica esperando (até 3 dias) e só recebe quando o envio for configurado.</p>}
+      {faltam.map((p) => <p key={p} className="chip-erro">Nenhuma opção vale para o {p.toUpperCase()}: quem for aprovado no {p.toUpperCase()} não recebe template.</p>)}
     </div>
   )
 }
@@ -917,7 +929,7 @@ function EditorPagina({ inicial, salvar, onFechar, token, api }) {
     const dados = { ...p, nome: p.nome.trim(), espera_s: Number(p.espera_s) || 120, destinos: [],
       envio: (() => {
         const ops = opcoesDe(p.envio).filter((o) => o.template && o.numero_id).map((o) => ({ bm: o.bm, waba: o.waba, numero_id: o.numero_id,
-          numero: o.numero, template: o.template, idioma: o.idioma || 'pt_BR', variaveis: o.variaveis || [] }))
+          numero: o.numero, template: o.template, idioma: o.idioma || 'pt_BR', variaveis: o.variaveis || [], produto: o.produto || 'todos' }))
         return ops.length ? { opcoes: ops } : null
       })(),
       whatsapp: p.whatsapp.map((x) => x.trim()).filter(waValido) }
@@ -1064,7 +1076,7 @@ function SecaoPaginas({ d, salvar, token, api }) {
                 <div key={p.id} className="iac-banco" style={{ borderLeftColor: p.ativa ? 'var(--lime)' : 'var(--muted)' }}>
                   <div className="iac-banco-topo"><b>{p.nome}</b><span className="iac-tag">{p.ativa ? nomeProduto(p.produto) : 'desligada'}</span></div>
                   <small className="iac-miudo" style={{ margin: 0 }}>{NOME_MODO[p.modo]}{p.modo === 'prende' ? ` · espera ${Math.round(p.espera_s / 6) / 10} min · ${(p.whatsapp || []).length} WhatsApp` : ''}</small>
-                  <small className="iac-miudo" style={{ margin: 0 }}>Aprovado recebe: {opcoesDe(p.envio).length ? opcoesDe(p.envio).map((o) => `${o.template} · ${o.numero || ''}`).join(' | ') : 'nada ainda (escolha o template)'}</small>
+                  <small className="iac-miudo" style={{ margin: 0 }}>Aprovado recebe: {opcoesDe(p.envio).length ? opcoesDe(p.envio).map((o) => `${o.template}${NOME_PRODUTO_ENVIO[o.produto || 'todos']} · ${o.numero || ''}`).join(' | ') : 'nada ainda (escolha o template)'}</small>
                   <div className="iac-banco-acoes"><button className="iac-link" onClick={() => setEd({ tipo: 'pagina', v: p })}>Editar</button></div>
                 </div>
               ))}
