@@ -790,6 +790,22 @@ const AJUDA_MODO = {
   devolve: 'Consulta na hora. Aprovou: o cliente vê "em instantes você recebe no WhatsApp" e vai para o disparo.',
   prende: 'Consulta com o cliente na página. Aprovou: botão para falar no WhatsApp; se não tocar na espera, vai para o disparo.',
 }
+// botão do WhatsApp da página (dono, 02/10): número + mensagem -> link wa.me (o servidor guarda os links)
+const waPartes = (link) => {
+  const m = String(link || '').match(/wa\.me\/(\d*)(?:\?text=([^&#]*))?/)
+  let numero = m ? m[1] : '', texto = ''
+  try { texto = m && m[2] ? decodeURIComponent(m[2].replace(/\+/g, ' ')) : '' } catch { texto = m[2] }
+  if (/^55\d{10,11}$/.test(numero)) numero = numero.slice(2)
+  return { numero, texto }
+}
+const waLink = ({ numero, texto }) => {
+  let d = String(numero || '').replace(/\D/g, '').slice(0, 13)
+  if (/^\d{10,11}$/.test(d)) d = '55' + d
+  return `https://wa.me/${d}${texto ? `?text=${encodeURIComponent(texto)}` : ''}`
+}
+const waMascara = (d) => String(d || '').replace(/\D/g, '').slice(0, 11).replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d{1,4})$/, '$1-$2')
+const waValido = (link) => /^https:\/\/wa\.me\/55\d{10,11}(\?text=.*)?$/.test(String(link || ''))
+
 const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos: [], whatsapp: [], espera_s: 120, ativa: true, envio: null })
 const VARIAVEIS_ENVIO = [['primeiro_nome', 'Primeiro nome'], ['pedido', 'Pedido ("simulação de crédito do trabalhador")'], ['resultado', 'Resultado ("Valor liberado: R$ 4.500,00")'], ['nome', 'Nome completo'], ['valor', 'Maior valor aprovado'], ['produto', 'Produto']]
 // variável = texto livre com marcadores [campo] (migração 172); o formato antigo (só o nome do campo) vira [campo]
@@ -904,7 +920,7 @@ function EditorPagina({ inicial, salvar, onFechar, token, api }) {
           numero: o.numero, template: o.template, idioma: o.idioma || 'pt_BR', variaveis: o.variaveis || [] }))
         return ops.length ? { opcoes: ops } : null
       })(),
-      whatsapp: p.whatsapp.map((x) => x.trim()).filter(Boolean) }
+      whatsapp: p.whatsapp.map((x) => x.trim()).filter(waValido) }
     for (const k of ['criado_em', 'atualizado_em']) delete dados[k]
     const r = await salvar('lp_pagina', dados, inicial?.id ? 'Página salva' : 'Página criada')
     setSalvando(false)
@@ -933,16 +949,24 @@ function EditorPagina({ inicial, salvar, onFechar, token, api }) {
       <>
           <div>
             <b>WhatsApp do botão</b>
-            <p className="iac-miudo">Botão verde que aparece quando o cliente é aprovado (quem toca não recebe o template). Links wa.me
-              (com a mensagem, se quiser). Com mais de um, os clientes vão em rodízio.</p>
-            {p.whatsapp.map((x, i) => (
-              <div key={i} className="iac-filtros" style={{ marginBottom: 6 }}>
-                <input className="chip-input" style={{ flex: 1, minWidth: 220 }} value={x} placeholder="https://wa.me/5511…"
-                       onChange={(e) => set('whatsapp', p.whatsapp.map((y, j) => (j === i ? e.target.value : y)))} />
-                <button className="iac-link" onClick={() => set('whatsapp', p.whatsapp.filter((_, j) => j !== i))}>remover</button>
-              </div>
-            ))}
-            <button className="iac-link" onClick={() => set('whatsapp', [...p.whatsapp, ''])}>+ número</button>
+            <p className="iac-miudo">Botão verde que aparece quando o cliente é aprovado (quem toca não recebe o template). Escolha o
+              número e a mensagem que já vem escrita; o painel monta o link. Com mais de um, cada cliente cai num deles, sorteado.</p>
+            {p.whatsapp.map((x, i) => {
+              const w = waPartes(x)
+              const mudar = (k, v) => set('whatsapp', p.whatsapp.map((y, j) => (j === i ? waLink({ ...waPartes(y), [k]: v }) : y)))
+              return (
+                <div key={i} className="iac-filtros" style={{ marginBottom: 6, alignItems: 'center' }}>
+                  <input className="chip-input" style={{ width: 170 }} value={waMascara(w.numero)} placeholder="(17) 98182-5570"
+                         inputMode="tel" onChange={(e) => mudar('numero', e.target.value)} />
+                  <input className="chip-input" style={{ flex: 1, minWidth: 200 }} value={w.texto} maxLength={300}
+                         placeholder="Mensagem que já vem escrita (opcional)" onChange={(e) => mudar('texto', e.target.value)} />
+                  <button className="iac-link" onClick={() => set('whatsapp', p.whatsapp.filter((_, j) => j !== i))}>remover</button>
+                  {x && <a className="iac-miudo" href={x} target="_blank" rel="noreferrer" style={{ flexBasis: '100%', margin: 0 }}>{x}</a>}
+                </div>
+              )
+            })}
+            <button className="iac-link" onClick={() => set('whatsapp', [...p.whatsapp,
+              waLink({ numero: '', texto: p.whatsapp.length ? waPartes(p.whatsapp[p.whatsapp.length - 1]).texto : '' })])}>+ número</button>
           </div>
           {p.modo === 'prende' && (
           <Linha titulo="Esperar o clique por" ajuda="Sem tocar no botão nesse tempo, o cliente recebe o template.">
