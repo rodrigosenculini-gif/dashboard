@@ -990,9 +990,9 @@ function EditorPagina({ inicial, salvar, onFechar, token, api, bancos = [] }) {
           {!todos && <button type="button" className="iac-link" onClick={() => set('bancos', [])}>marcar todos</button>}
         </div>
       </Linha>
-      <Linha titulo="Tempo máximo da consulta" ajuda="Passou esse tempo, a página fecha com o que tiver: os bancos que ainda não responderam ficam de fora. Sem limite = espera todos (pode levar vários minutos).">
+      <Linha titulo="Tempo máximo da consulta" ajuda="Os bancos rodam juntos e o primeiro valor já segue. Passou esse tempo, a página fecha com o que tiver (os bancos que não responderam, ou que esperam o cliente, ficam de fora). Depois de 1 minuto a tela avisa que o cliente pode sair: a resposta vai pelo WhatsApp.">
         <div className="chip-opcoes">
-          {[[null, 'Sem limite'], [120, '2 min'], [180, '3 min'], [300, '5 min'], [600, '10 min']].map(([v, t]) => (
+          {[[null, 'Padrão (1min30)'], [120, '2 min'], [180, '3 min'], [300, '5 min'], [600, '10 min']].map(([v, t]) => (
             <button key={t} type="button" className={`chip-opcao ${(p.tempo_max_s || null) === v ? 'on' : ''}`} onClick={() => set('tempo_max_s', v)}>{t}</button>
           ))}
         </div>
