@@ -1297,7 +1297,7 @@ export default async function handler(req, res) {
                 case when lower(coalesce(seguro, '')) in ('sim', 's', 'true') then 'S'
                      when lower(coalesce(seguro, '')) in ('nao', 'não', 'n', 'false') then ''
                      when tabela ~* 'sem seguro|s/ ?seg' then ''
-                     when tabela ~* 'com seguro|c/ ?seg|seguro' then 'S'
+                     when tabela ~* 'com seguro|c/ ?seg|seguro|\\mseg\\M' then 'S'
                      else '' end as "SEGURO",
                 replace(to_char(coalesce(valor, 0), 'FM999999990.00'), '.', ',') as "VALOR"
          from vendas_gerais
