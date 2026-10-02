@@ -6995,6 +6995,24 @@ function VendasView() {
   const handleDownload = () => {
     const qs = new URLSearchParams({ type: 'vendas_export', date_from: dataInicio, date_to: dataFim })
     window.open(`/api/dashboard?${qs.toString()}`, '_blank')
+    setMenuBaixar(false)
+  }
+
+  // Baixar abre duas opcoes: o relatorio normal (periodo da tela) e o REL CRM,
+  // que tem layout fixo e periodo proprio escolhido no modal
+  const [menuBaixar, setMenuBaixar] = useState(false)
+  const [crmAberto, setCrmAberto] = useState(false)
+  const [crmInicio, setCrmInicio] = useState(dataInicio)
+  const [crmFim, setCrmFim] = useState(dataFim)
+  const abrirCrm = () => {
+    setCrmInicio(dataInicio); setCrmFim(dataFim)
+    setMenuBaixar(false); setCrmAberto(true)
+  }
+  const baixarCrm = () => {
+    const qs = new URLSearchParams({ type: 'vendas_export_crm', date_from: crmInicio, date_to: crmFim })
+    if (bancoSel.length) qs.set('banco', bancoSel.join(','))
+    window.open(`/api/dashboard?${qs.toString()}`, '_blank')
+    setCrmAberto(false)
   }
 
   // Downloads do que foi coletado das APIs dos bancos (log de consultas e
@@ -7019,9 +7037,33 @@ function VendasView() {
           <button className="refresh-btn" onClick={() => ajusteInputRef.current?.click()} disabled={ajustando} title="Importar relatório de qualquer banco (v8, C6, Novo Saque, Soma, Presença) ou a planilha do VendeAI. Mostra a prévia linha a linha antes de gravar.">
             {ajustando ? 'Lendo...' : '↑ Importação'}
           </button>
-          <button className="refresh-btn" onClick={handleDownload} title="Baixar tabela filtrada em CSV">
-            &#8595; Baixar
-          </button>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button className="refresh-btn" onClick={() => setMenuBaixar((v) => !v)} title="Baixar relatório">
+              &#8595; Baixar &#9662;
+            </button>
+            {menuBaixar && (
+              <>
+                <div onClick={() => setMenuBaixar(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                <div
+                  style={{
+                    position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41,
+                    background: 'var(--panel, #14181c)', border: '1px solid var(--border, #2a3038)',
+                    borderRadius: 8, padding: 6, minWidth: 220,
+                    boxShadow: '0 8px 24px rgba(0,0,0,.45)',
+                  }}
+                >
+                  <button className="refresh-btn" style={{ width: '100%', textAlign: 'left', marginBottom: 4 }}
+                    onClick={handleDownload} title="Tabela de vendas do período da tela, com todas as colunas">
+                    &#8595; Relat&oacute;rio normal
+                  </button>
+                  <button className="refresh-btn" style={{ width: '100%', textAlign: 'left' }}
+                    onClick={abrirCrm} title="BANCO, ADE, CPF, PESO, PRAZO, SEGURO, VALOR — escolhe o período antes de baixar">
+                    &#8595; REL CRM
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <button
               className="refresh-btn"
@@ -7253,6 +7295,25 @@ function VendasView() {
                 {ajustando ? 'Aplicando...' : `Aplicar ${fmtInt((ajuste.previa.resumo?.atualizar || 0) + (ajuste.previa.resumo?.inserir || 0))} alterações`}
               </button>
               <button className="reset-btn" onClick={() => setAjuste(null)} disabled={ajustando}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {crmAberto && (
+        <div className="funil-overlay" onClick={() => setCrmAberto(false)}>
+          <div className="funil-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560, overflow: 'visible' }}>
+            <div className="funil-header">
+              <div><h2>REL CRM</h2></div>
+              <button className="funil-close" onClick={() => setCrmAberto(false)}>&times;</button>
+            </div>
+            <p className="kpi-sub" style={{ marginBottom: 12 }}>
+              Colunas: BANCO, ADE, CPF, PESO, PRAZO, SEGURO, VALOR
+              {bancoSel.length ? <> &middot; s&oacute; {bancoSel.join(', ')} (filtro de banco da tela)</> : null}
+            </p>
+            <DateRangeFilter dataInicio={crmInicio} setDataInicio={setCrmInicio} dataFim={crmFim} setDataFim={setCrmFim} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button className="refresh-btn" onClick={baixarCrm} disabled={!crmInicio || !crmFim}>&#8595; Baixar REL CRM</button>
+              <button className="reset-btn" onClick={() => setCrmAberto(false)}>Cancelar</button>
             </div>
           </div>
         </div>

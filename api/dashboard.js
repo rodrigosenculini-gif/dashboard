@@ -1280,6 +1280,38 @@ export default async function handler(req, res) {
     }
   }
 
+  // REL CRM: layout fixo pedido pelo CRM (BANCO, ADE, CPF, PESO, PRAZO, SEGURO,
+  // VALOR), decimais com virgula para abrir direto no Excel. Seguro vazio na
+  // venda e deduzido pelo nome da tabela ('COM SEGURO', '|C/seg|').
+  if (type === 'vendas_export_crm') {
+    try {
+      const p_banco = req.query.banco || null;
+      const client = getPool();
+      const result = await client.query(
+        `select coalesce(banco, '') as "BANCO",
+                coalesce(adesao::text, proposal_id_raw, '') as "ADE",
+                coalesce(cpf, '') as "CPF",
+                replace(trim_scale(coalesce(peso, 0))::text, '.', ',') as "PESO",
+                coalesce(parcelas::text, '') as "PRAZO",
+                case when lower(coalesce(seguro, '')) in ('sim', 's', 'true') then 'SIM'
+                     when lower(coalesce(seguro, '')) in ('nao', 'não', 'n', 'false') then 'NAO'
+                     when tabela ~* 'sem seguro|s/ ?seg' then 'NAO'
+                     when tabela ~* 'com seguro|c/ ?seg|seguro' then 'SIM'
+                     else '' end as "SEGURO",
+                replace(to_char(coalesce(valor, 0), 'FM999999990.00'), '.', ',') as "VALOR"
+         from vendas_gerais
+         where ($1::date is null or data >= $1::date) and ($2::date is null or data <= $2::date)
+           and ($3::text is null or $3::text = '' or banco = any(string_to_array($3::text, ',')))
+         order by data, banco, id`,
+        [p_date_from, p_date_to, p_banco]
+      );
+      const cols = ['BANCO', 'ADE', 'CPF', 'PESO', 'PRAZO', 'SEGURO', 'VALOR'];
+      return sendCsv(res, cols, result.rows, `REL_CRM_${p_date_from || 'todas'}_${p_date_to || 'todas'}.csv`);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (type === 'consultas_bancos_export') {
     try {
       const p_banco = req.query.banco || null;
