@@ -929,8 +929,17 @@ function EscolherEnvios({ envio, onChange, token, api }) {
   )
 }
 
-function EditorPagina({ inicial, salvar, onFechar, token, api }) {
-  const [p, setP] = useState(() => ({ ...paginaVazia(), ...inicial }))
+function EditorPagina({ inicial, salvar, onFechar, token, api, bancos = [] }) {
+  const [p, setP] = useState(() => ({ ...paginaVazia(), bancos: [], tempo_max_s: null, ...inicial }))
+  // bancos do CLT que a página consulta (migração 187): vazio = todos os ligados no Painel > Bancos
+  const bancosClt = bancos.filter((b) => b.produto === 'clt').sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
+  const marcados = p.bancos || []
+  const todos = !marcados.length
+  const alternaBanco = (b) => {
+    const base = todos ? bancosClt.map((x) => x.banco) : marcados
+    const novo = base.includes(b) ? base.filter((x) => x !== b) : [...base, b]
+    set('bancos', novo.length === bancosClt.length ? [] : novo)
+  }
   const [salvando, setSalvando] = useState(false)
   const set = (k, v) => setP((x) => ({ ...x, [k]: v }))
   const setDestino = (i, k, v) => set('destinos', p.destinos.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
@@ -964,6 +973,27 @@ function EditorPagina({ inicial, salvar, onFechar, token, api }) {
         <div className="chip-opcoes">
           {[['clt', 'CLT'], ['fgts', 'FGTS']].map(([k, t]) => (
             <button key={k} className={`chip-opcao ${p.produto === k ? 'on' : ''}`} onClick={() => set('produto', k)}>{t}</button>
+          ))}
+        </div>
+      </Linha>
+      <Linha titulo="Bancos consultados (CLT)" ajuda="Toque para tirar ou colocar um banco só nesta página. Todos marcados = os bancos ligados no Painel > Bancos (onde também ficam pausa, espera e tentativas).">
+        <div className="chip-opcoes">
+          {bancosClt.map((b) => {
+            const on = todos || marcados.includes(b.banco)
+            return (
+              <button key={b.banco} type="button" className={`chip-opcao ${on ? 'on' : ''}`} onClick={() => alternaBanco(b.banco)}
+                      title={b.ativo ? '' : 'Desligado no Painel > Bancos: não consulta mesmo marcado'}>
+                {nomeBanco(b.banco)}{b.ativo ? '' : ' (desligado)'}
+              </button>
+            )
+          })}
+          {!todos && <button type="button" className="iac-link" onClick={() => set('bancos', [])}>marcar todos</button>}
+        </div>
+      </Linha>
+      <Linha titulo="Tempo máximo da consulta" ajuda="Passou esse tempo, a página fecha com o que tiver: os bancos que ainda não responderam ficam de fora. Sem limite = espera todos (pode levar vários minutos).">
+        <div className="chip-opcoes">
+          {[[null, 'Sem limite'], [120, '2 min'], [180, '3 min'], [300, '5 min'], [600, '10 min']].map(([v, t]) => (
+            <button key={t} type="button" className={`chip-opcao ${(p.tempo_max_s || null) === v ? 'on' : ''}`} onClick={() => set('tempo_max_s', v)}>{t}</button>
           ))}
         </div>
       </Linha>
@@ -1079,7 +1109,7 @@ function SecaoPaginas({ d, salvar, token, api }) {
       <section className="iac-bloco">
         <p className="section-label">Páginas</p>
         {ed?.tipo === 'pagina'
-          ? <EditorPagina inicial={ed.v} salvar={salvar} onFechar={() => setEd(null)} token={token} api={api} />
+          ? <EditorPagina inicial={ed.v} salvar={salvar} onFechar={() => setEd(null)} token={token} api={api} bancos={d.bancos || []} />
           : (
             <div className="iac-bancos">
               {lp.paginas.map((p) => (
