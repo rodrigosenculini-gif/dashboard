@@ -1,0 +1,79 @@
+/* ================= Funil ao vivo (FunilAoVivo.jsx) =================
+   Mesma paleta do dashboard: lime = certo, gold = atenção, rose = falha. */
+.fav-topo{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:14px; }
+.fav-topo h2{ margin:0; font-size:22px; display:flex; align-items:center; gap:10px; }
+.fav-vivo{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:11px; font-weight:400; color:var(--lime); }
+.fav-vivo i{ width:7px; height:7px; border-radius:50%; background:var(--lime); animation:fav-pisca 1.6s infinite; }
+@keyframes fav-pisca{ 50%{ opacity:.3; } }
+
+.fav-kpis{ display:grid; grid-template-columns:repeat(auto-fill, minmax(124px, 1fr)); gap:10px; margin-bottom:14px; }
+.fav-kpi{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
+.fav-kpi small{ color:var(--muted); font-size:12px; }
+.fav-kpi b{ font-size:24px; font-weight:600; }
+
+.fav-filtros{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+.fav-filtros > .chip-input{ width:auto; flex:0 0 auto; }
+.fav-filtros > .fav-busca{ flex:1 1 220px; max-width:340px; }
+
+.fav-tabela-caixa{ padding:0; overflow-x:auto; }
+.fav-tabela{ width:100%; border-collapse:collapse; font-size:13px; min-width:1080px; }
+.fav-tabela th{ text-align:left; font-weight:500; color:var(--muted); font-size:12px; padding:10px 12px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.fav-tabela td{ padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.fav-tabela tbody tr{ cursor:pointer; transition:background .1s; }
+.fav-tabela tbody tr:hover, .fav-tabela tbody tr.sel{ background:var(--surface-2); }
+.fav-tabela .num{ text-align:right; white-space:nowrap; }
+.fav-tabela td:nth-child(n+6){ white-space:nowrap; }
+.fav-vazio{ text-align:center; color:var(--muted); padding:28px !important; cursor:default; }
+.fav-cliente{ display:flex; align-items:center; gap:10px; }
+.fav-cliente > i{ flex:0 0 7px; height:7px; border-radius:50%; background:var(--border); }
+.fav-cliente > i.on{ background:var(--lime); box-shadow:0 0 0 3px rgba(169,217,127,.18); }
+.fav-cliente b{ display:block; font-weight:600; text-transform:uppercase; font-size:12.5px; }
+.fav-cliente small{ color:var(--muted); font-size:11.5px; font-family:var(--font-mono); }
+.fav-cliente small span{ margin-left:10px; }
+.fav-troca{ display:block; color:var(--gold); font-size:11px; }
+.fav-quem{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.fav-onde{ max-width:280px; }
+
+.fav-badge{ display:inline-block; padding:3px 8px; border-radius:6px; font-size:11.5px; white-space:nowrap; border:1px solid transparent; }
+.fav-badge.verde{ background:rgba(169,217,127,.14); color:var(--lime); border-color:rgba(169,217,127,.35); }
+.fav-badge.azul{ background:rgba(110,160,255,.14); color:#9fbfff; border-color:rgba(110,160,255,.35); }
+.fav-badge.laranja{ background:rgba(245,130,32,.14); color:#ffb06a; border-color:rgba(245,130,32,.4); }
+.fav-badge.roxo{ background:rgba(170,130,255,.14); color:#c7aaff; border-color:rgba(170,130,255,.35); }
+.fav-badge.vermelho{ background:rgba(240,110,120,.14); color:var(--rose); border-color:rgba(240,110,120,.35); }
+.fav-badge.cinza{ background:var(--surface-2); color:var(--muted); border-color:var(--border); }
+
+.fav-entrar{ max-width:360px; display:flex; flex-direction:column; gap:10px; }
+
+/* gaveta do detalhe */
+.fav-gaveta-fundo{ position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.35); }
+.fav-gaveta{ position:absolute; top:0; right:0; bottom:0; width:min(440px, 100vw); overflow-y:auto; background:var(--surface);
+  border-left:1px solid var(--border); padding:20px 18px 28px; box-shadow:-20px 0 40px rgba(0,0,0,.4); }
+.fav-fechar{ position:absolute; top:10px; right:12px; background:none; border:0; color:var(--muted); font-size:24px; cursor:pointer; }
+.fav-nome{ margin:0 26px 4px 0; font-size:17px; text-transform:uppercase; }
+.fav-sub{ margin:0 0 2px; color:var(--muted); font-size:12px; font-family:var(--font-mono); }
+.fav-linha-chips{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0 12px; }
+.fav-cartao{ border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:12px; background:var(--surface-2); }
+.fav-cartao-topo{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.fav-cartao-topo small{ color:var(--muted); font-size:12px; }
+.fav-banco{ display:block; font-size:13px; }
+.fav-valor{ font-size:24px; font-weight:700; margin:4px 0 2px; }
+.fav-titulo-bloco{ font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 10px; }
+.fav-passos{ display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; }
+.fav-passos div{ display:flex; flex-direction:column; gap:6px; font-size:10.5px; color:var(--muted); }
+.fav-passos i{ height:4px; border-radius:4px; background:var(--border); }
+.fav-passos .feito{ color:var(--text); }
+.fav-passos .feito i{ background:var(--lime); }
+.fav-banco-linha{ display:grid; grid-template-columns:96px auto 1fr; gap:8px; align-items:center; font-size:12.5px; padding:4px 0; }
+.fav-banco-linha small{ color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fav-tempo{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; font-size:12.5px; }
+.fav-tempo li{ display:grid; grid-template-columns:62px 10px 1fr; gap:8px; align-items:start; }
+.fav-tempo time{ color:var(--muted); font-family:var(--font-mono); font-size:11px; padding-top:1px; }
+.fav-ponto{ width:8px; height:8px; border-radius:50%; margin-top:4px; background:var(--muted); }
+.fav-ponto.cliente{ background:var(--gold); }
+.fav-ponto.ia{ background:var(--lime); }
+.fav-ponto.banco{ background:#9fbfff; }
+.fav-tempo-banco em{ font-style:normal; margin-left:4px; }
+.fav-tempo-banco em.ok{ color:var(--lime); }
+.fav-tempo-banco em.falha{ color:var(--rose); }
+.fav-tempo-banco small{ display:block; color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:300px; }
+@media (max-width:700px){ .fav-kpi b{ font-size:20px; } .fav-topo h2{ font-size:19px; } }

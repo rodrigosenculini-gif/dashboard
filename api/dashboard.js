@@ -243,6 +243,18 @@ export default async function handler(req, res) {
           const r = await client.query('select public.meta_tpl_uso($1, $2) as r', [token, Number(b.dias) || 30]);
           return res.json(r.rows[0].r);
         }
+        // Funil ao vivo (migracao 183): conversas da IA e paginas da LP; so leitura, com a sessao do Painel
+        if (b.acao === 'funil') {
+          const f = b.filtros && typeof b.filtros === 'object' ? b.filtros : {};
+          const filtros = { periodo: String(f.periodo || 'hoje').slice(0, 8), produto: String(f.produto || '').slice(0, 10),
+            canal: String(f.canal || '').slice(0, 10), busca: String(f.busca || '').slice(0, 80) };
+          const r = await client.query('select public.funil_ao_vivo($1, $2::jsonb) as r', [token, JSON.stringify(filtros)]);
+          return res.json(r.rows[0].r);
+        }
+        if (b.acao === 'funil_detalhe') {
+          const r = await client.query('select public.funil_detalhe($1, $2) as r', [token, Number(b.id) || 0]);
+          return res.json(r.rows[0].r);
+        }
         if (b.acao === 'meta') {
           const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
           const resp = await fetch(META_TPL_URL, {

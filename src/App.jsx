@@ -11,6 +11,7 @@ import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
 import RoboFollowup from './RoboFollowup'
 import IAConfiguracao from './IAConfiguracao'
+import FunilAoVivo from './FunilAoVivo'
 import Trello from './Trello'
 import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
 import MetaComemoracao from './MetaComemoracao'
@@ -94,6 +95,8 @@ const VIEWS = [
   { id: 'inicio', label: 'Geral' },
   // Painel da IA de atendimento: configuração e análises juntas, com menu lateral (01/10)
   { id: 'painel', label: 'Painel' },
+  // conversas da IA e páginas da LP em tempo real (02/10)
+  { id: 'funil', label: 'Funil ao vivo' },
   { id: 'disparos', label: 'Disparos' },
   { id: 'leilao', label: 'Meta — Detalhado' },
   { id: 'produtos', label: 'Entradas LP' },
@@ -798,13 +801,14 @@ function CampanhaDetalhadoList({ items, loading }) {
 // verde. Recolhe para so icones (botao no rodape, lembrado no navegador); no
 // celular vira gaveta aberta pelo botao de menu do cabecalho.
 const NAV_GRUPOS = [
-  ['Visão geral', ['inicio', 'painel']],
+  ['Visão geral', ['inicio', 'painel', 'funil']],
   ['Captação', ['disparos', 'leilao', 'produtos']],
   ['Vendas', ['propostas', 'vendas', 'vendedoras']],
   ['Sistema', ['n8n', 'ia', 'robo']],
 ]
 const NAV_ICONE = {
   inicio: 'M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10',
+  funil: 'M22 12h-4l-3 9L9 3l-3 9H2',
   painel: 'M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM9 4v16M12.5 14l2-3 2 2 2.5-4',
   disparos: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
   leilao: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
@@ -7859,6 +7863,7 @@ function Dashboard({ permitidas, onLogout }) {
       {view === 'vendas' && podeVer('vendas') && <VendasView />}
       {view === 'ia' && podeVer('ia') && <IATreinamento />}
       {view === 'painel' && podeVer('painel') && <IAConfiguracao onVoltar={() => changeView('inicio')} />}
+      {view === 'funil' && podeVer('funil') && <FunilAoVivo />}
       {view === 'trello' && podeVer('trello') && <Trello onVoltar={() => changeView('inicio')} />}
       {view === 'chips' && podeVer('chips') && <Chips onVoltar={() => changeView('inicio')} />}
       {view === 'robo' && podeVer('robo') && <RoboFollowup onVoltar={() => changeView('inicio')} />}
