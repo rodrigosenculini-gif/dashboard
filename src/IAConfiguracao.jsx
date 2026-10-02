@@ -913,7 +913,7 @@ function EditorPagina({ inicial, salvar, onFechar, token, api }) {
       <>
           <div>
             <b>WhatsApp do botão</b>
-            <p className="iac-miudo">{p.modo === 'prende' ? 'Aparece quando o cliente é aprovado.' : 'Aparece depois de 30 s esperando a consulta.'} Links wa.me
+            <p className="iac-miudo">Botão verde que aparece quando o cliente é aprovado (quem toca não recebe o template). Links wa.me
               (com a mensagem, se quiser). Com mais de um, os clientes vão em rodízio.</p>
             {p.whatsapp.map((x, i) => (
               <div key={i} className="iac-filtros" style={{ marginBottom: 6 }}>
