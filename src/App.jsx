@@ -3170,6 +3170,11 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         return
       }
     }
+    // V8: sem API, o seguro define a tabela (CLT ACELERA com/sem seguro) e o peso
+    if (addForm.banco === 'V8' && !['sim', 'nao'].includes(addForm.seguro)) {
+      setAddMsg('Informe se a venda V8 é com ou sem seguro — o peso depende disso.')
+      return
+    }
     setAdding(true)
     setAddMsg('')
     try {
@@ -3188,6 +3193,8 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
         banco: addForm.banco,
         tabela: addForm.banco === 'C6'
           ? (c6Opcoes.find((o) => o.codigo === String(addForm.tabelaNome || '').replace(/\D/g, ''))?.nome || addForm.tabelaNome)
+          : addForm.banco === 'V8'
+          ? (addForm.seguro === 'sim' ? 'CLT ACELERA - COM SEGURO' : 'CLT ACELERA - SEM SEGURO')
           : (ehPorCodigo ? addForm.codigo : (ehPorTabelaNome || ehBancoComApi || ehTabelaLivreDeApiBanco ? addForm.tabelaNome : '')),
         data_pagamento: addForm.dataPagamento,
         parcelas: (ehPorTabelaNome && !precisaParcelasComTabelaNome) ? '' : addForm.parcelas,
@@ -3477,9 +3484,12 @@ function AddVendaModal({ vendedorFixo, vendedoresDisponiveis, onClose, onAdded }
                   <label>Parcelas
                     <input required value={addForm.parcelas} onChange={(e) => setAddForm({ ...addForm, parcelas: e.target.value })} placeholder="ex: 24" />
                   </label>
-                  <label>Seguro
-                    <select value={addForm.seguro} onChange={(e) => setAddForm({ ...addForm, seguro: e.target.value })}>
-                      <option value="">n&atilde;o informado</option>
+                  <label>Seguro{addForm.banco === 'V8' && <span style={{ color: 'var(--muted)', fontWeight: 400 }}> (obrigat&oacute;rio &mdash; muda o peso)</span>}
+                    {/* V8 nao tem API: o seguro e o que separa CLT ACELERA com/sem
+                        seguro (peso 1.4 x 0.6 em 36x). Sem ele a venda entrava sem
+                        tabela e o peso assumia com seguro (02/10). */}
+                    <select required={addForm.banco === 'V8'} value={addForm.seguro} onChange={(e) => setAddForm({ ...addForm, seguro: e.target.value })}>
+                      <option value="">{addForm.banco === 'V8' ? 'selecione' : 'não informado'}</option>
                       <option value="sim">Com seguro</option>
                       <option value="nao">Sem seguro</option>
                     </select>
