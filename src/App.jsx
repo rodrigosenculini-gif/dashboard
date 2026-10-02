@@ -6242,10 +6242,11 @@ const VENDAS_CORES = ['#a9d97f', '#d99089', '#7fa8d9', '#d9b877', '#c17fd9', '#7
 // Todas as propostas (propostas_bancos), como a lista do VendeAI: filtros da
 // tela de Vendas + situacao, busca, colunas escolhidas/ordenadas pela pessoa e
 // detalhe da proposta e do lead ao clicar na linha (dono, 01/10).
-const PROP_SITUACOES = ['Pago', 'Aguardando assinatura', 'Em processamento', 'Pendente', 'Cancelado']
+// Estornado: foi pago e depois desfeito (desaverbado, reembolso, estorno, pago e cancelado)
+const PROP_SITUACOES = ['Pago', 'Aguardando assinatura', 'Em processamento', 'Pendente', 'Cancelado', 'Estornado']
 const PROP_SIT_COR = {
   Pago: '#a9d97f', 'Aguardando assinatura': '#7ea6e0', 'Em processamento': '#d9b877',
-  Pendente: '#e0a46a', Cancelado: '#d99089',
+  Pendente: '#e0a46a', Cancelado: '#d99089', Estornado: '#c48ad9',
 }
 const fmtCpf = (c) => {
   const d = String(c || '').replace(/\D/g, '')
