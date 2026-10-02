@@ -27,6 +27,40 @@ async function getResumo() {
 }
 
 const hora = (t) => (t ? new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—')
+const fmtMin = (m) => (m == null ? '—' : m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`)
+
+// conversas por trás de uma linha (carga / caso+etapa / motivo de encerramento)
+function ListaConversas({ tipo, a, b }) {
+  const [itens, setItens] = useState(null)
+  const [erro, setErro] = useState(null)
+  useEffect(() => {
+    const qs = new URLSearchParams({ type: 'robo_lista', tipo, a: a || '', b: b || '' })
+    fetch(`/api/dashboard?${qs}`).then((r) => r.json())
+      .then((d) => (Array.isArray(d) ? setItens(d) : setErro(d?.error || 'falha')))
+      .catch((e) => setErro(e.message))
+  }, [tipo, a, b])
+  if (erro) return <div className="robo-lista state-msg error">Erro: {erro}</div>
+  if (!itens) return <div className="robo-lista home-vazio">carregando...</div>
+  if (!itens.length) return <div className="robo-lista home-vazio">Nenhuma conversa.</div>
+  return (
+    <div className="robo-lista">
+      {itens.map((c) => (
+        <div key={c.conversation_id} className="robo-lista-item">
+          <a href={CRM + c.conversation_id} target="_blank" rel="noreferrer">#{c.conversation_id}</a>
+          <span>
+            {tipo === 'carga' && <>esperando {fmtMin(c.espera_min)}{c.urgente ? <b className="robo-tag">urgente</b> : null}</>}
+            {tipo === 'aberto' && <>cliente calado há {fmtMin(c.espera_min)} · etapa há {fmtMin(c.etapa_min)}</>}
+            {tipo === 'encerrado' && <>{NOME_CASO[c.caso] || c.caso} · {hora(c.quando)}</>}
+          </span>
+          <span className="robo-lista-extra">
+            {[c.vendedora, c.detalhe, c.audios ? `${c.audios} áudio(s)` : null,
+              tipo === 'carga' ? (c.labels || []).filter((l) => l !== 'clt').join(', ') : null].filter(Boolean).join(' · ')}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function RoboFollowup({ onVoltar }) {
   const dialogo = useDialogo()
@@ -34,6 +68,12 @@ export default function RoboFollowup({ onVoltar }) {
   const [erro, setErro] = useState(null)
   const [carregando, setCarregando] = useState(false)
   const [mudando, setMudando] = useState(false)
+  const [aberta, setAberta] = useState(null) // chave da linha expandida: "tipo|a|b"
+  const alternar = (tipo, a, b) => {
+    const k = `${tipo}|${a}|${b || ''}`
+    setAberta((x) => (x === k ? null : k))
+  }
+  const estaAberta = (tipo, a, b) => aberta === `${tipo}|${a}|${b || ''}`
 
   const carregar = useCallback(async () => {
     setCarregando(true)
@@ -105,11 +145,15 @@ export default function RoboFollowup({ onVoltar }) {
           {carga.map((c) => {
             const pct = Math.min(100, Math.round((Number(c.urgentes) / limite) * 100))
             return (
-              <div key={c.vendedora} className="robo-carga">
-                <span className="robo-carga-nome">{c.vendedora}</span>
-                <span className={`robo-barra ${Number(c.urgentes) >= limite ? 'cheia' : ''}`}><i style={{ width: `${pct}%` }} /></span>
-                <span className="robo-carga-num" title="urgentes / total sem resposta">{c.urgentes} <small>/ {c.sem_resposta}</small></span>
-              </div>
+              <React.Fragment key={c.vendedora}>
+                <button type="button" className={`robo-carga robo-clicavel ${estaAberta('carga', c.vendedora) ? 'on' : ''}`}
+                        onClick={() => alternar('carga', c.vendedora)}>
+                  <span className="robo-carga-nome">{c.vendedora}</span>
+                  <span className={`robo-barra ${Number(c.urgentes) >= limite ? 'cheia' : ''}`}><i style={{ width: `${pct}%` }} /></span>
+                  <span className="robo-carga-num" title="urgentes / total sem resposta">{c.urgentes} <small>/ {c.sem_resposta}</small></span>
+                </button>
+                {estaAberta('carga', c.vendedora) && <ListaConversas tipo="carga" a={c.vendedora} />}
+              </React.Fragment>
             )
           })}
           {!carga.length && <p className="home-vazio">Sem dados ainda.</p>}
@@ -118,16 +162,26 @@ export default function RoboFollowup({ onVoltar }) {
         <section className="panel">
           <p className="section-label">Em acompanhamento agora</p>
           {abertos.map((a) => (
-            <div key={`${a.caso}-${a.etapa}`} className="robo-linha">
-              <span>{NOME_CASO[a.caso] || a.caso} <small>· {NOME_ETAPA[a.etapa] || a.etapa}</small></span>
-              <strong>{a.n}</strong>
-            </div>
+            <React.Fragment key={`${a.caso}-${a.etapa}`}>
+              <button type="button" className={`robo-linha robo-clicavel ${estaAberta('aberto', a.caso, a.etapa) ? 'on' : ''}`}
+                      onClick={() => alternar('aberto', a.caso, a.etapa)}>
+                <span>{NOME_CASO[a.caso] || a.caso} <small>· {NOME_ETAPA[a.etapa] || a.etapa}</small></span>
+                <strong>{a.n}</strong>
+              </button>
+              {estaAberta('aberto', a.caso, a.etapa) && <ListaConversas tipo="aberto" a={a.caso} b={a.etapa} />}
+            </React.Fragment>
           ))}
           {!abertos.length && <p className="home-vazio">Nenhum caso aberto.</p>}
           {encerrados.length > 0 && <>
             <p className="section-label robo-sub">Encerrados hoje</p>
-            {encerrados.slice(0, 8).map(([m, n]) => (
-              <div key={m} className="robo-linha"><span>{m}</span><strong>{n}</strong></div>
+            {encerrados.map(([m, n]) => (
+              <React.Fragment key={m}>
+                <button type="button" className={`robo-linha robo-clicavel ${estaAberta('encerrado', m) ? 'on' : ''}`}
+                        onClick={() => alternar('encerrado', m)}>
+                  <span>{m}</span><strong>{n}</strong>
+                </button>
+                {estaAberta('encerrado', m) && <ListaConversas tipo="encerrado" a={m} />}
+              </React.Fragment>
             ))}
           </>}
         </section>

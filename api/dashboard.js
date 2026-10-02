@@ -1257,6 +1257,8 @@ export default async function handler(req, res) {
     chips_opcoes:      { sql: 'select dashboard_chips_opcoes() as r', args: () => [] },
     // robô de follow-up do CRM VendeAI: resumo da aba "Robô follow-up"
     robo_resumo:       { sql: 'select dashboard_robo_resumo() as r', args: () => [] },
+    robo_lista:        { sql: 'select dashboard_robo_lista($1::text,$2::text,$3::text) as r',
+                         args: () => [req.query.tipo || null, req.query.a || null, req.query.b || null] },
     chips_para_recarga:{ sql: 'select dashboard_chips_para_recarga($1::int) as r',
                          args: () => [parseInt(req.query.dias, 10) || 3] },
     trello_quadro:     { sql: 'select dashboard_trello_quadro($1::bigint) as r',
