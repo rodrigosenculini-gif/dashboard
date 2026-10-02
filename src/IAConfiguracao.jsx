@@ -792,6 +792,11 @@ const AJUDA_MODO = {
 }
 const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos: [], whatsapp: [], espera_s: 120, ativa: true, envio: null })
 const VARIAVEIS_ENVIO = [['primeiro_nome', 'Primeiro nome'], ['pedido', 'Pedido ("simulação de crédito do trabalhador")'], ['resultado', 'Resultado ("Valor liberado: R$ 4.500,00")'], ['nome', 'Nome completo'], ['valor', 'Maior valor aprovado'], ['produto', 'Produto']]
+// variável = texto livre com marcadores [campo] (migração 172); o formato antigo (só o nome do campo) vira [campo]
+const CAMPO_EXEMPLO = { primeiro_nome: 'Maria', nome: 'Maria Souza', valor: 'R$ 4.500,00', produto: 'crédito do trabalhador',
+  pedido: 'simulação de crédito do trabalhador', resultado: 'Valor liberado: R$ 4.500,00' }
+const textoVar = (v) => (CAMPO_EXEMPLO[v] !== undefined ? `[${v}]` : (v || ''))
+const exemploVar = (v) => textoVar(v).replace(/\[(\w+)\]/g, (m, k) => (CAMPO_EXEMPLO[k] !== undefined ? CAMPO_EXEMPLO[k] : m))
 
 // Envio do aprovado (migração 166): template aprovado de uma das nossas BMs, pelo número escolhido
 function EscolherEnvio({ envio, onChange, token, api, onRemover, n }) {
@@ -836,16 +841,31 @@ function EscolherEnvio({ envio, onChange, token, api, onRemover, n }) {
           {aprovados.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
         </select>
       </div>
-      {tpl && <p className="tpl-leitura" style={{ margin: '6px 0', whiteSpace: 'pre-wrap' }}>{corpo}</p>}
-      {Array.from({ length: nVars }, (_, i) => (
-        <div key={i} className="iac-filtros" style={{ marginBottom: 6 }}>
-          <span className="iac-rot">{`{{${i + 1}}}`}</span>
-          <select className="chip-input" value={(e.variaveis || [])[i] || 'primeiro_nome'}
-                  onChange={(ev) => { const v = [...(e.variaveis || [])]; v[i] = ev.target.value; mudar({ variaveis: v }) }}>
-            {VARIAVEIS_ENVIO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
-          </select>
-        </div>
-      ))}
+      {tpl && <p className="iac-miudo" style={{ margin: '6px 0 2px' }}>Modelo: {corpo}</p>}
+      {Array.from({ length: nVars }, (_, i) => {
+        const val = textoVar((e.variaveis || [])[i])
+        const setVar = (t) => { const v = [...(e.variaveis || [])]; while (v.length < nVars) v.push(''); v[i] = t.replace(/[\r\n\t]+/g, ' ').slice(0, 300); mudar({ variaveis: v }) }
+        return (
+          <div key={i} style={{ marginBottom: 8 }}>
+            <div className="iac-filtros" style={{ margin: 0 }}>
+              <span className="iac-rot">{`{{${i + 1}}}`}</span>
+              <input className="chip-input" style={{ flex: 1, minWidth: 220 }} value={val} maxLength={300}
+                     placeholder="Escreva o texto e insira os campos abaixo" onChange={(ev) => setVar(ev.target.value)} />
+            </div>
+            <div className="chip-opcoes" style={{ margin: '4px 0 0 36px' }}>
+              {VARIAVEIS_ENVIO.map(([k, t]) => (
+                <button key={k} type="button" className="chip-opcao" title={t}
+                        onClick={() => setVar(`${val}${val && !/\s$/.test(val) ? ' ' : ''}[${k}]`)}>+ {t.split(' (')[0]}</button>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+      {tpl && (
+        <p className="tpl-leitura" style={{ margin: '6px 0', whiteSpace: 'pre-wrap' }}>
+          {corpo.replace(/\{\{(\d+)\}\}/g, (m, n) => exemploVar((e.variaveis || [])[Number(n) - 1]) || m)}
+        </p>
+      )}
     </div>
   )
 }
