@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 // Qualidade dos atendimentos da VendeAI (vendedoras e IA): análise diária pelos 9 critérios
 // (n8n "Qualidade - transcrição e análise de atendimentos" -> tabela crm_qualidade).
@@ -58,11 +58,97 @@ function Triagem({ dias }) {
   )
 }
 
+// etiquetas colocadas à mão (tratativa, followup1/2, retomar, nova_simulação): quem colocou, quem fez,
+// o que venceu sem atendimento (o robô retoma) e o que ainda está no prazo
+const NOME_STATUS = { aguardando: 'no prazo', vencido: 'venceu — robô retoma', feito: 'feito', removida: 'removida' }
+function Manuais({ dias }) {
+  const [d, setD] = useState(null)
+  useEffect(() => {
+    fetch(`/api/dashboard?type=robo_manuais&dias=${dias}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
+  }, [dias])
+  if (!d?.por_etiqueta) return null
+  const prazos = d.prazos || {}
+  return (
+    <section className="panel table-panel">
+      <p className="section-label">Etiquetas manuais · colocadas pela equipe (não pelo robô) · no prazo a pessoa faz; vencida, o robô retoma</p>
+      <div className="scroll-table">
+        <table className="robo-desemp">
+          <thead><tr><th>Etiqueta</th><th>Prazo</th><th>Qtd.</th><th>Feito</th><th>No prazo</th><th>Venceu</th><th>Removida</th><th>Tempo médio</th></tr></thead>
+          <tbody>
+            {d.por_etiqueta.map((e) => (
+              <tr key={e.etiqueta}>
+                <td>{e.etiqueta}</td><td>{prazos[e.etiqueta] ?? '—'} min</td><td>{e.n}</td>
+                <td className="robo-taxa ok">{e.feito}</td><td>{e.aguardando}</td>
+                <td className={`robo-taxa ${e.vencido ? 'ruim' : ''}`}>{e.vencido}</td><td>{e.removida}</td>
+                <td>{e.media_min != null ? `${e.media_min} min` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!d.por_etiqueta.length && <p className="home-vazio">Nenhuma etiqueta manual no período.</p>}
+      </div>
+      {d.por_pessoa.length > 0 && <>
+        <p className="section-label robo-sub">Por responsável pelo atendimento</p>
+        <div className="scroll-table">
+          <table className="robo-desemp">
+            <thead><tr><th>Com quem estava</th><th>Qtd.</th><th>Feito</th><th>No prazo</th><th>Venceu</th><th>Tempo médio</th></tr></thead>
+            <tbody>
+              {d.por_pessoa.map((p) => (
+                <tr key={p.dono}>
+                  <td>{p.dono}</td><td>{p.n}</td><td className="robo-taxa ok">{p.feito}</td><td>{p.aguardando}</td>
+                  <td className={`robo-taxa ${p.vencido ? 'ruim' : ''}`}>{p.vencido}</td><td>{p.media_min != null ? `${p.media_min} min` : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>}
+      {d.por_autor?.length > 0 && <>
+        <p className="section-label robo-sub">Quem colocou</p>
+        {d.por_autor.map((a) => (
+          <div key={a.autor} className="robo-acao">
+            <span className="robo-acao-tipo">{a.autor}</span>
+            <span className="robo-acao-det">{a.n} · {Object.entries(a.etiquetas || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}</span>
+          </div>
+        ))}
+      </>}
+      {d.pendentes.length > 0 && <>
+        <p className="section-label robo-sub">Abertas (no prazo ou vencidas)</p>
+        {d.pendentes.map((p) => (
+          <div key={`${p.conversation_id}-${p.etiqueta}`} className="robo-acao">
+            <span className="robo-acao-hora">{hora(p.em)}</span>
+            <span className="robo-acao-tipo">{p.etiqueta}</span>
+            <a href={CRM + p.conversation_id} target="_blank" rel="noreferrer">#{p.conversation_id}</a>
+            <span className="robo-acao-det">{NOME_STATUS[p.status] || p.status} · por {p.por || '?'} · com {p.dono || 'sem dono'}</span>
+          </div>
+        ))}
+      </>}
+      {d.feitos?.length > 0 && <>
+        <p className="section-label robo-sub">Feitos recentemente</p>
+        {d.feitos.map((p) => (
+          <div key={`${p.conversation_id}-${p.etiqueta}-${p.feito_em}`} className="robo-acao">
+            <span className="robo-acao-hora">{hora(p.feito_em)}</span>
+            <span className="robo-acao-tipo">{p.etiqueta}</span>
+            <a href={CRM + p.conversation_id} target="_blank" rel="noreferrer">#{p.conversation_id}</a>
+            <span className="robo-acao-det">por {p.por || '?'} · feito por {p.quem_fez || '?'} em {Math.round((new Date(p.feito_em) - new Date(p.em)) / 60000)} min</span>
+          </div>
+        ))}
+      </>}
+    </section>
+  )
+}
+
 export default function RoboQualidade() {
   const [dias, setDias] = useState(7)
   const [d, setD] = useState(null)
   const [erro, setErro] = useState(null)
   const [sel, setSel] = useState(null) // avaliado_id escolhido
+  const analisesRef = useRef(null)
+  // clique na linha: filtra as análises dela e rola até a lista
+  const escolher = (id) => {
+    setSel((x) => (x === id ? null : id))
+    if (sel !== id) setTimeout(() => analisesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
 
   useEffect(() => {
     setD(null)
@@ -102,7 +188,7 @@ export default function RoboQualidade() {
             <tbody>
               {d.ranking.map((r) => (
                 <tr key={`${r.avaliado}-${r.avaliado_id}`} className={`rq-linha ${sel === r.avaliado_id ? 'on' : ''}`}
-                    onClick={() => setSel((x) => (x === r.avaliado_id ? null : r.avaliado_id))}>
+                    onClick={() => escolher(r.avaliado_id)}>
                   <td>{r.avaliado === 'ia' ? '🤖 ' : ''}{r.nome}</td>
                   <td>{r.n}</td>
                   <td className={`robo-taxa ${corNota(Number(r.media))}`}>{r.media}</td>
@@ -119,10 +205,13 @@ export default function RoboQualidade() {
         </div>
       </section>
 
-      <Triagem dias={dias} />
-
-      <section className="panel table-panel">
-        <p className="section-label">Últimas análises{sel != null ? ' · filtrado' : ''}</p>
+      <section className="panel table-panel" ref={analisesRef}>
+        <div className="rq-topo">
+          <p className="section-label">
+            Últimas análises{sel != null ? ` · ${d.ranking.find((r) => r.avaliado_id === sel)?.nome ?? ''} (${ultimas.length})` : ''} · clique para abrir
+          </p>
+          {sel != null && <button className="reset-btn" onClick={() => setSel(null)}>Ver todas</button>}
+        </div>
         <div className="rq-cards">
           {ultimas.map((u) => (
             <details key={u.id} className="rq-card">
@@ -141,6 +230,9 @@ export default function RoboQualidade() {
           {!ultimas.length && <p className="home-vazio">Nada por aqui ainda.</p>}
         </div>
       </section>
+
+      <Triagem dias={dias} />
+      <Manuais dias={dias} />
     </div>
   )
 }

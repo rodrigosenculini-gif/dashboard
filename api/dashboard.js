@@ -1287,6 +1287,7 @@ export default async function handler(req, res) {
     robo_desempenho:   { sql: 'select dashboard_robo_desempenho() as r', args: () => [] },
     robo_triagem:      { sql: 'select dashboard_robo_triagem($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 1] },
     robo_qualidade:    { sql: 'select dashboard_robo_qualidade($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 7] },
+    robo_manuais:      { sql: 'select dashboard_robo_manuais($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 1] },
     robo_lista:        { sql: 'select dashboard_robo_lista($1::text,$2::text,$3::text) as r',
                          args: () => [req.query.tipo || null, req.query.a || null, req.query.b || null] },
     chips_para_recarga:{ sql: 'select dashboard_chips_para_recarga($1::int) as r',
