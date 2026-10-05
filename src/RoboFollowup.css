@@ -97,3 +97,32 @@
 .rq-cli{ opacity:.7; flex:1; min-width:120px; }
 .rq-falha{ color:#E5484D; }
 .rq-obs{ opacity:.8; font-style:italic; }
+
+/* Qualidade: cada tabela/lista com altura máxima e rolagem própria (cabeçalho fixo) */
+.rq .scroll-table{ max-height:360px; overflow:auto; }
+.rq .scroll-table thead th{ position:sticky; top:0; background:var(--surface); z-index:1; }
+.rq-lista{ max-height:320px; overflow-y:auto; padding-right:4px; }
+.rq-periodo{ margin:4px 0 10px; }
+
+/* Visão geral da equipe: KPIs + gráficos (azul = equipe, laranja = IA; validados no fundo escuro) */
+.rq{ --rq-eq:#3987e5; --rq-ia:#d95926; }
+.rq-kpis{ margin-top:8px; }
+.rq-kpis .kpi-value small{ font-size:12px; color:var(--muted); font-weight:400; }
+.rq-kpi-txt{ font-size:15px !important; line-height:1.3; }
+.rq-graficos{ display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; margin-top:12px; }
+.rq-graf{ min-width:0; }
+.rq-legenda{ display:flex; gap:14px; font-size:12px; color:var(--muted); margin:2px 0 8px; }
+.rq-cor{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.rq-cor.rq-eq, .rq-barra.rq-eq, .rq-col.rq-eq{ background:var(--rq-eq); }
+.rq-cor.rq-ia, .rq-barra.rq-ia, .rq-col.rq-ia{ background:var(--rq-ia); }
+.rq-crit{ display:grid; grid-template-columns:120px 1fr; gap:8px; align-items:center; padding:3px 0; }
+.rq-crit-nome{ font-size:12px; color:var(--text); }
+.rq-barras{ display:flex; flex-direction:column; gap:2px; }
+.rq-barra-linha{ display:flex; align-items:center; gap:6px; height:9px; }
+.rq-barra{ height:7px; border-radius:0 4px 4px 0; min-width:1px; max-width:calc(100% - 38px); }
+.rq-barra-val{ font-size:10.5px; color:var(--muted); font-family:var(--font-mono); }
+.rq-dias-graf{ display:flex; align-items:flex-end; gap:10px; height:170px; padding-top:6px; border-bottom:1px solid var(--border); overflow-x:auto; }
+.rq-dia{ display:flex; flex-direction:column; align-items:center; gap:4px; height:100%; min-width:28px; }
+.rq-dia-barras{ flex:1; display:flex; align-items:flex-end; gap:2px; width:100%; justify-content:center; }
+.rq-col{ width:10px; border-radius:4px 4px 0 0; min-height:1px; }
+.rq-dia-lbl{ font-size:10.5px; color:var(--muted); font-family:var(--font-mono); }

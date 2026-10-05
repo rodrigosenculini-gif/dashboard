@@ -45,14 +45,16 @@ function Triagem({ dias }) {
       </div>
       {d.ultimas.length > 0 && <>
         <p className="section-label robo-sub">Últimas</p>
-        {d.ultimas.map((u) => (
-          <div key={u.id} className="robo-acao">
-            <span className="robo-acao-hora">{hora(u.em)}</span>
-            <span className="robo-acao-tipo">{u.motivo}</span>
-            <a href={CRM + u.conversation_id} target="_blank" rel="noreferrer">#{u.conversation_id}</a>
-            <span className="robo-acao-det">{u.etapa}{u.destino_vendeai ? ` · VendeAI: ${u.destino_vendeai}` : ''} · {u.status}: {u.resultado || NOME_ACAO_TRIAGEM[u.acao] || u.acao}</span>
-          </div>
-        ))}
+        <div className="rq-lista">
+          {d.ultimas.map((u) => (
+            <div key={u.id} className="robo-acao">
+              <span className="robo-acao-hora">{hora(u.em)}</span>
+              <span className="robo-acao-tipo">{u.motivo}</span>
+              <a href={CRM + u.conversation_id} target="_blank" rel="noreferrer">#{u.conversation_id}</a>
+              <span className="robo-acao-det">{u.etapa}{u.destino_vendeai ? ` · VendeAI: ${u.destino_vendeai}` : ''} · {u.status}: {u.resultado || NOME_ACAO_TRIAGEM[u.acao] || u.acao}</span>
+            </div>
+          ))}
+        </div>
       </>}
     </section>
   )
@@ -105,35 +107,123 @@ function Manuais({ dias }) {
       </>}
       {d.por_autor?.length > 0 && <>
         <p className="section-label robo-sub">Quem colocou</p>
-        {d.por_autor.map((a) => (
-          <div key={a.autor} className="robo-acao">
-            <span className="robo-acao-tipo">{a.autor}</span>
-            <span className="robo-acao-det">{a.n} · {Object.entries(a.etiquetas || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}</span>
-          </div>
-        ))}
+        <div className="rq-lista">
+          {d.por_autor.map((a) => (
+            <div key={a.autor} className="robo-acao">
+              <span className="robo-acao-tipo">{a.autor}</span>
+              <span className="robo-acao-det">{a.n} · {Object.entries(a.etiquetas || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}</span>
+            </div>
+          ))}
+        </div>
       </>}
       {d.pendentes.length > 0 && <>
         <p className="section-label robo-sub">Abertas (no prazo ou vencidas)</p>
-        {d.pendentes.map((p) => (
+        <div className="rq-lista">{d.pendentes.map((p) => (
           <div key={`${p.conversation_id}-${p.etiqueta}`} className="robo-acao">
             <span className="robo-acao-hora">{hora(p.em)}</span>
             <span className="robo-acao-tipo">{p.etiqueta}</span>
             <a href={CRM + p.conversation_id} target="_blank" rel="noreferrer">#{p.conversation_id}</a>
             <span className="robo-acao-det">{NOME_STATUS[p.status] || p.status} · por {p.por || '?'} · com {p.dono || 'sem dono'}</span>
           </div>
-        ))}
+        ))}</div>
       </>}
       {d.feitos?.length > 0 && <>
         <p className="section-label robo-sub">Feitos recentemente</p>
-        {d.feitos.map((p) => (
+        <div className="rq-lista">{d.feitos.map((p) => (
           <div key={`${p.conversation_id}-${p.etiqueta}-${p.feito_em}`} className="robo-acao">
             <span className="robo-acao-hora">{hora(p.feito_em)}</span>
             <span className="robo-acao-tipo">{p.etiqueta}</span>
             <a href={CRM + p.conversation_id} target="_blank" rel="noreferrer">#{p.conversation_id}</a>
             <span className="robo-acao-det">por {p.por || '?'} · feito por {p.quem_fez || '?'} em {Math.round((new Date(p.feito_em) - new Date(p.em)) / 60000)} min</span>
           </div>
-        ))}
+        ))}</div>
       </>}
+    </section>
+  )
+}
+
+// visão geral da equipe (todas as vendedoras juntas, ponderado pelo nº de atendimentos) x IA da VendeAI
+const fmt = (n, c = 1) => (n == null || Number.isNaN(n) ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c }))
+function Visao({ d }) {
+  const eq = d.ranking.filter((r) => r.avaliado !== 'ia')
+  const ia = d.ranking.find((r) => r.avaliado === 'ia')
+  const nEq = eq.reduce((s, r) => s + r.n, 0)
+  if (!nEq && !ia) return null
+  const mediaEq = nEq ? eq.reduce((s, r) => s + Number(r.media) * r.n, 0) / nEq : null
+  const ruimEq = nEq ? eq.reduce((s, r) => s + r.ruim, 0) / nEq : null
+  const bomEq = nEq ? eq.reduce((s, r) => s + r.excelente + r.bom, 0) / nEq : null
+  // % do máximo em cada critério: equipe (média ponderada) e IA
+  const crit = CRITERIOS.map(([k, nome, max]) => {
+    const com = eq.filter((r) => r.criterios?.[k] != null)
+    const n = com.reduce((s, r) => s + r.n, 0)
+    const e = n ? com.reduce((s, r) => s + Number(r.criterios[k]) * r.n, 0) / n / max : null
+    const i = ia?.criterios?.[k] != null ? Number(ia.criterios[k]) / max : null
+    return { k, nome, e, i }
+  })
+  const comEq = crit.filter((c) => c.e != null).sort((a, b) => a.e - b.e)
+  const pior = comEq[0], melhor = comEq.at(-1)
+  const dias = d.por_dia || []
+  return (
+    <section className="panel">
+      <p className="section-label">Visão geral · todas as vendedoras juntas x IA da VendeAI</p>
+      <div className="kpi-grid rq-kpis">
+        <div className="kpi"><p className="kpi-label">Nota média da equipe</p>
+          <p className={`kpi-value robo-taxa ${corNota(mediaEq)}`}>{fmt(mediaEq)}<small> / 10,5 · {nEq} atend.</small></p></div>
+        <div className="kpi"><p className="kpi-label">Nota média da IA da VendeAI</p>
+          <p className={`kpi-value robo-taxa ${corNota(ia ? Number(ia.media) : null)}`}>{ia ? fmt(Number(ia.media)) : '—'}<small> / 10,5 · {ia?.n ?? 0} atend.</small></p></div>
+        <div className="kpi"><p className="kpi-label">Equipe: excelente ou bom</p>
+          <p className="kpi-value">{bomEq == null ? '—' : `${Math.round(bomEq * 100)}%`}</p></div>
+        <div className="kpi"><p className="kpi-label">Equipe: necessita melhoria</p>
+          <p className={`kpi-value ${ruimEq > 0.5 ? 'alerta' : ''}`}>{ruimEq == null ? '—' : `${Math.round(ruimEq * 100)}%`}</p></div>
+        <div className="kpi"><p className="kpi-label">Ponto mais fraco da equipe</p>
+          <p className="kpi-value rq-kpi-txt">{pior ? `${pior.nome} · ${Math.round(pior.e * 100)}%` : '—'}</p></div>
+        <div className="kpi"><p className="kpi-label">Ponto mais forte da equipe</p>
+          <p className="kpi-value rq-kpi-txt">{melhor ? `${melhor.nome} · ${Math.round(melhor.e * 100)}%` : '—'}</p></div>
+      </div>
+
+      <div className="rq-graficos">
+        <div className="rq-graf">
+          <p className="section-label robo-sub">Critérios · % da nota máxima</p>
+          <div className="rq-legenda">
+            <span><i className="rq-cor rq-eq" />Equipe</span><span><i className="rq-cor rq-ia" />IA da VendeAI</span>
+          </div>
+          {crit.map((c) => (
+            <div key={c.k} className="rq-crit">
+              <span className="rq-crit-nome">{c.nome}</span>
+              <div className="rq-barras">
+                {[['eq', 'Equipe', c.e], ['ia', 'IA da VendeAI', c.i]].map(([cls, quem, v]) => (
+                  <div key={cls} className="rq-barra-linha" title={`${c.nome} · ${quem}: ${v == null ? 'sem dado' : `${Math.round(v * 100)}%`}`}>
+                    <div className={`rq-barra rq-${cls}`} style={{ width: `${v == null ? 0 : Math.max(v * 100, 1)}%` }} />
+                    <span className="rq-barra-val">{v == null ? '—' : `${Math.round(v * 100)}%`}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="rq-graf">
+          <p className="section-label robo-sub">Nota média por dia</p>
+          <div className="rq-legenda">
+            <span><i className="rq-cor rq-eq" />Equipe</span><span><i className="rq-cor rq-ia" />IA da VendeAI</span>
+          </div>
+          {dias.length < 2
+            ? <p className="home-vazio">A evolução aparece a partir do 2º dia de análises{dias[0] ? ` (hoje: equipe ${fmt(Number(dias[0].equipe))}, IA ${fmt(Number(dias[0].ia))})` : ''}.</p>
+            : <div className="rq-dias-graf">
+                {dias.map((x) => (
+                  <div key={x.dia} className="rq-dia">
+                    <div className="rq-dia-barras">
+                      {[['eq', 'Equipe', x.equipe, x.n_equipe], ['ia', 'IA da VendeAI', x.ia, x.n_ia]].map(([cls, quem, v, n]) => (
+                        <div key={cls} className={`rq-col rq-${cls}`} style={{ height: `${v == null ? 0 : (Number(v) / 10.5) * 100}%` }}
+                             title={`${new Date(x.dia + 'T12:00').toLocaleDateString('pt-BR')} · ${quem}: ${fmt(Number(v))} (${n} atend.)`} />
+                      ))}
+                    </div>
+                    <span className="rq-dia-lbl">{new Date(x.dia + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                  </div>
+                ))}
+              </div>}
+        </div>
+      </div>
     </section>
   )
 }
@@ -172,12 +262,18 @@ export default function RoboQualidade() {
         <div className="kpi"><p className="kpi-label">Erros de análise</p><p className={`kpi-value ${fila.erro ? 'alerta' : ''}`}>{fila.erro ?? 0}</p></div>
       </div>
 
+      <div className="rq-topo rq-periodo">
+        <p className="section-label">Período</p>
+        <div className="rq-dias">
+          {[1, 7, 30].map((n) => <button key={n} className={`reset-btn ${dias === n ? 'rc-on' : ''}`} onClick={() => setDias(n)}>{n === 1 ? 'Hoje' : `${n} dias`}</button>)}
+        </div>
+      </div>
+
+      <Visao d={d} />
+
       <section className="panel table-panel">
         <div className="rq-topo">
           <p className="section-label">Notas por vendedora e IA · 9 critérios, máx. 10,5 · clique para ver os atendimentos</p>
-          <div className="rq-dias">
-            {[1, 7, 30].map((n) => <button key={n} className={`reset-btn ${dias === n ? 'rc-on' : ''}`} onClick={() => setDias(n)}>{n === 1 ? 'Hoje' : `${n} dias`}</button>)}
-          </div>
         </div>
         <div className="scroll-table">
           <table className="robo-desemp">
@@ -212,7 +308,7 @@ export default function RoboQualidade() {
           </p>
           {sel != null && <button className="reset-btn" onClick={() => setSel(null)}>Ver todas</button>}
         </div>
-        <div className="rq-cards">
+        <div className="rq-cards rq-lista">
           {ultimas.map((u) => (
             <details key={u.id} className="rq-card">
               <summary>
