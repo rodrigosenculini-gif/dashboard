@@ -172,7 +172,7 @@ export default function RoboFollowup({ onVoltar }) {
           <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>
           <button className="refresh-btn" onClick={carregar} disabled={carregando}>&#8635; Atualizar</button>
           <button className={`reset-btn ${verQual ? 'rc-on' : ''}`} onClick={() => { setVerQual((x) => !x); setVerConfig(false) }}>
-            {verQual ? '← Painel' : '★ Qualidade'}
+            {verQual ? '← Painel' : '★ Qualidade e triagem'}
           </button>
           <button className={`reset-btn ${verConfig ? 'rc-on' : ''}`} onClick={() => { setVerConfig((x) => !x); setVerQual(false) }}>
             {verConfig ? '← Painel' : '⚙ Configurações'}

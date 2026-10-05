@@ -12,6 +12,52 @@ const CRITERIOS = [
 const corNota = (n) => (n == null ? '' : n >= 9 ? 'ok' : n >= 7 ? 'bom' : n >= 5 ? 'medio' : 'ruim')
 const corPct = (p) => (p == null ? '' : p >= 0.8 ? 'ok' : p >= 0.5 ? 'medio' : 'ruim')
 
+const NOME_ACAO_TRIAGEM = {
+  manter: 'Manter (VendeAI)', followup: 'Follow-up do robô', vendedora: 'Vendedora', vendedora_3k: 'Vendedora se ≥ R$ 3 mil',
+  back: 'Backoffice (Hotline)', nossa_ia: 'Nossa IA', encerrar: 'Encerrar',
+}
+const hora = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+// derivações da IA da VendeAI para humano e o que a nossa triagem fez/faria
+function Triagem({ dias }) {
+  const [d, setD] = useState(null)
+  useEffect(() => {
+    fetch(`/api/dashboard?type=robo_triagem&dias=${dias}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
+  }, [dias])
+  if (!d?.por_motivo) return null
+  return (
+    <section className="panel table-panel">
+      <p className="section-label">
+        Triagem · transferências da IA da VendeAI para humano · {d.modo === 'ativo' ? 'agindo' : 'em prévia (só registra o que faria)'}
+      </p>
+      <div className="scroll-table">
+        <table className="robo-desemp">
+          <thead><tr><th>Motivo (VendeAI)</th><th>Qtd.</th><th title="a VendeAI deixou sem dono / mandou para vendas">Sem dono / vendas</th><th>Nossa ação</th></tr></thead>
+          <tbody>
+            {d.por_motivo.map((m) => (
+              <tr key={`${m.motivo}-${m.acao}`}>
+                <td>{m.motivo || '—'}</td><td>{m.n}</td><td>{m.sem_dono} / {m.vendas}</td><td>{NOME_ACAO_TRIAGEM[m.acao] || m.acao}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!d.por_motivo.length && <p className="home-vazio">Nenhuma transferência no período.</p>}
+      </div>
+      {d.ultimas.length > 0 && <>
+        <p className="section-label robo-sub">Últimas</p>
+        {d.ultimas.map((u) => (
+          <div key={u.id} className="robo-acao">
+            <span className="robo-acao-hora">{hora(u.em)}</span>
+            <span className="robo-acao-tipo">{u.motivo}</span>
+            <a href={CRM + u.conversation_id} target="_blank" rel="noreferrer">#{u.conversation_id}</a>
+            <span className="robo-acao-det">{u.etapa}{u.destino_vendeai ? ` · VendeAI: ${u.destino_vendeai}` : ''} · {u.status}: {u.resultado || NOME_ACAO_TRIAGEM[u.acao] || u.acao}</span>
+          </div>
+        ))}
+      </>}
+    </section>
+  )
+}
+
 export default function RoboQualidade() {
   const [dias, setDias] = useState(7)
   const [d, setD] = useState(null)
@@ -72,6 +118,8 @@ export default function RoboQualidade() {
           {!d.ranking.length && <p className="home-vazio">Nenhum atendimento analisado no período ainda. A análise roda depois que o atendimento fica 4h parado (ou no dia seguinte).</p>}
         </div>
       </section>
+
+      <Triagem dias={dias} />
 
       <section className="panel table-panel">
         <p className="section-label">Últimas análises{sel != null ? ' · filtrado' : ''}</p>
