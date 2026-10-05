@@ -28,7 +28,9 @@ function Triagem({ dias }) {
   return (
     <section className="panel table-panel">
       <p className="section-label">
-        Triagem · transferências da IA da VendeAI para humano · {d.modo === 'ativo' ? 'agindo' : 'em prévia (só registra o que faria)'}
+        Triagem · transferências da IA da VendeAI para humano · {d.modo === 'ativo' || !d.em_previa?.length
+          ? 'agindo em todos os motivos'
+          : `agindo em ${d.n_motivos - d.em_previa.length} de ${d.n_motivos} motivos · só registra: ${d.em_previa.join(', ')}`}
       </p>
       <div className="scroll-table">
         <table className="robo-desemp">
