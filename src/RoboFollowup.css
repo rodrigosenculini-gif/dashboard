@@ -67,5 +67,16 @@
   display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px 16px; min-width:0; }
 .rc-grupo legend{ font-size:12px; font-weight:600; padding:0 6px; }
 .rc-vend{ display:flex; flex-direction:column; gap:6px; }
-.rc-vend-linha{ display:grid; grid-template-columns:180px 1fr 1.4fr auto; gap:8px; align-items:center; font-size:12.5px; }
+.rc-vend-linha{ display:grid; grid-template-columns:180px 1fr 1.4fr 110px auto; gap:8px; align-items:center; font-size:12.5px; }
 @media (max-width:700px){ .rc-vend-linha{ grid-template-columns:1fr; } }
+
+/* desempenho das vendedoras */
+.robo-desemp{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.robo-desemp th{ text-align:left; font-weight:600; color:var(--muted, #888); padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.robo-desemp td{ padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.robo-desemp td small{ opacity:.6; margin-left:3px; }
+.robo-desemp tr.off td{ opacity:.55; }
+.robo-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#999; margin-right:4px; }
+.robo-dot.on{ background:#30A46C; }
+.robo-taxa{ font-weight:600; }
+.robo-taxa.ok{ color:#30A46C; } .robo-taxa.medio{ color:#D9A400; } .robo-taxa.ruim{ color:#E5484D; }

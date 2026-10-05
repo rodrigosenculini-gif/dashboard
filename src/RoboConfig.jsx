@@ -14,6 +14,7 @@ const SECOES = {
   tempos:             ['Tempos', 'Prazos do fluxo com cliente esperando.'],
   saturacao:          ['Não saturar o cliente', 'Quando o robô deixa de mandar áudio/lembrete.'],
   protecao:           ['Proteção da vendedora', 'Quando o atendimento nunca é tirado dela.'],
+  atribuicao_limites: ['Limite de atendimentos por hora', 'Teto da equipe e limite automático por vendedora: sobe quando ela responde a maioria no prazo, desce quando não. O limite fixo de cada uma fica em "Vendedoras do robô".'],
   atribuicao_inicial: ['Atribuição inicial', 'Casos que o robô tira da IA e passa para vendedora.'],
   nao_tirar_da_ia:    ['Não tirar da IA', 'Nos demais casos, conversa com a IA fica com a IA.'],
   ligacao:            ['Lembrete de ligação', 'Oferta alta esperando aceite.'],
@@ -32,6 +33,9 @@ const SECOES = {
 }
 
 const CAMPO = {
+  total_hora: 'Máx. atendimentos novos por hora (equipe)', base_vendedora: 'Limite inicial por vendedora (por hora)', min: 'Limite mínimo', max: 'Limite máximo',
+  passo: 'Sobe/desce de quanto em quanto', subir_taxa: 'Sobe se responder pelo menos (0 a 1)', descer_taxa: 'Desce se responder menos de (0 a 1)',
+  resposta_ok_min: 'Resposta conta no prazo até (min)', valor_min_ofertado: 'Ofertado só passa para vendedora a partir de (R$)', ligacao_30_valor_min: 'Ticket alto: liga aos 30 min a partir de (R$)',
   slots_min: 'Follow-ups (min)', atraso_max_min: 'Não manda follow-up atrasado há mais de (min)', valor_prioridade: 'Valor de prioridade (R$)', slots_valor_baixo: 'Follow-ups abaixo desse valor',
   ligacao_30: 'Aos 30 min liga (casos)', audio: 'Áudios', vendedora: 'Vendedoras (horário, se não usar online)', dias: 'Dias', ini: 'Início', fim: 'Fim',
   vendedora_por_online: 'Vendedoras: usar quem está online no CRM (sem horário fixo)',
@@ -137,7 +141,7 @@ function Vendedoras({ lista, salvar }) {
   return (
     <section className="panel rc-secao">
       <div className="rc-topo"><div><p className="section-label">Vendedoras do robô</p>
-        <p className="rc-desc">Quem recebe atendimentos, lembretes (nome no dashboard) e e-mails. Desativada não recebe nada.</p></div>
+        <p className="rc-desc">Quem recebe atendimentos, lembretes (nome no dashboard) e e-mails. Desativada não recebe nada. Limite por hora: vazio = automático pelo desempenho; com número, fica fixo.</p></div>
         {msg && <span className="rc-estado ok">{msg}</span>}</div>
       <div className="rc-vend">
         {itens.map((x) => {
@@ -148,6 +152,9 @@ function Vendedoras({ lista, salvar }) {
               <label className="rc-check"><input type="checkbox" checked={!!x.ativo} onChange={(e) => muda(x.agent_id, 'ativo', e.target.checked)} /> {x.nome_crm}</label>
               <input placeholder="nome no dashboard" value={x.nome_dash || ''} onChange={(e) => muda(x.agent_id, 'nome_dash', e.target.value)} />
               <input placeholder="e-mail" value={x.email || ''} onChange={(e) => muda(x.agent_id, 'email', e.target.value)} />
+              <input className="rc-limite" type="number" min="0" title="Atendimentos novos por hora. Vazio = automático (pelo desempenho)."
+                     placeholder={`auto: ${x.limite_auto ?? '—'}/h`} value={x.limite_fixo ?? ''}
+                     onChange={(e) => muda(x.agent_id, 'limite_fixo', e.target.value === '' ? null : Number(e.target.value))} />
               <button className="refresh-btn" disabled={!mudou} onClick={async () => { await salvar(x); setMsg(`${x.nome_crm} salva`) }}>Salvar</button>
             </div>)
         })}

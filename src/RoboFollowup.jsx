@@ -21,6 +21,47 @@ const NOME_ACAO = {
   email: 'E-mail', encerrar: 'Encerrou', audio_pulado: 'Áudio pulado', lembrete_pulado: 'Lembrete pulado', erro: 'Erro',
   email_pulado: 'E-mail pulado', assumir_followup: 'Assumiu follow-up', lembrete_ligacao: 'Lembrete de ligação',
   etiqueta: 'Etiqueta', followup_pulado: 'Follow-up pulado (atrasado)', quer_digitar: 'Quer digitar', recontar: 'Recontou',
+  sem_vaga: 'Sem vaga (limite/hora)',
+}
+
+// desempenho das vendedoras com os atendimentos que o robô passou para elas hoje
+function Desempenho({ tick }) {
+  const [d, setD] = useState(null)
+  useEffect(() => {
+    fetch('/api/dashboard?type=robo_desempenho').then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
+  }, [tick])
+  if (!d?.vendedoras) return null
+  const pct = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`)
+  const cor = (x) => (x == null ? '' : x >= 0.8 ? 'ok' : x < 0.5 ? 'ruim' : 'medio')
+  return (
+    <section className="panel table-panel">
+      <p className="section-label">
+        Desempenho das vendedoras · hoje · última hora {d.recebidos_hora}/{d.total_hora} atendimentos novos (equipe)
+      </p>
+      <div className="scroll-table">
+        <table className="robo-desemp">
+          <thead><tr>
+            <th>Vendedora</th><th title="atendimentos novos na última hora / limite por hora">Hora</th><th>Recebidos</th>
+            <th>Respondidos</th><th>Taxa</th><th title={`respondeu em até ${d.resposta_ok_min} min`}>No prazo</th>
+            <th>Tempo médio</th><th>Sem resposta</th><th title="saiu dela sem ela responder">Saiu s/ resp.</th>
+            <th>Ligações pend.</th>
+          </tr></thead>
+          <tbody>
+            {d.vendedoras.map((v) => (
+              <tr key={v.agent_id} className={v.online ? '' : 'off'}>
+                <td><span className={`robo-dot ${v.online ? 'on' : ''}`} /> {v.nome}</td>
+                <td>{v.hora}/{v.limite}<small>{v.limite_fixo != null ? ' fixo' : ' auto'}</small></td>
+                <td>{v.hoje}</td><td>{v.respondidos}</td>
+                <td className={`robo-taxa ${cor(v.taxa)}`}>{pct(v.taxa)}</td>
+                <td>{v.no_prazo}</td><td>{fmtMin(v.media_min)}</td>
+                <td>{v.sem_resposta}</td><td>{v.saiu_sem_resposta}</td><td>{v.ligacoes_pend}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
 }
 
 async function getResumo() {
@@ -147,6 +188,8 @@ export default function RoboFollowup({ onVoltar }) {
         <div className="kpi"><p className="kpi-label">Lembretes / e-mails</p><p className="kpi-value aviso">{(hoje.lembrete ?? 0)} / {(hoje.email ?? 0)}</p></div>
         <div className="kpi"><p className="kpi-label">Erros hoje</p><p className={`kpi-value ${dados?.erros_hoje ? 'alerta' : ''}`}>{dados?.erros_hoje ?? 0}</p></div>
       </div>
+
+      <Desempenho tick={dados} />
 
       <div className="robo-grid">
         <section className="panel">
