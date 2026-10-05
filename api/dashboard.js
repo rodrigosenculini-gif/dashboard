@@ -247,7 +247,8 @@ export default async function handler(req, res) {
         if (b.acao === 'funil') {
           const f = b.filtros && typeof b.filtros === 'object' ? b.filtros : {};
           const filtros = { periodo: String(f.periodo || 'hoje').slice(0, 8), produto: String(f.produto || '').slice(0, 10),
-            canal: String(f.canal || '').slice(0, 10), busca: String(f.busca || '').slice(0, 80) };
+            canal: String(f.canal || '').slice(0, 10), busca: String(f.busca || '').slice(0, 80),
+            status: String(f.status || '').slice(0, 16) };   // migracao 208: filtro de status
           const r = await client.query('select public.funil_ao_vivo($1, $2::jsonb) as r', [token, JSON.stringify(filtros)]);
           return res.json(r.rows[0].r);
         }

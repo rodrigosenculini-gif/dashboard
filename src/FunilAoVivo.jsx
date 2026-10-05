@@ -85,9 +85,12 @@ function ondeAgora(l) {
   if (l.aguarda_cliente) return 'Esperando o cliente autorizar um banco'
   return l.ultimo ? textoEvento(l.ultimo.tipo, l.ultimo.d) : '—'
 }
+// motivo do encerramento (migração 208 manda o desfecho; 207: FGTS sem autorização em página que não pede)
+const DESFECHO = { pago: 'Pago', sem_saldo: 'Sem saldo', fora_politica: 'Fora da política', fgts_sem_autorizacao: 'FGTS sem autorização',
+  teste_reiniciado: 'Teste reiniciado', lp_nova_consulta: 'Nova consulta' }
 function etapa(l) {
   if (l.situacao === 'derivado') return ['Com a equipe', 'laranja']
-  if (l.situacao === 'encerrado') return [`Encerrado · ${(FASE[l.fase] || [l.fase || '—'])[0]}`, 'cinza']
+  if (l.situacao === 'encerrado') return [`Encerrado · ${DESFECHO[l.desfecho] || (FASE[l.fase] || [l.fase || '—'])[0]}`, 'cinza']
   if (l.aguarda_cliente && l.fase === 'consulta') return ['Aguardando autorização', 'laranja']
   return FASE[l.fase] || [l.fase || '—', 'cinza']
 }
@@ -208,7 +211,7 @@ function Detalhe({ id, token, onFechar, agora }) {
 
 export default function FunilAoVivo() {
   const [token, setToken] = useState(() => lerToken())
-  const [filtros, setFiltros] = useState({ periodo: 'hoje', produto: '', canal: '', busca: '' })
+  const [filtros, setFiltros] = useState({ periodo: 'hoje', produto: '', canal: '', status: '', busca: '' })
   const [busca, setBusca] = useState('')
   const [dados, setDados] = useState(null)
   const [erro, setErro] = useState('')
@@ -251,6 +254,13 @@ export default function FunilAoVivo() {
         </select>
         <select className="chip-input" value={filtros.canal} onChange={(e) => set('canal', e.target.value)}>
           <option value="">Todos os canais</option><option value="lp">Página (LP)</option><option value="chat">WhatsApp</option>
+        </select>
+        {/* filtro de status (migração 208): só a lista; os números do topo continuam com o total */}
+        <select className="chip-input" value={filtros.status} onChange={(e) => set('status', e.target.value)}>
+          <option value="">Todos os status</option><option value="ativos">Ativos</option><option value="simulando">Simulando</option>
+          <option value="aguardando">Aguardando autorização</option><option value="oferta">Com oferta</option>
+          <option value="aprovado_lp">Aprovado (LP)</option><option value="digitando">Digitando</option>
+          <option value="equipe">Com a equipe</option><option value="encerrado">Encerrado</option>
         </select>
         <select className="chip-input" value={filtros.periodo} onChange={(e) => set('periodo', e.target.value)}>
           <option value="hoje">Hoje</option><option value="24h">Últimas 24 h</option><option value="7d">7 dias</option><option value="30d">30 dias</option>
