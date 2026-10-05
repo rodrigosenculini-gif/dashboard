@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { useDialogo } from './Dialogo'
 import RoboConfig from './RoboConfig'
 import RoboQualidade from './RoboQualidade'
+import RoboImpacto from './RoboImpacto'
 import './RoboFollowup.css'
 
 // Robô de follow-up do CRM VendeAI (edge function robo-followup no Supabase).
@@ -117,6 +118,7 @@ export default function RoboFollowup({ onVoltar }) {
   const [aberta, setAberta] = useState(null) // chave da linha expandida: "tipo|a|b"
   const [verConfig, setVerConfig] = useState(false)
   const [verQual, setVerQual] = useState(false)
+  const [verImp, setVerImp] = useState(false)
   const alternar = (tipo, a, b) => {
     const k = `${tipo}|${a}|${b || ''}`
     setAberta((x) => (x === k ? null : k))
@@ -171,10 +173,13 @@ export default function RoboFollowup({ onVoltar }) {
           </span>
           <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>
           <button className="refresh-btn" onClick={carregar} disabled={carregando}>&#8635; Atualizar</button>
-          <button className={`reset-btn ${verQual ? 'rc-on' : ''}`} onClick={() => { setVerQual((x) => !x); setVerConfig(false) }}>
+          <button className={`reset-btn ${verImp ? 'rc-on' : ''}`} onClick={() => { setVerImp((x) => !x); setVerQual(false); setVerConfig(false) }}>
+            {verImp ? '← Painel' : '📈 Impacto'}
+          </button>
+          <button className={`reset-btn ${verQual ? 'rc-on' : ''}`} onClick={() => { setVerQual((x) => !x); setVerConfig(false); setVerImp(false) }}>
             {verQual ? '← Painel' : '★ Qualidade e triagem'}
           </button>
-          <button className={`reset-btn ${verConfig ? 'rc-on' : ''}`} onClick={() => { setVerConfig((x) => !x); setVerQual(false) }}>
+          <button className={`reset-btn ${verConfig ? 'rc-on' : ''}`} onClick={() => { setVerConfig((x) => !x); setVerQual(false); setVerImp(false) }}>
             {verConfig ? '← Painel' : '⚙ Configurações'}
           </button>
           <button className={`robo-modo ${ativo ? 'on' : ''}`} onClick={trocarModo} disabled={!dados || mudando}>
@@ -185,7 +190,7 @@ export default function RoboFollowup({ onVoltar }) {
 
       {erro && <div className="state-msg error">Erro: {erro}</div>}
 
-      {verConfig ? <RoboConfig /> : verQual ? <RoboQualidade /> : <>
+      {verConfig ? <RoboConfig /> : verQual ? <RoboQualidade /> : verImp ? <RoboImpacto /> : <>
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Casos acompanhados</p><p className="kpi-value">{dados ? totalAbertos : '—'}</p></div>
         <div className="kpi"><p className="kpi-label">Áudios hoje</p><p className="kpi-value accent">{hoje.audio ?? 0}</p></div>

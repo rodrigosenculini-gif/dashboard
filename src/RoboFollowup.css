@@ -126,3 +126,20 @@
 .rq-dia-barras{ flex:1; display:flex; align-items:flex-end; gap:2px; width:100%; justify-content:center; }
 .rq-col{ width:10px; border-radius:4px 4px 0 0; min-height:1px; }
 .rq-dia-lbl{ font-size:10.5px; color:var(--muted); font-family:var(--font-mono); }
+
+/* Impacto do robô */
+.ri{ --ri-azul:#3987e5; --ri-laranja:#d95926; --ri-cinza:#7d7c76; --ri-vermelho:#e66767; --ri-violeta:#9085e9; }
+.ri-cols{ display:flex; align-items:flex-end; gap:3px; height:150px; border-bottom:1px solid var(--border); padding-top:6px; overflow-x:auto; }
+.ri-col-w{ flex:1; min-width:10px; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:3px; }
+.ri-col{ width:100%; max-width:16px; background:var(--ri-cinza); border-radius:3px 3px 0 0; min-height:1px; }
+.ri-col.ri-robo{ background:var(--ri-azul); }
+.ri-col-lbl{ font-size:10px; color:var(--muted); font-family:var(--font-mono); }
+.ri-stack{ display:flex; height:22px; border-radius:4px; overflow:hidden; gap:2px; margin:8px 0; }
+.ri-seg{ min-width:2px; }
+.ri-s1, .rq-cor.ri-s1{ background:var(--ri-azul); } .ri-s2, .rq-cor.ri-s2{ background:var(--ri-violeta); }
+.ri-s3, .rq-cor.ri-s3{ background:var(--ri-laranja); } .ri-s4, .rq-cor.ri-s4{ background:var(--ri-vermelho); }
+.ri-leg{ flex-wrap:wrap; }
+.ri-comp{ grid-template-columns:260px 1fr; }
+.rq-barra.ri-cinza{ background:var(--ri-cinza); } .rq-barra.ri-laranja{ background:var(--ri-laranja); }
+.rq-barra.ri-azul{ background:var(--ri-azul); } .rq-barra.ri-vermelho{ background:var(--ri-vermelho); }
+.ri .rq-barra-linha{ height:14px; } .ri .rq-barra{ height:12px; }
