@@ -32,7 +32,7 @@ const SECOES = {
 }
 
 const CAMPO = {
-  slots_min: 'Follow-ups (min)', valor_prioridade: 'Valor de prioridade (R$)', slots_valor_baixo: 'Follow-ups abaixo desse valor',
+  slots_min: 'Follow-ups (min)', atraso_max_min: 'Não manda follow-up atrasado há mais de (min)', valor_prioridade: 'Valor de prioridade (R$)', slots_valor_baixo: 'Follow-ups abaixo desse valor',
   ligacao_30: 'Aos 30 min liga (casos)', audio: 'Áudios', vendedora: 'Vendedoras (horário, se não usar online)', dias: 'Dias', ini: 'Início', fim: 'Fim',
   vendedora_por_online: 'Vendedoras: usar quem está online no CRM (sem horário fixo)',
   max_audios_24h: 'Máx. áudios por conversa em 24h', funil_vendedora_min: 'Cliente esperando: passa para vendedora (min)',
