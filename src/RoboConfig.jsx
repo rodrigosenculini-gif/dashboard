@@ -44,7 +44,7 @@ const CAMPO = {
   lembrete_mesma_conversa_h: '1 lembrete/nota por conversa a cada (h)', link: 'Ela mandou link', min_msgs_vendedora: 'Ela mandou X mensagens',
   atendendo_desde_h: 'Ela atende há mais de (h)', labels_com_ela: 'Etiquetas que protegem', casos_nao_retirar: 'Nunca troca de vendedora (casos)',
   labels_nunca_ia: 'Etiquetas que nunca voltam para a IA', casos: 'Casos', ativo: 'Ativo', valor_min: 'Valor mínimo (R$)',
-  labels_bloqueio: 'Etiquetas que bloqueiam', sair: 'Pediu para sair (nao_perturbe)', engano: 'Número errado', objecao: 'Objeção (passa p/ vendedora)',
+  labels_bloqueio: 'Etiquetas que bloqueiam', manter_valor_min: 'Mantém ligação após 24h se oferta ≥ (R$)', sair: 'Pediu para sair (nao_perturbe)', engano: 'Número errado', objecao: 'Objeção (passa p/ vendedora)',
   ja_fez: 'Já fez com outro banco', depois: 'Vai ver depois', desinteresse: 'Sem interesse', digitar: 'Quer digitar',
   sem_margem: 'IA disse sem margem/não aprovado', pedido_vendedora: 'Vendedora pediu algo', passa_vendedora: 'Passa para vendedora (por intenção)',
   esperando: 'Cliente esperando', copia: 'Cópia', quando: 'Quando enviar', limite_por_hora: 'Máx. por hora', limite_total_dia: 'Máx. no dia',
