@@ -806,7 +806,8 @@ const waLink = ({ numero, texto }) => {
 const waMascara = (d) => String(d || '').replace(/\D/g, '').slice(0, 11).replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d{1,4})$/, '$1-$2')
 const waValido = (link) => /^https:\/\/wa\.me\/55\d{10,11}(\?text=.*)?$/.test(String(link || ''))
 
-const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos: [], whatsapp: [], espera_s: 120, ativa: true, envio: null })
+const paginaVazia = () => ({ nome: '', modo: 'devolve', produto: 'clt', destinos: [], whatsapp: [], espera_s: 120, ativa: true, envio: null,
+  fgts_pede_autorizacao: true })
 const VARIAVEIS_ENVIO = [['primeiro_nome', 'Primeiro nome'], ['pedido', 'Pedido ("simulação de crédito do trabalhador")'], ['resultado', 'Resultado ("Valor liberado: R$ 4.500,00")'], ['nome', 'Nome completo'], ['valor', 'Maior valor aprovado'], ['produto', 'Produto']]
 // variável = texto livre com marcadores [campo] (migração 172); o formato antigo (só o nome do campo) vira [campo]
 const CAMPO_EXEMPLO = { primeiro_nome: 'Maria', nome: 'Maria Souza', valor: 'R$ 4.500,00', produto: 'crédito do trabalhador',
@@ -997,6 +998,14 @@ function EditorPagina({ inicial, salvar, onFechar, token, api, bancos = [] }) {
           ))}
         </div>
       </Linha>
+      <Linha titulo="FGTS sem autorização" ajuda="Cliente que ainda não autorizou a GIRO no app do FGTS (vale também quando o CLT não aprova e a consulta passa para o FGTS). Não pedir: a página mostra “Recebemos a sua solicitação” e não manda o cliente ao app. Quem já autorizou é consultado normalmente.">
+        <div className="chip-opcoes">
+          {[[true, 'Pedir autorização'], [false, 'Não pedir']].map(([v, t]) => (
+            <button key={t} type="button" className={`chip-opcao ${(p.fgts_pede_autorizacao !== false) === v ? 'on' : ''}`}
+                    onClick={() => set('fgts_pede_autorizacao', v)}>{t}</button>
+          ))}
+        </div>
+      </Linha>
       <EscolherEnvios envio={p.envio} onChange={(v) => set('envio', v)} token={token} api={api} />
       <>
           <div>
@@ -1089,6 +1098,34 @@ function EditorCampanha({ inicial, paginas, salvar, onFechar }) {
   )
 }
 
+// Clientes reais pela LP (migração 196): o link do WhatsApp da Arara (PHP de whats.hotlinesolucoes.com.br) manda para a
+// página "arara" os números de teste e uma amostra de clientes: até o limite, e só a % sorteada de cada clique novo
+function AmostraReal({ a, salvar }) {
+  const atual = { limite: a?.limite ?? 0, chance_pct: a?.chance_pct ?? 0 }
+  const [v, setV, mudou, desfazer] = useRascunho(atual)
+  const [salvando, setSalvando] = useState(false)
+  if (!a) return null
+  async function ok() {
+    setSalvando(true)
+    if (Number(v.limite) !== atual.limite) await salvar('parametro', { chave: 'lp_real_limite', valor: Math.max(0, Math.round(Number(v.limite) || 0)) }, 'Limite salvo')
+    if (Number(v.chance_pct) !== atual.chance_pct) await salvar('parametro', { chave: 'lp_real_chance_pct', valor: Math.min(100, Math.max(0, Math.round(Number(v.chance_pct) || 0))) }, 'Chance salva')
+    setSalvando(false)
+  }
+  const cheio = a.limite > 0 && a.usados >= a.limite
+  return (
+    <section className="iac-bloco">
+      <p className="section-label">Clientes reais pela LP</p>
+      <Linha titulo="Quantos clientes" ajuda={`Clientes do disparo da Arara que, ao tocar no link do WhatsApp, vão para a LP em vez do WhatsApp. Já foram ${a.usados} de ${a.limite}${cheio ? ' (limite atingido: os próximos seguem para o WhatsApp)' : ''}; ${a.abertos} abriram a consulta e ${a.aprovados} foram aprovados. 0 desliga. O mesmo cliente cai sempre no mesmo lugar.`}>
+        <Numero valor={v.limite} min={0} max={1000} onChange={(n) => setV({ ...v, limite: n })} sufixo="clientes" />
+      </Linha>
+      <Linha titulo="Chance a cada clique" ajuda="De cada cliente novo que toca no link, essa porcentagem vai para a LP (até o limite). Assim a amostra se espalha pelo disparo, em vez de pegar só os primeiros.">
+        <Numero valor={v.chance_pct} min={0} max={100} onChange={(n) => setV({ ...v, chance_pct: n })} sufixo="%" />
+      </Linha>
+      <BotoesRascunho mudou={mudou} salvando={salvando} onDesfazer={desfazer} onSalvar={ok} />
+    </section>
+  )
+}
+
 function SecaoPaginas({ d, salvar, token, api }) {
   const lp = d.lp || { paginas: [], campanhas: [] }
   const [ed, setEd] = useState(null)   // { tipo: 'pagina'|'campanha', v }
@@ -1106,6 +1143,8 @@ function SecaoPaginas({ d, salvar, token, api }) {
         o id da mensagem e a página abre a consulta do cliente; sem isso, ela pede CPF e celular.
       </p>
 
+      <AmostraReal a={lp.amostra} salvar={salvar} />
+
       <section className="iac-bloco">
         <p className="section-label">Páginas</p>
         {ed?.tipo === 'pagina'
@@ -1115,7 +1154,7 @@ function SecaoPaginas({ d, salvar, token, api }) {
               {lp.paginas.map((p) => (
                 <div key={p.id} className="iac-banco" style={{ borderLeftColor: p.ativa ? 'var(--lime)' : 'var(--muted)' }}>
                   <div className="iac-banco-topo"><b>{p.nome}</b><span className="iac-tag">{p.ativa ? nomeProduto(p.produto) : 'desligada'}</span></div>
-                  <small className="iac-miudo" style={{ margin: 0 }}>{NOME_MODO[p.modo]}{p.modo === 'prende' ? ` · espera ${Math.round(p.espera_s / 6) / 10} min · ${(p.whatsapp || []).length} WhatsApp` : ''}</small>
+                  <small className="iac-miudo" style={{ margin: 0 }}>{NOME_MODO[p.modo]}{p.modo === 'prende' ? ` · espera ${Math.round(p.espera_s / 6) / 10} min · ${(p.whatsapp || []).length} WhatsApp` : ''}{p.fgts_pede_autorizacao === false ? ' · FGTS: não pede autorização' : ''}</small>
                   <small className="iac-miudo" style={{ margin: 0 }}>Aprovado recebe: {opcoesDe(p.envio).length ? opcoesDe(p.envio).map((o) => `${o.template}${NOME_PRODUTO_ENVIO[o.produto || 'todos']} · ${o.numero || ''}`).join(' | ') : 'nada ainda (escolha o template)'}</small>
                   <div className="iac-banco-acoes"><button className="iac-link" onClick={() => setEd({ tipo: 'pagina', v: p })}>Editar</button></div>
                 </div>
