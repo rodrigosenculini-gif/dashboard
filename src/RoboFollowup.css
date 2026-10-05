@@ -80,3 +80,20 @@
 .robo-dot.on{ background:#30A46C; }
 .robo-taxa{ font-weight:600; }
 .robo-taxa.ok{ color:#30A46C; } .robo-taxa.medio{ color:#D9A400; } .robo-taxa.ruim{ color:#E5484D; }
+
+/* qualidade dos atendimentos */
+.rq-topo{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.rq-dias{ display:flex; gap:6px; }
+.rq-linha{ cursor:pointer; }
+.rq-linha.on td{ background:rgba(127,127,127,.12); }
+.robo-taxa.bom{ color:#3E9BD6; }
+.rq-cards{ display:flex; flex-direction:column; gap:6px; }
+.rq-card{ border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:12.5px; }
+.rq-card summary{ display:flex; gap:10px; align-items:center; cursor:pointer; flex-wrap:wrap; }
+.rq-card p{ margin:6px 0 0; line-height:1.45; }
+.rq-nota{ font-weight:700; min-width:34px; }
+.rq-nota.ok{ color:#30A46C; } .rq-nota.bom{ color:#3E9BD6; } .rq-nota.medio{ color:#D9A400; } .rq-nota.ruim{ color:#E5484D; }
+.rq-quem{ font-weight:600; }
+.rq-cli{ opacity:.7; flex:1; min-width:120px; }
+.rq-falha{ color:#E5484D; }
+.rq-obs{ opacity:.8; font-style:italic; }
