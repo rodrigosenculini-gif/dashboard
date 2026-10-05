@@ -77,3 +77,8 @@
 .fav-tempo-banco em.falha{ color:var(--rose); }
 .fav-tempo-banco small{ display:block; color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:300px; }
 @media (max-width:700px){ .fav-kpi b{ font-size:20px; } .fav-topo h2{ font-size:19px; } }
+/* migração 214: ids e chips de interação/venda */
+.fav-ids{ display:block; color:var(--muted); font-size:11px; }
+.fav-chips-mini{ display:flex; flex-wrap:wrap; gap:4px; max-width:240px; }
+.fav-chips-mini .fav-badge{ font-size:11px; padding:1px 7px; }
+.fav-de{ font-size:12px; color:var(--muted); font-weight:400; }

@@ -7,6 +7,7 @@ import './FunilAoVivo.css'
 // ?type=config). Atualiza sozinho a cada 10 s com a aba visível.
 
 const TOKEN_KEY = 'ia_config_token'
+const CRM = 'https://crm.vendeaitecnologia.com.br/app/accounts/75/conversations/'
 const ATUALIZA_MS = 10000
 
 const FASE = {
@@ -101,6 +102,25 @@ const Icone = ({ k }) => (
   </svg>
 )
 
+// Interação depois do resultado e venda (migração 214): clicou no WhatsApp da página, voltou à página, respondeu no
+// VendeAI ou mandou mensagem; proposta / pago / cancelado vêm das propostas da IA e das propostas dos bancos pelo CPF.
+function chipsInteracao(l) {
+  const i = l.inter || {}, c = []
+  if (i.clicou) c.push(['Clicou no WhatsApp', 'verde'])
+  if (i.vendeai) c.push(['Respondeu no VendeAI', 'verde'])
+  if (i.voltou) c.push(['Voltou à página', 'azul'])
+  if (i.msgs) c.push([`${i.msgs} msg do cliente`, 'azul'])
+  if (!c.length && l.lp?.aprovado_em) c.push([l.lp.entregue_em ? 'Sem interação' : 'Resultado não entregue', 'cinza'])
+  if (i.lembretes) c.push([`${i.lembretes} lembrete${i.lembretes > 1 ? 's' : ''}`, 'cinza'])
+  return c
+}
+function chipVenda(v) {
+  if (!v) return null
+  if (v.pago) return ['Pago', 'verde']
+  if (v.cancelado) return ['Cancelado', 'vermelho']
+  return [`Proposta${v.status ? ` · ${String(v.status).slice(0, 28)}` : ''}`, 'roxo']
+}
+
 function Entrar({ onOk }) {
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
@@ -144,7 +164,9 @@ function Detalhe({ id, token, onFechar, agora }) {
           <>
             <h3 className="fav-nome">{a.nome || 'Sem nome'}</h3>
             <p className="fav-sub">{fone(a.telefone)} · {cpfFmt(a.cpf)}</p>
-            <p className="fav-sub">Atendimento {a.id}{a.campanha ? ` · campanha ${a.campanha}` : ''}</p>
+            <p className="fav-sub">Atendimento {a.id}{a.campanha ? ` · campanha ${a.campanha}` : ''}
+              {a.conversa ? ` · conversa ${a.conversa}` : ''}
+              {d.vendeai?.length ? ` · VendeAI ${d.vendeai.map((c) => c.conversa).join(', ')}` : (!a.conversa ? ' · sem conversa' : '')}</p>
             <div className="fav-linha-chips">
               <span className={`fav-badge ${etapa(a)[1]}`}>{etapa(a)[0]}</span>
               {a.na_pagina && <span className="fav-badge verde">Na página agora</span>}
@@ -152,6 +174,10 @@ function Detalhe({ id, token, onFechar, agora }) {
                 <a className="iac-link" href={`https://chatwoot.querosacarfgts.com.br/app/accounts/${a.conta || 1}/conversations/${a.conversa}`}
                    target="_blank" rel="noreferrer">Ver conversa no Chatwoot</a>
               )}
+              {(d.vendeai || []).slice(0, 3).map((c) => (
+                <a key={c.conversa} className="iac-link" href={CRM + c.conversa} target="_blank" rel="noreferrer">
+                  Conversa {c.conversa} no VendeAI</a>
+              ))}
             </div>
 
             <div className="fav-cartao">
@@ -165,6 +191,27 @@ function Detalhe({ id, token, onFechar, agora }) {
                 </>
               ) : <p className="iac-miudo">Sem oferta{a.trocou_de ? ` (veio do ${nomeProduto(a.trocou_de)})` : ''}.</p>}
             </div>
+
+            {(a.lp?.aprovado_em || d.vendeai?.length > 0 || d.propostas?.length > 0) && (
+              <div className="fav-cartao">
+                <p className="fav-titulo-bloco">Interação e venda</p>
+                <div className="fav-linha-chips">
+                  {a.lp?.clicou_em && <span className="fav-badge verde">Clicou no WhatsApp {hm(a.lp.clicou_em)}</span>}
+                  {(d.vendeai || []).filter((c) => c.cliente_ultima_em).slice(0, 3).map((c) => (
+                    <span key={c.conversa} className="fav-badge verde">Respondeu no VendeAI {hm(c.cliente_ultima_em)} (conversa {c.conversa})</span>
+                  ))}
+                  {!a.lp?.clicou_em && !(d.vendeai || []).some((c) => c.cliente_ultima_em) && <span className="fav-badge cinza">Sem resposta do cliente</span>}
+                </div>
+                {(d.propostas || []).map((p, i) => (
+                  <div key={i} className="fav-banco-linha">
+                    <b>{nomeBanco(p.banco)}</b>
+                    <span className={`fav-badge ${p.pago ? 'verde' : p.cancelado ? 'vermelho' : 'roxo'}`}>{p.pago ? 'pago' : p.cancelado ? 'cancelado' : 'proposta'}</span>
+                    <small>{p.valor ? `${brl(p.valor)} · ` : ''}{p.status || ''}{p.vendedor ? ` · ${p.vendedor}` : ''} · {hm(p.em)}</small>
+                  </div>
+                ))}
+                {!d.propostas?.length && <p className="iac-miudo">Nenhuma proposta.</p>}
+              </div>
+            )}
 
             <div className="fav-cartao">
               <p className="fav-titulo-bloco">Andamento</p>
@@ -234,7 +281,8 @@ export default function FunilAoVivo() {
   if (!token) return <div className="fav"><Entrar onOk={setToken} /></div>
   const k = dados?.kpis || {}
   const CARTOES = [['entraram', 'Entraram'], ['na_pagina', 'Na página agora'], ['simulando', 'Simulando'], ['aguardando', 'Aguardando autorização'],
-    ['com_oferta', 'Com oferta na mão'], ['digitando', 'Digitando'], ['equipe', 'Com a equipe'], ['propostas', 'Propostas']]
+    ['com_oferta', 'Com oferta na mão'], ['digitando', 'Digitando'], ['equipe', 'Com a equipe'], ['interagiram', 'Interagiram (aprovados)'], ['com_proposta', 'Com proposta'],
+    ['pagos', 'Pagos'], ['cancelados', 'Cancelados']]
   const set = (c, v) => setFiltros((f) => ({ ...f, [c]: v }))
   return (
     <div className="fav">
@@ -245,7 +293,7 @@ export default function FunilAoVivo() {
         </div>
       </div>
       <div className="fav-kpis">
-        {CARTOES.map(([c, t]) => <div key={c} className="fav-kpi"><small>{t}</small><b>{dados ? (k[c] ?? 0).toLocaleString('pt-BR') : '—'}</b></div>)}
+        {CARTOES.map(([c, t]) => <div key={c} className="fav-kpi"><small>{t}</small><b>{dados ? (k[c] ?? 0).toLocaleString('pt-BR') : '—'}{dados && c === 'interagiram' && k.aprovados_lp ? <small className="fav-de"> de {k.aprovados_lp}</small> : null}</b></div>)}
       </div>
       <div className="fav-filtros">
         <input className="chip-input fav-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome, CPF ou telefone" />
@@ -261,6 +309,8 @@ export default function FunilAoVivo() {
           <option value="aguardando">Aguardando autorização</option><option value="oferta">Com oferta</option>
           <option value="aprovado_lp">Aprovado (LP)</option><option value="digitando">Digitando</option>
           <option value="equipe">Com a equipe</option><option value="encerrado">Encerrado</option>
+          <option value="interagiu">Interagiu</option><option value="sem_interacao">Aprovado sem interação</option>
+          <option value="proposta">Com proposta</option><option value="pago">Pago</option><option value="cancelado">Cancelado</option>
         </select>
         <select className="chip-input" value={filtros.periodo} onChange={(e) => set('periodo', e.target.value)}>
           <option value="hoje">Hoje</option><option value="24h">Últimas 24 h</option><option value="7d">7 dias</option><option value="30d">30 dias</option>
@@ -271,22 +321,27 @@ export default function FunilAoVivo() {
       <div className="panel fav-tabela-caixa">
         <table className="fav-tabela">
           <thead><tr><th>Cliente</th><th>Produto</th><th>Com quem</th><th>Etapa</th><th>Onde está agora</th><th>Banco</th>
-            <th className="num">Oferta</th><th>Entrou</th><th>Última atividade</th></tr></thead>
+            <th className="num">Oferta</th><th>Interação / venda</th><th>Entrou</th><th>Última atividade</th></tr></thead>
           <tbody>
-            {dados && !dados.linhas.length && <tr><td colSpan={9} className="fav-vazio">Nenhum atendimento neste período.</td></tr>}
+            {dados && !dados.linhas.length && <tr><td colSpan={10} className="fav-vazio">Nenhum atendimento neste período.</td></tr>}
             {(dados?.linhas || []).map((l) => {
               const [quem, ic] = comQuem(l), [et, cor] = etapa(l)
               const ativo = l.na_pagina || (agora - new Date(l.ultima)) < 120000
               return (
                 <tr key={l.id} onClick={() => setAberto(l.id)} className={aberto === l.id ? 'sel' : ''}>
                   <td><div className="fav-cliente"><i className={ativo ? 'on' : ''} /><div>
-                    <b>{l.nome || 'Sem nome'}</b><small>{fone(l.telefone)} <span>{cpfFmt(l.cpf)}</span></small></div></div></td>
+                    <b>{l.nome || 'Sem nome'}</b><small>{fone(l.telefone)} <span>{cpfFmt(l.cpf)}</span></small>
+                    <small className="fav-ids">#{l.id}{l.conversa ? ` · conversa ${l.conversa}` : ''}{l.conversa_vendeai ? ` · VendeAI ${l.conversa_vendeai}` : ''}</small></div></div></td>
                   <td>{nomeProduto(l.produto)}{l.trocou_de && <small className="fav-troca">veio do {nomeProduto(l.trocou_de)}</small>}</td>
                   <td><span className="fav-quem"><Icone k={ic} />{quem}</span></td>
                   <td><span className={`fav-badge ${cor}`}>{et}</span></td>
                   <td className="fav-onde">{ondeAgora(l)}</td>
                   <td>{l.banco ? nomeBanco(l.banco) : ''}</td>
                   <td className="num"><b>{l.oferta ? brl(l.oferta) : ''}</b></td>
+                  <td><div className="fav-chips-mini">
+                    {chipsInteracao(l).map(([t, c]) => <span key={t} className={`fav-badge ${c}`}>{t}</span>)}
+                    {chipVenda(l.venda) && <span className={`fav-badge ${chipVenda(l.venda)[1]}`}>{chipVenda(l.venda)[0]}</span>}
+                  </div></td>
                   <td>{ha(l.entrou, agora)}</td>
                   <td>{ha(l.ultima, agora)}</td>
                 </tr>
