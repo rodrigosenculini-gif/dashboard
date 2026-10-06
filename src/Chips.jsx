@@ -189,6 +189,7 @@ export default function Chips({ onVoltar }) {
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState('')
   const [soRecarga, setSoRecarga] = useState(false)
+  const [soInativos, setSoInativos] = useState(false)   // filtro: números fora do controle
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
   const [editando, setEditando] = useState(null)
@@ -202,7 +203,7 @@ export default function Chips({ onVoltar }) {
     setCarregando(true); setErro(null)
     try {
       const d = await getJson('chips_listar', {
-        busca, status: statusFiltro, so_recarga: soRecarga ? '1' : '0',
+        busca, status: statusFiltro, so_recarga: soRecarga ? '1' : '0', inativos: soInativos ? '1' : '0',
       }, opts)
       setDados(d)
       setMarcados([])
@@ -211,7 +212,7 @@ export default function Chips({ onVoltar }) {
     } finally {
       setCarregando(false)
     }
-  }, [busca, statusFiltro, soRecarga, revisaoCache])
+  }, [busca, statusFiltro, soRecarga, soInativos, revisaoCache])
 
   useEffect(() => {
     const t = setTimeout(carregar, busca ? 350 : 0)
@@ -249,8 +250,12 @@ export default function Chips({ onVoltar }) {
   }
 
   async function excluir(id) {
-    if (!await dialogo.confirmar({ titulo: 'Remover este chip?', texto: 'Ele sai do controle de chips.', perigo: true, rotuloOk: 'Remover' })) return
+    if (!await dialogo.confirmar({ titulo: 'Inativar este chip?', texto: 'Ele sai da lista e fica no filtro "Inativos", de onde pode ser reativado.', perigo: true, rotuloOk: 'Inativar' })) return
     await postJson('chips_excluir', { id })
+    carregar({ forcar: true })
+  }
+  async function reativar(id) {
+    await postJson('chips_reativar', { id })
     carregar({ forcar: true })
   }
 
@@ -259,7 +264,7 @@ export default function Chips({ onVoltar }) {
       <div className="topbar">
         <h1><span className="pulse" /> Chips &mdash; WhatsApp</h1>
         <div className="topbar-right">
-          <span className="status-line">{carregando ? 'carregando...' : `${rows.length} de ${resumo.total || 0} chips`}</span>
+          <span className="status-line">{carregando ? 'carregando...' : soInativos ? `${rows.length} de ${resumo.inativos || 0} inativos` : `${rows.length} de ${resumo.total || 0} chips`}</span>
           <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>
           <button className="refresh-btn" onClick={() => carregar({ forcar: true })} disabled={carregando}>&#8635; Atualizar</button>
           <button className="reset-btn" onClick={abrirLoteDoEmail} title="Marcar como recarregados os números que saíram no último e-mail">
@@ -306,6 +311,9 @@ export default function Chips({ onVoltar }) {
           ))}
           <button type="button" className={`chip-opcao ${soRecarga ? 'on' : ''}`}
                   onClick={() => setSoRecarga((v) => !v)}>Precisa recarregar</button>
+          <button type="button" className={`chip-opcao ${soInativos ? 'on' : ''}`}
+                  title="Números que saíram do controle de chips"
+                  onClick={() => setSoInativos((v) => !v)}>Inativos{resumo.inativos ? ` (${resumo.inativos})` : ''}</button>
         </div>
         {marcados.length > 0 && (
           <button className="chip-salvar" onClick={recarregar}>
@@ -354,14 +362,16 @@ export default function Chips({ onVoltar }) {
                   <td className="chips-obs" title={c.observacao || ''}>{c.observacao || '—'}</td>
                   <td className="chips-acoes">
                     <button className="chips-mini" onClick={() => setEditando(c)}>Editar</button>
-                    <button className="chips-mini chips-mini-perigo" onClick={() => excluir(c.id)}>Remover</button>
+                    {c.ativo
+                      ? <button className="chips-mini chips-mini-perigo" onClick={() => excluir(c.id)}>Inativar</button>
+                      : <button className="chips-mini" onClick={() => reativar(c.id)}>Reativar</button>}
                   </td>
                 </tr>
               )
             })}
             {!rows.length && !carregando && (
               <tr><td colSpan={9} className="home-vazio">
-                Nenhum chip com esses filtros. Ajuste a busca ou adicione um número novo.
+                {soInativos ? 'Nenhum chip inativo com esses filtros.' : 'Nenhum chip com esses filtros. Ajuste a busca ou adicione um número novo.'}
               </td></tr>
             )}
           </tbody>

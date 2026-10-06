@@ -1129,6 +1129,7 @@ export default async function handler(req, res) {
     const RPC_POST = {
       chips_salvar:        { sql: 'select dashboard_chips_salvar($1::jsonb) as r',                       args: (b) => [JSON.stringify(b)] },
       chips_excluir:       { sql: 'select dashboard_chips_excluir($1::bigint) as r',                     args: (b) => [b.id] },
+      chips_reativar:      { sql: 'select dashboard_chips_reativar($1::bigint) as r',                    args: (b) => [b.id] },
       chips_recarregar:    { sql: 'select dashboard_chips_recarregar($1::bigint[],$2::date,$3::numeric,$4::text) as r',
                              args: (b) => [b.ids || [], b.data || null, b.valor ?? null, b.observacao || null] },
       trello_card_salvar:  { sql: 'select dashboard_trello_card_salvar($1::jsonb) as r',                 args: (b) => [JSON.stringify(b)] },
@@ -1277,9 +1278,10 @@ export default async function handler(req, res) {
   const RPC_JSON = {
     versao:            { sql: 'select dashboard_versao() as r', args: () => [] },
     home:              { sql: 'select dashboard_home($1::date) as r', args: () => [req.query.dia || null] },
-    chips_listar:      { sql: 'select dashboard_chips_listar($1::text,$2::text,$3::text,$4::boolean) as r',
+    chips_listar:      { sql: 'select dashboard_chips_listar($1::text,$2::text,$3::text,$4::boolean,$5::boolean) as r',
                          args: () => [req.query.busca || null, req.query.status || null,
-                                      req.query.plataforma || null, req.query.so_recarga === '1'] },
+                                      req.query.plataforma || null, req.query.so_recarga === '1',
+                                      req.query.inativos === '1'] },
     chips_opcoes:      { sql: 'select dashboard_chips_opcoes() as r', args: () => [] },
     // robô de follow-up do CRM VendeAI: resumo da aba "Robô follow-up"
     robo_resumo:       { sql: 'select dashboard_robo_resumo() as r', args: () => [] },
