@@ -97,6 +97,9 @@ const VIEWS = [
   { id: 'painel', label: 'Painel' },
   // conversas da IA e páginas da LP em tempo real (02/10)
   { id: 'funil', label: 'Funil ao vivo' },
+  // Trello e Chips eram só atalhos na tela Geral; entraram no menu (06/10)
+  { id: 'trello', label: 'Trello' },
+  { id: 'chips', label: 'Chips' },
   { id: 'disparos', label: 'Disparos' },
   { id: 'leilao', label: 'Meta — Detalhado' },
   { id: 'produtos', label: 'Entradas LP' },
@@ -801,7 +804,7 @@ function CampanhaDetalhadoList({ items, loading }) {
 // verde. Recolhe para so icones (botao no rodape, lembrado no navegador); no
 // celular vira gaveta aberta pelo botao de menu do cabecalho.
 const NAV_GRUPOS = [
-  ['Visão geral', ['inicio', 'painel', 'funil']],
+  ['Visão geral', ['inicio', 'painel', 'funil', 'trello', 'chips']],
   ['Captação', ['disparos', 'leilao', 'produtos']],
   ['Vendas', ['propostas', 'vendas', 'vendedoras']],
   ['Sistema', ['n8n', 'ia', 'robo']],
@@ -810,6 +813,8 @@ const NAV_ICONE = {
   inicio: 'M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10',
   funil: 'M22 12h-4l-3 9L9 3l-3 9H2',
   painel: 'M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM9 4v16M12.5 14l2-3 2 2 2.5-4',
+  trello: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM7 7h4v10H7zM13 7h4v6h-4z',
+  chips: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM9 7h6M9 11h6M9 15h3',
   disparos: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
   leilao: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
   produtos: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
@@ -7771,8 +7776,9 @@ function VisaoGeral() {
 const VIEW_STORAGE_KEY = 'disparos_dashboard_view'
 const LATERAL_STORAGE_KEY = 'dash_lateral_recolhida'
 
-// Views que aparecem como atalho na tela Geral (a própria Geral fica de fora)
-const VIEWS_ATALHO = VIEWS.filter((v) => v.id !== 'inicio')
+// Views que aparecem como atalho na tela Geral (a própria Geral fica de fora;
+// Trello e Chips já têm bloco próprio lá)
+const VIEWS_ATALHO = VIEWS.filter((v) => !['inicio', 'trello', 'chips'].includes(v.id))
 
 // permitidas = lista de ids de view. undefined -> tudo (gestao).
 // Acesso restrito nao passa pela tela Geral: ela resume areas que o perfil
