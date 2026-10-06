@@ -18,7 +18,9 @@ async function postJson(type, body) {
 }
 
 const CHECAGEM_MS = 30 * 1000
-const ehDoRobo = (t) => /crm\.vendeaitecnologia\.com\.br\/app\/accounts\/\d+\/conversations\/\d+\s*$/.test(t?.titulo || '')
+// lembretes automáticos: robô de follow-up (link da conversa do CRM VendeAI) e "Cliente esperando resposta no Chatwoot"
+const ehDoRobo = (t) => /crm\.vendeaitecnologia\.com\.br\/app\/accounts\/\d+\/conversations\/\d+\s*$/.test(t?.titulo || '') ||
+  /^Cliente esperando resposta no Chatwoot/.test(t?.titulo || '')
 const ATALHOS = [
   { rotulo: '15 min', min: 15 },
   { rotulo: '30 min', min: 30 },
@@ -76,7 +78,10 @@ export default function MascoteLembretes({ vendedor, escopo = 'vendedora' }) {
 
   // lembretes do robô de follow-up (terminam no link da conversa do CRM) não
   // notificam aqui: quem avisa é a extensão; no painel continuam na lista
-  const vencidas = tarefas.filter((t) => t.vencida && !t.feita && !ehDoRobo(t))
+  // na gestão só avisa o que é da própria gestão: os lembretes das vendedoras aparecem na lista,
+  // mas não acendem o selo nem o título da aba
+  const vencidas = tarefas.filter((t) => t.vencida && !t.feita && !ehDoRobo(t) &&
+    (!ehGestao || !t.vendedor || t.vendedor === 'gestao'))
   const pendencias = vencidas.length
 
   // clicar fora fecha o painel: antes so o proprio mascote fechava
