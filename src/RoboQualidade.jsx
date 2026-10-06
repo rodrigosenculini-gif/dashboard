@@ -230,6 +230,36 @@ function Visao({ d }) {
   )
 }
 
+// destaques da equipe: em cada critério, quem foi melhor (pódio de 3); só entra quem tem o mínimo de atendimentos
+const MIN_ATEND = 3
+function Destaques({ d }) {
+  const eq = d.ranking.filter((r) => r.avaliado !== 'ia' && r.n >= MIN_ATEND)
+  if (eq.length < 2) return null
+  const cards = [
+    { k: 'media', nome: 'Nota geral', val: (r) => Number(r.media) / 10.5, txt: (r) => fmt(Number(r.media)) },
+    ...CRITERIOS.map(([k, nome, max]) => ({ k, nome, val: (r) => (r.criterios?.[k] == null ? null : Number(r.criterios[k]) / max) })),
+  ].map((c) => ({ ...c, podio: eq.filter((r) => c.val(r) != null).sort((a, b) => c.val(b) - c.val(a) || b.n - a.n).slice(0, 3) }))
+    .filter((c) => c.podio.length)
+  const pctTxt = (c, r) => (c.txt ? c.txt(r) : `${Math.round(c.val(r) * 100)}%`)
+  return (
+    <section className="panel">
+      <p className="section-label">Destaques da equipe · quem se saiu melhor em cada critério (mín. {MIN_ATEND} atendimentos no período)</p>
+      <div className="rq-destaques">
+        {cards.map((c) => (
+          <div key={c.k} className="rq-dest">
+            <span className="rq-dest-crit">{c.nome}</span>
+            <span className="rq-dest-nome">🏆 {c.podio[0].nome}</span>
+            <span className={`rq-dest-val robo-taxa ${c.k === 'media' ? corNota(Number(c.podio[0].media)) : corPct(c.val(c.podio[0]))}`}>{pctTxt(c, c.podio[0])}</span>
+            {c.podio.slice(1).map((r, i) => (
+              <span key={r.avaliado_id} className="rq-dest-outro">{i + 2}º {r.nome} · {pctTxt(c, r)}</span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default function RoboQualidade() {
   const [dias, setDias] = useState(7)
   const [d, setD] = useState(null)
@@ -272,6 +302,7 @@ export default function RoboQualidade() {
       </div>
 
       <Visao d={d} />
+      <Destaques d={d} />
 
       <section className="panel table-panel">
         <div className="rq-topo">

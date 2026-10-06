@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { DateRangeFilter, presetRange } from './App'
 
 // Impacto do robô de follow-up na conversão: antes x depois, resposta ao áudio do robô e o que acontece
 // quando ele passa o atendimento para a vendedora (RPC dashboard_robo_impacto / dashboard_robo_impacto_periodo).
@@ -7,9 +8,6 @@ const pct = (a, b, c = 1) => (b ? ((100 * a) / b).toLocaleString('pt-BR', { mini
 const num = (v, c = 2) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c }))
 const NOME_CASO = { ticket_alto: 'Ticket alto', ofertado: 'Ofertado', cliente_sumiu: 'Cliente sumiu', assinatura: 'Assinatura', pendencia: 'Pendência' }
 const NOME_VIGIA = { 'vendedora escreveu': 'Vendedora escreveu em até 20 min', 'devolvido para a IA': 'Voltou para a IA (vendedora não escreveu)', urgente_com_vendedora: 'Ficou com ela como URGENTE (venda depende dela)' }
-const INICIO_ROBO = '2026-10-02'
-const hojeSP = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10)
-const menosDias = (iso, n) => new Date(new Date(iso + 'T12:00:00Z').getTime() - n * 86400_000).toISOString().slice(0, 10)
 const br = (iso) => (iso ? new Date(iso.slice(0, 10) + 'T12:00').toLocaleDateString('pt-BR') : '')
 
 // colunas por dia de uma taxa; dias com robô em azul, antes em cinza
@@ -33,34 +31,23 @@ function Serie({ serie, inicio, campo, titulo, so_completo }) {
 }
 
 export default function RoboImpacto() {
-  const [per, setPer] = useState({ dias: 7 })
-  const [de, setDe] = useState(menosDias(hojeSP(), 6))
-  const [ate, setAte] = useState(hojeSP())
+  // filtro de datas padrão do painel; abre sempre na semana atual
+  const [de, setDe] = useState(() => presetRange('esta_semana').from)
+  const [ate, setAte] = useState(() => presetRange('esta_semana').to)
   const [d, setD] = useState(null)
   const [erro, setErro] = useState(null)
   useEffect(() => {
+    if (!de || !ate) return // calendário no meio da escolha (1º clique) ou limpo
     setD(null); setErro(null)
-    const q = per.de ? `de=${per.de}&ate=${per.ate}` : `dias=${per.dias}`
-    fetch(`/api/dashboard?type=robo_impacto&${q}`).then((r) => r.json())
+    fetch(`/api/dashboard?type=robo_impacto&de=${de}&ate=${ate}`).then((r) => r.json())
       .then((x) => { const v = x?.data ?? x; if (v?.serie) setD(v); else setErro(x?.error || 'falha') })
       .catch((e) => setErro(e.message))
-  }, [per])
-  const atalho = (dias) => { setPer({ dias }); setDe(menosDias(hojeSP(), dias - 1)); setAte(hojeSP()) }
-  const desdeRobo = per.de === INICIO_ROBO && per.ate === hojeSP()
+  }, [de, ate])
 
   const topo = (
     <div className="rq-topo rq-periodo">
       <p className="section-label">Impacto do robô · passagens, resposta e conversão</p>
-      <div className="rq-dias ri-filtro">
-        {[1, 7, 30].map((n) => <button key={n} className={`reset-btn ${!per.de && per.dias === n ? 'rc-on' : ''}`} onClick={() => atalho(n)}>{n === 1 ? 'Hoje' : `${n} dias`}</button>)}
-        <button className={`reset-btn ${desdeRobo ? 'rc-on' : ''}`} onClick={() => { setDe(INICIO_ROBO); setAte(hojeSP()); setPer({ de: INICIO_ROBO, ate: hojeSP() }) }}>Desde o robô</button>
-        <span className="ri-datas">
-          <input type="date" value={de} max={ate} onChange={(e) => setDe(e.target.value)} aria-label="De" />
-          <span>até</span>
-          <input type="date" value={ate} min={de} max={hojeSP()} onChange={(e) => setAte(e.target.value)} aria-label="Até" />
-          <button className={`reset-btn ${per.de && !desdeRobo ? 'rc-on' : ''}`} disabled={!de || !ate || de > ate} onClick={() => setPer({ de, ate })}>Aplicar</button>
-        </span>
-      </div>
+      <DateRangeFilter dataInicio={de} setDataInicio={setDe} dataFim={ate} setDataFim={setAte} />
     </div>
   )
   if (erro) return <div className="rq ri">{topo}<div className="state-msg error">Erro: {erro}</div></div>
@@ -135,7 +122,8 @@ export default function RoboImpacto() {
         <p className="section-label">Por vendedora · atendimentos passados pelo robô</p>
         <div className="scroll-table">
           <table className="robo-desemp">
-            <thead><tr><th>Vendedora</th><th>Recebeu</th><th>Não escreveu</th>
+            <thead><tr><th>Vendedora</th><th title="Atendimentos atribuídos a ela por qualquer origem (VendeAI, robô, colegas) — referência">Recebeu ao todo</th>
+              <th title="Atendimentos que o robô passou para ela (base das colunas seguintes)">Recebeu do robô</th><th>Não escreveu</th>
               <th title="Ela mesma devolveu para a IA da VendeAI sem escrever">↳ ela devolveu à IA</th>
               <th title="O robô tirou dela ou devolveu à IA antes de ela escrever">↳ robô tirou</th>
               <th>Tempo até escrever (mediana)</th><th>Digitou</th><th>Pagou</th></tr></thead>
@@ -144,7 +132,7 @@ export default function RoboImpacto() {
                 const t = v.recebeu ? v.nao_escreveu / v.recebeu : 0
                 return (
                   <tr key={v.vendedora}>
-                    <td>{v.vendedora}</td><td>{v.recebeu}</td>
+                    <td>{v.vendedora}</td><td>{v.recebeu_total ?? '—'}</td><td>{v.recebeu}</td>
                     <td className={`robo-taxa ${t > 0.5 ? 'ruim' : t > 0.25 ? 'medio' : 'ok'}`}>{pct(v.nao_escreveu, v.recebeu, 0)}% ({v.nao_escreveu})</td>
                     <td>{v.devolveu_ia || 0}</td><td>{v.robo_tirou || 0}</td>
                     <td>{v.mediana_min != null ? `${v.mediana_min} min` : '—'}</td><td>{v.digitou} ({pct(v.digitou, v.recebeu)}%)</td><td>{v.pagou}</td>

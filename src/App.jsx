@@ -389,7 +389,7 @@ function weekRange() {
   return { from: fmtDateISO(monday), to }
 }
 
-function presetRange(preset) {
+export function presetRange(preset) {
   const now = new Date()
   const y = now.getFullYear()
   const m = now.getMonth()
@@ -415,7 +415,7 @@ function presetRange(preset) {
   return { from: '', to: '' }
 }
 
-function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
+export function DateRangeFilter({ dataInicio, setDataInicio, dataFim, setDataFim }) {
   const applyPreset = (preset) => {
     const { from, to } = presetRange(preset)
     setDataInicio(from)

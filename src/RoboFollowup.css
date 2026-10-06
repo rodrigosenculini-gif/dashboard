@@ -151,3 +151,9 @@
 .ri-medias > div{ flex:1; min-width:240px; border:1px solid var(--border); border-left:4px solid var(--ri-cinza); border-radius:6px; padding:8px 10px; font-size:13px; }
 .ri-medias > div.ri-medias-robo{ border-left-color:var(--ri-azul); }
 .ri-medias-t{ display:block; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:2px; }
+.rq-destaques{ display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:8px; margin-top:6px; }
+.rq-dest{ display:flex; flex-direction:column; gap:2px; border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-width:0; }
+.rq-dest-crit{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.rq-dest-nome{ font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rq-dest-val{ font-size:20px; font-weight:600; font-family:var(--font-mono); }
+.rq-dest-outro{ font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
