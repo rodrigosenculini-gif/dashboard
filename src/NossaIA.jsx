@@ -87,8 +87,9 @@ export default function NossaIA() {
     <div className="rq ri">
       {topo}
       <p className="home-vazio ri-aviso">Em cada transferência da IA da VendeAI, a nossa IA lê a conversa e decide: responder, ressimular, passar para a vendedora,
-        aguardar ou encerrar. Nada é enviado ao cliente. "Concorda" compara a decisão com quem respondeu de verdade
-        (responder/ressimular = a IA da VendeAI seguiu; passar = uma pessoa respondeu).</p>
+        aguardar ou encerrar. Nada é enviado ao cliente. "Concorda" compara a decisão com o que foi feito de verdade antes de o
+        cliente escrever de novo: ressimular = mandaram nova simulação (R$ + parcelas); passar = uma pessoa assumiu; responder = responderam
+        sem simular; aguardar = ninguém respondeu.</p>
 
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Conversas</p><p className="kpi-value">{d.conversas}</p></div>
