@@ -22,6 +22,13 @@ function fmtFone(f) {
   return s
 }
 const fmtData = (d) => (d ? String(d).split('-').reverse().join('/') : '—')
+const hojeIso = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+// '2026-10-06' + 60 -> '2026-12-05' (sem fuso: soma no calendário)
+function somaDias(iso, n) {
+  const [a, m, d] = String(iso).split('-').map(Number)
+  const dt = new Date(Date.UTC(a, m - 1, d + Number(n)))
+  return dt.toISOString().slice(0, 10)
+}
 
 // Opções fixas viram botão — é o que a planilha já usava, só que sem digitar.
 const STATUS_WPP = ['CONECTADO', 'DESCONECTADO', 'BANIDO', 'N CONECTAR']
@@ -32,7 +39,7 @@ const OPERADORAS = ['TIM', 'CLARO', 'VIVO', 'OI']
 const VAZIO = {
   id: null, telefone: '', operadora: '', responsavel: '', plataforma: '',
   status: 'DESCONECTADO', status_plataforma: '', instancia: '',
-  recarregar: true, ultima_recarga: '', proxima_recarga: '', intervalo_dias: 30, observacao: '',
+  recarregar: true, ultima_recarga: '', proxima_recarga: '', intervalo_dias: 60, observacao: '',
 }
 
 function Escolha({ label, valor, opcoes, onChange, permitirLimpar = true }) {
@@ -57,6 +64,14 @@ function Editor({ chip, opcoes, onFechar, onSalvo }) {
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
+  // Última recarga ou intervalo mudou: a próxima acompanha (antes só o banco
+  // calculava, e só quando a próxima vinha em branco)
+  const setRecarga = (k, v) => setF((x) => {
+    const n = { ...x, [k]: v }
+    const base = n.ultima_recarga || hojeIso()
+    n.proxima_recarga = somaDias(base, n.intervalo_dias || 60)
+    return n
+  })
 
   const instancias = useMemo(
     () => Array.from(new Set([...(opcoes.instancias || [])].filter(Boolean))).sort(),
@@ -123,14 +138,14 @@ function Editor({ chip, opcoes, onFechar, onSalvo }) {
             <div className="chip-campo">
               <label>Última recarga</label>
               <input type="date" className="chip-input" value={f.ultima_recarga || ''}
-                     onChange={(e) => set('ultima_recarga', e.target.value)} />
+                     onChange={(e) => setRecarga('ultima_recarga', e.target.value)} />
             </div>
             <div className="chip-campo">
               <label>Recarrega a cada</label>
               <div className="chip-opcoes">
                 {[15, 30, 60, 90].map((dd) => (
                   <button key={dd} type="button" className={`chip-opcao ${Number(f.intervalo_dias) === dd ? 'on' : ''}`}
-                          onClick={() => set('intervalo_dias', dd)}>{dd}d</button>
+                          onClick={() => setRecarga('intervalo_dias', dd)}>{dd}d</button>
                 ))}
               </div>
             </div>
@@ -138,7 +153,7 @@ function Editor({ chip, opcoes, onFechar, onSalvo }) {
               <label>Próxima recarga</label>
               <input type="date" className="chip-input" value={f.proxima_recarga || ''}
                      onChange={(e) => set('proxima_recarga', e.target.value)} />
-              <small className="chip-dica">Em branco = última + {f.intervalo_dias || 30} dias</small>
+              <small className="chip-dica">Em branco = última + {f.intervalo_dias || 60} dias</small>
             </div>
           </div>
 
