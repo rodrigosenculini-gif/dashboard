@@ -157,3 +157,19 @@
 .rq-dest-nome{ font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .rq-dest-val{ font-size:20px; font-weight:600; font-family:var(--font-mono); }
 .rq-dest-outro{ font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Nossa IA (modo sombra) */
+.ni-filtro { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border, #ddd); background: transparent; color: inherit; }
+.ni-lista { display: flex; flex-direction: column; gap: 10px; max-height: 720px; overflow-y: auto; }
+.ni-item { border: 1px solid var(--border, #e3e3e3); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.ni-item p { margin: 4px 0; overflow-wrap: anywhere; }
+.ni-cab { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; opacity: .9; }
+.ni-mot { opacity: .7; }
+.ni-acao { padding: 1px 8px; border-radius: 10px; background: rgba(120,120,120,.15); font-weight: 600; }
+.ni-passar_vendedora { background: rgba(245,130,32,.18); }
+.ni-responder, .ni-simular { background: rgba(48,164,108,.18); }
+.ni-ok { color: #30a46c; font-weight: 600; }
+.ni-nao { color: #e5484d; font-weight: 600; }
+.ni-nos { border-left: 3px solid #30a46c; padding-left: 8px; }
+.ni-real { border-left: 3px solid #8e8e8e; padding-left: 8px; opacity: .85; }
+.ni-porque { font-size: 12px; opacity: .7; }

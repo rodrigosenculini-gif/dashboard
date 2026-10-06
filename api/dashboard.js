@@ -1293,6 +1293,8 @@ export default async function handler(req, res) {
     robo_impacto:      req.query.de && req.query.ate
                          ? { sql: 'select dashboard_robo_impacto_periodo($1::date, $2::date) as r', args: () => [req.query.de, req.query.ate] }
                          : { sql: 'select dashboard_robo_impacto($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 7] },
+    nossa_ia:          { sql: 'select dashboard_nossa_ia($1::date, $2::date) as r', args: () => [req.query.de, req.query.ate] },
+    politica_vendeai:  { sql: 'select dashboard_politica_comparacao($1::date, $2::date) as r', args: () => [req.query.de, req.query.ate] },
     vendedoras_atendimento: { sql: 'select dashboard_vendedoras_atendimento($1::date, $2::date) as r', args: () => [req.query.de, req.query.ate] },
     robo_lista:        { sql: 'select dashboard_robo_lista($1::text,$2::text,$3::text) as r',
                          args: () => [req.query.tipo || null, req.query.a || null, req.query.b || null] },
