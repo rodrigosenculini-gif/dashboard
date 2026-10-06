@@ -1155,6 +1155,10 @@ export default async function handler(req, res) {
                                args: (b) => [JSON.stringify(b)] },
       tarefa_criar:          { sql: 'select dashboard_tarefa_criar($1::text,$2::text,$3::int,$4::text) as r',
                                args: (b) => [b.vendedor || null, b.titulo || '', b.minutos ?? null, b.quando || null] },
+      // extensão Esquentadinho: botão "em turno" (o robô atribui só para quem está em turno);
+      // sem em_turno só consulta e marca que a extensão dela está ligada
+      robo_turno:            { sql: 'select robo_fu_turno($1::text,$2::boolean) as r',
+                               args: (b) => [b.vendedor || null, typeof b.em_turno === 'boolean' ? b.em_turno : null] },
       tarefa_acao:           { sql: 'select dashboard_tarefa_acao($1::bigint,$2::text,$3::int) as r',
                                args: (b) => [b.id, b.acao, b.minutos ?? 10] },
       regra_salvar:          { sql: 'select dashboard_regra_salvar($1::jsonb) as r',
