@@ -30,6 +30,56 @@ function Serie({ serie, inicio, campo, titulo, so_completo }) {
   )
 }
 
+// tudo o que cada vendedora recebeu, de qualquer origem (VendeAI, robô/Hotline, colega, ela mesma)
+function AtendimentoGeral({ de, ate }) {
+  const [d, setD] = useState(null)
+  useEffect(() => {
+    if (!de || !ate) return
+    setD(null)
+    fetch(`/api/dashboard?type=vendedoras_atendimento&de=${de}&ate=${ate}`).then((r) => r.json())
+      .then((x) => setD(x?.data ?? x)).catch(() => setD({ por_vendedora: [] }))
+  }, [de, ate])
+  const lista = d?.por_vendedora || []
+  return (
+    <section className="panel table-panel">
+      <p className="section-label">Por vendedora · tudo o que ela recebeu (qualquer origem){d?.desde ? ` · desde ${new Date(d.desde).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}</p>
+      {!d ? <p className="home-vazio">carregando...</p> : (
+        <div className="scroll-table">
+          <table className="robo-desemp">
+            <thead><tr>
+              <th>Vendedora</th><th>Recebeu</th>
+              <th title="Distribuição automática da VendeAI (política) ou a IA da VendeAI passou">VendeAI</th>
+              <th title="Robô de follow-up ou alguém no login Hotline">Robô/Hotline</th>
+              <th title="Uma colega passou para ela">Colega</th><th title="Ela mesma pegou a conversa">Ela mesma</th>
+              <th>Não escreveu</th>
+              <th title="O cliente mandou mensagem depois, ela não escreveu e a conversa continuou com ela">↳ cliente sem resposta</th>
+              <th title="Ela devolveu para a IA da VendeAI sem escrever">↳ devolveu à IA</th>
+              <th title="Saiu dela (outra pessoa, IA ou robô) antes de ela escrever">↳ saiu antes</th>
+              <th>Tempo até escrever (mediana)</th><th>Digitou</th>
+            </tr></thead>
+            <tbody>
+              {lista.map((v) => {
+                const t = v.recebeu ? v.nao_escreveu / v.recebeu : 0
+                return (
+                  <tr key={v.vendedora}>
+                    <td>{v.vendedora}</td><td>{v.recebeu}</td><td>{v.de_vendeai}</td><td>{v.do_robo}</td><td>{v.de_colega}</td><td>{v.ela_mesma}</td>
+                    <td className={`robo-taxa ${t > 0.5 ? 'ruim' : t > 0.25 ? 'medio' : 'ok'}`}>{pct(v.nao_escreveu, v.recebeu, 0)}% ({v.nao_escreveu})</td>
+                    <td className={v.cliente_sem_resposta ? 'robo-taxa ruim' : ''}>{v.cliente_sem_resposta}</td>
+                    <td>{v.devolveu_ia}</td><td>{v.saiu_antes}</td>
+                    <td>{v.mediana_min != null ? `${v.mediana_min} min` : '—'}</td><td>{v.digitou} ({pct(v.digitou, v.recebeu)}%)</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          {!lista.length && <p className="home-vazio">Nenhuma atribuição no período.</p>}
+          <p className="home-vazio">Atribuições que duraram menos de 2 min sem ela escrever não contam (a VendeAI distribui o lead novo e a IA dela pega de volta no mesmo segundo).</p>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function RoboImpacto() {
   // filtro de datas padrão do painel; abre sempre na semana atual
   const [de, setDe] = useState(() => presetRange('esta_semana').from)
@@ -119,7 +169,7 @@ export default function RoboImpacto() {
       </section>
 
       <section className="panel table-panel">
-        <p className="section-label">Por vendedora · atendimentos passados pelo robô</p>
+        <p className="section-label">Por vendedora · só o que o robô passou para ela</p>
         <div className="scroll-table">
           <table className="robo-desemp">
             <thead><tr><th>Vendedora</th><th title="Atendimentos atribuídos a ela por qualquer origem (VendeAI, robô, colegas) — referência">Recebeu ao todo</th>
@@ -144,6 +194,8 @@ export default function RoboImpacto() {
           {!(d.por_vendedora || []).length && <p className="home-vazio">Nenhuma passagem no período.</p>}
         </div>
       </section>
+
+      <AtendimentoGeral de={de} ate={ate} />
 
       <div className="rq-graficos">
         <section className="panel table-panel">
