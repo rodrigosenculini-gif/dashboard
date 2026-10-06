@@ -143,3 +143,11 @@
 .rq-barra.ri-cinza{ background:var(--ri-cinza); } .rq-barra.ri-laranja{ background:var(--ri-laranja); }
 .rq-barra.ri-azul{ background:var(--ri-azul); } .rq-barra.ri-vermelho{ background:var(--ri-vermelho); }
 .ri .rq-barra-linha{ height:14px; } .ri .rq-barra{ height:12px; }
+.ri-filtro{ flex-wrap:wrap; align-items:center; }
+.ri-datas{ display:inline-flex; align-items:center; gap:6px; margin-left:6px; color:var(--muted); font-size:12px; }
+.ri-datas input[type=date]{ background:transparent; color:inherit; border:1px solid var(--border); border-radius:6px; padding:4px 6px; font:inherit; color-scheme:dark; }
+.ri-aviso{ text-align:left; margin:0 0 10px; }
+.ri-medias{ display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 12px; }
+.ri-medias > div{ flex:1; min-width:240px; border:1px solid var(--border); border-left:4px solid var(--ri-cinza); border-radius:6px; padding:8px 10px; font-size:13px; }
+.ri-medias > div.ri-medias-robo{ border-left-color:var(--ri-azul); }
+.ri-medias-t{ display:block; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:2px; }
