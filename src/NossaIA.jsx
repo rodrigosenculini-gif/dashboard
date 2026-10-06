@@ -9,8 +9,55 @@ const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0)
 const usd = (v) => `US$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
 const NOME_ACAO = { responder: 'Responder', simular: 'Ressimular', passar_vendedora: 'Passar p/ vendedora', encerrar: 'Encerrar', aguardar: 'Aguardar', erro: 'Erro' }
 const NOME_REAL = { ia_vendeai: 'IA VendeAI', humano: 'Pessoa', ninguem: 'Ninguém' }
+// IA da VendeAI calada (robô v68+): motivo pela nota privada da IA e para onde o caso foi
+const NOME_GRUPO = { simulando: 'Simulação em andamento', nao_autorizou: 'Não autorizou (C6)', proposta_andamento: 'Proposta em andamento',
+  tabela: 'Tabela selecionada', instabilidade: 'Instabilidade do banco', outro: 'Outro motivo', sem_nota: 'Sem nota' }
+const NOME_DESTINO = { ia_vendeai: 'IA VendeAI voltou', hotline: 'Hotline', vendedora: 'Vendedora', aguardando: 'Aguardando',
+  robo_hotline: 'Hotline', ninguem: 'Ninguém', encerrado: 'Encerrado', outro: 'Outro' }
 const hora = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 const link = (id) => `https://crm.vendeaitecnologia.com.br/app/accounts/75/conversations/${id}`
+
+// Cliente escreveu e a IA da VendeAI não respondeu: por motivo, quantas vezes ela voltou sozinha, quantas foram
+// para a Hotline/vendedora e se alguém respondeu depois. Base para decidir quem fica com cada motivo.
+function IaCalada({ ic }) {
+  const grupos = ic.grupos || []
+  return (
+    <section className="panel table-panel">
+      <p className="section-label">IA da VendeAI calada · cliente esperando ({ic.casos} casos)</p>
+      <p className="home-vazio ri-aviso">O robô espera um tempo por motivo (simulação em andamento 25 min; não autorizou e outros 20 min) antes de passar.
+        "IA voltou" = a IA da VendeAI respondeu dentro desse prazo. Urgentes (ticket alto, ofertado, assinatura, pendência) vão para a vendedora.</p>
+      <div className="scroll-table">
+        <table className="robo-desemp">
+          <thead><tr><th>Motivo (nota da IA)</th><th>Casos</th><th>IA voltou</th><th>Hotline</th><th>Hotline respondeu</th>
+            <th>Vendedora</th><th>Vendedora respondeu</th><th>Aguardando</th><th>Outros</th></tr></thead>
+          <tbody>{grupos.map((g) => (
+            <tr key={g.grupo}>
+              <td>{NOME_GRUPO[g.grupo] ?? g.grupo}</td><td>{g.casos}</td>
+              <td>{g.ia_voltou}{g.ia_min != null ? ` (~${g.ia_min} min)` : ''}</td>
+              <td>{g.hotline}</td><td>{g.hotline ? `${g.hotline_resp}${g.hotline_min != null ? ` (~${g.hotline_min} min)` : ''}` : '—'}</td>
+              <td>{g.vendedora}</td><td>{g.vendedora ? g.vendedora_resp : '—'}</td>
+              <td>{g.aguardando}</td><td>{g.outros}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <div className="ni-lista">
+        {(ic.ultimos || []).slice(0, 20).map((u) => (
+          <div key={`${u.conversation_id}-${u.em}`} className="ni-item">
+            <div className="ni-cab">
+              <a href={link(u.conversation_id)} target="_blank" rel="noreferrer">#{u.conversation_id}</a>
+              <span>{hora(u.em)}</span><span className="ni-mot">{NOME_GRUPO[u.grupo] ?? u.grupo}</span>
+              <span className="ni-acao">{NOME_DESTINO[u.destino] ?? u.destino}{u.min_resp != null ? ` em ${u.min_resp} min` : ''}</span>
+              {u.resp_min != null && <span className="ni-ok">respondido {u.resp_min} min depois</span>}
+            </div>
+            {u.nota && <p className="ni-porque">{u.nota}</p>}
+            {u.motivo_fim && <p className="ni-real">Robô: {u.motivo_fim}</p>}
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 export default function NossaIA() {
   const [de, setDe] = useState(() => presetRange('esta_semana').from)
@@ -51,6 +98,8 @@ export default function NossaIA() {
         <div className="kpi"><p className="kpi-label">Custo no período</p><p className="kpi-value">{usd(d.custo)}</p>
           <p className="kpi-sub">{d.turnos ? usd(d.custo / d.turnos) : '—'} por decisão · {d.erros} erro(s)</p></div>
       </div>
+
+      {d.ia_calada && <IaCalada ic={d.ia_calada} />}
 
       <section className="panel table-panel">
         <p className="section-label">Decisão x o que aconteceu de verdade</p>
