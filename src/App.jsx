@@ -4967,6 +4967,12 @@ function AIChatButton({ vendedor }) {
   const [memoriaResposta, setMemoriaResposta] = useState('')
   const [enviandoMemoria, setEnviandoMemoria] = useState(false)
   const [memoriaMsg, setMemoriaMsg] = useState('')
+  // Ensinar com arquivo (08/10): PDF/planilha/texto + o que é o arquivo; o n8n extrai o texto
+  const [arquivo, setArquivo] = useState(null)
+  const [arquivoContexto, setArquivoContexto] = useState('')
+  const [enviandoArquivo, setEnviandoArquivo] = useState(false)
+  const [arquivoMsg, setArquivoMsg] = useState('')
+  const arquivoRef = useRef(null)
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const menuRef = useRef(null)
@@ -5028,6 +5034,31 @@ function AIChatButton({ vendedor }) {
       setMemoriaMsg('Erro ao salvar. Tente de novo.')
     } finally {
       setEnviandoMemoria(false)
+    }
+  }
+
+  async function enviarArquivo() {
+    const contexto = arquivoContexto.trim()
+    if (!arquivo || !contexto || enviandoArquivo) return
+    if (arquivo.size > 25 * 1024 * 1024) { setArquivoMsg('Arquivo acima de 25 MB.'); return }
+    setEnviandoArquivo(true); setArquivoMsg('')
+    try {
+      const fd = new FormData()
+      fd.append('arquivo', arquivo, arquivo.name)
+      fd.append('Contexto', contexto)
+      fd.append('Vendedora', vendedor || 'geral')
+      const data = await (await fetch(`${IA_WEBHOOK_URL}-arquivo`, { method: 'POST', body: fd })).json()
+      if (data?.ok) {
+        setArquivoMsg(data.mensagem || 'Arquivo registrado.')
+        setArquivo(null); setArquivoContexto('')
+        if (arquivoRef.current) arquivoRef.current.value = ''
+      } else {
+        setArquivoMsg(data?.mensagem || 'Não consegui salvar o arquivo agora. Tente de novo.')
+      }
+    } catch {
+      setArquivoMsg('Erro ao enviar o arquivo. Tente de novo.')
+    } finally {
+      setEnviandoArquivo(false)
     }
   }
 
@@ -5263,6 +5294,27 @@ function AIChatButton({ vendedor }) {
                         onClick={enviarMemoria}
                         disabled={enviandoMemoria || !memoriaPergunta.trim() || !memoriaResposta.trim()}>
                   {enviandoMemoria ? 'Salvando...' : 'Ensinar a IA'}
+                </button>
+
+                <p className="askia-aviso askia-aviso-alinhado" style={{ marginTop: 14 }}>
+                  Ou envie um arquivo (PDF, planilha, texto). Diga o que ele é: a IA usa o conteúdo junto com essa explicação.
+                </p>
+                <div className="chip-campo">
+                  <label>Arquivo</label>
+                  <input ref={arquivoRef} type="file" className="chip-input"
+                         accept=".pdf,.txt,.md,.csv,.json,.xlsx,.xls,.docx"
+                         onChange={(e) => { setArquivo(e.target.files?.[0] || null); setArquivoMsg('') }} />
+                </div>
+                <div className="chip-campo">
+                  <label>O que é esse arquivo</label>
+                  <textarea className="chip-input" rows={3} value={arquivoContexto} onChange={(e) => setArquivoContexto(e.target.value)}
+                            placeholder='Ex: "Tabela de taxas do C6 para CLT, vale a partir de outubro" ou "Roteiro de objeções que a liderança aprovou"' />
+                </div>
+                {arquivoMsg && <p className="askia-ok">{arquivoMsg}</p>}
+                <button className="chip-salvar" style={{ alignSelf: 'flex-start' }}
+                        onClick={enviarArquivo}
+                        disabled={enviandoArquivo || !arquivo || !arquivoContexto.trim()}>
+                  {enviandoArquivo ? 'Enviando...' : 'Enviar arquivo para a IA'}
                 </button>
               </div>
             )}
