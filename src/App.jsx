@@ -4972,7 +4972,27 @@ function AIChatButton({ vendedor }) {
   const [arquivoContexto, setArquivoContexto] = useState('')
   const [enviandoArquivo, setEnviandoArquivo] = useState(false)
   const [arquivoMsg, setArquivoMsg] = useState('')
+  const [arquivos, setArquivos] = useState([])          // arquivos já enviados (lista com Remover)
+  const [arquivosRevisao, setArquivosRevisao] = useState(0)
   const arquivoRef = useRef(null)
+
+  useEffect(() => {
+    if (!open || modo !== 'memoria') return
+    let cancelado = false
+    fetch(`${IA_WEBHOOK_URL}?Acao=arquivos`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelado && d?.ok) setArquivos(Array.isArray(d.arquivos) ? d.arquivos : []) })
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [open, modo, arquivosRevisao])
+
+  async function removerArquivo(a) {
+    if (!window.confirm(`Remover "${a.nome}"? A IA deixa de usar esse conteúdo.`)) return
+    try {
+      const d = await (await fetch(`${IA_WEBHOOK_URL}?Acao=arquivo_remover&Id=${encodeURIComponent(a.id)}`)).json()
+      if (d?.ok) setArquivosRevisao((v) => v + 1)
+    } catch { /* fica na lista; a pessoa tenta de novo */ }
+  }
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const menuRef = useRef(null)
@@ -5052,6 +5072,7 @@ function AIChatButton({ vendedor }) {
         setArquivoMsg(data.mensagem || 'Arquivo registrado.')
         setArquivo(null); setArquivoContexto('')
         if (arquivoRef.current) arquivoRef.current.value = ''
+        setArquivosRevisao((v) => v + 1)
       } else {
         setArquivoMsg(data?.mensagem || 'Não consegui salvar o arquivo agora. Tente de novo.')
       }
@@ -5316,6 +5337,24 @@ function AIChatButton({ vendedor }) {
                         disabled={enviandoArquivo || !arquivo || !arquivoContexto.trim()}>
                   {enviandoArquivo ? 'Enviando...' : 'Enviar arquivo para a IA'}
                 </button>
+
+                {arquivos.length > 0 && (
+                  <div className="chip-campo" style={{ marginTop: 10 }}>
+                    <label>Arquivos que a IA já usa ({arquivos.length})</label>
+                    {arquivos.map((a) => (
+                      <div key={a.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0', borderBottom: '1px solid var(--border, #2a2a2a)' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, overflowWrap: 'anywhere' }}>{a.nome}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{a.contexto}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {a.vendedora || 'geral'} · {a.criado_em}{a.aviso ? ` · ${a.aviso}` : ''}
+                          </div>
+                        </div>
+                        <button className="chips-mini chips-mini-perigo" onClick={() => removerArquivo(a)}>Remover</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
