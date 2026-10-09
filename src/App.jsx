@@ -7618,6 +7618,14 @@ function LeilaoConfigOverlay({ onClose }) {
                 </div>
               )}
 
+              <div className="leilao-sep" />
+
+              <div className="leilao-linha">
+                <label>Leads pela BM Yasmin</label>
+                <input type="number" min="0" max="100" step="1" value={cfg.yasmin_pct ?? 0} onChange={(e) => set('yasmin_pct', e.target.value)} />
+                <span className="leilao-hint">% dos leads do leilão que saem por template da Yasmin em vez da Arara (0 desliga)</span>
+              </div>
+
               {msg && <div className="state-msg" style={{ color: 'var(--lime)' }}>{msg}</div>}
 
               <div className="leilao-acoes">

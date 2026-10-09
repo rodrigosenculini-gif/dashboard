@@ -1095,6 +1095,7 @@ export default async function handler(req, res) {
              bloqueio_ativo = $5,
              bloqueio_dia_inicio = $6, bloqueio_hora_inicio = $7,
              bloqueio_dia_fim = $8, bloqueio_hora_fim = $9,
+             yasmin_pct = coalesce($11, yasmin_pct),
              atualizado_em = now(), atualizado_por = $10
            where id = 1
            returning *`,
@@ -1109,6 +1110,9 @@ export default async function handler(req, res) {
             num(b.bloqueio_dia_fim, 23),
             num(b.bloqueio_hora_fim, 8),
             b.atualizado_por || null,
+            // % dos leads do leilão que saem pela BM Yasmin (fluxo "Disparo Yasmin"); vazio = mantém
+            b.yasmin_pct === undefined || b.yasmin_pct === null || b.yasmin_pct === ''
+              ? null : Math.max(0, Math.min(100, Number(b.yasmin_pct) || 0)),
           ]
         );
         const cfg = r.rows[0];
