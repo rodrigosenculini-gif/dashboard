@@ -1,0 +1,13 @@
+-- Tabelas de pontos 13/10 (planilhas do usuario): Sempre Facil e PAN/Mercantil valem para o mes (01/10);
+-- Facta nova tabela geral vale a partir de 13/10 (antes fica como estava). Backup: backup_tabela_pontos_1310.
+-- Aplicado no banco em 13/10 (apply_migration tabelas_pontos_1310); aqui so o registro.
+--  - Sempre Facil: so a 2099 mudou (24x 0.65->0.91; 36/48x 0.71->0.92). Demais iguais.
+--  - PAN: sem seguro 4-36x 0.825; com seguro 4-12x 0.924, 13-18x 0.9735, 19-24x 1.01145, 25-36x 1.04775.
+--    Venda sem seguro informado cai no "sem seguro" (nome mais longo vence no buscar_pontos_tabela).
+--  - Mercantil: 1.08 qualquer prazo.
+--  - Facta 13/10: NOVO GOLD 697xx/698xx/699xx por faixa e prazo, NOVO SMART 69930/69949/69957/69965/69973,
+--    REFIN GOLD POWER 69981 0.88, REFIN 69655 0.704, portabilidade >12 pagas 0.352 / <12 pagas 0,
+--    refin da port 69299/69302 0.352. Codigos antigos (69604.., 69159..) mapeados para a familia SMART nova
+--    (como ja era desde 14/09). Linhas anteriores encerradas em 12/10.
+--  - Vendas de outubro desses bancos recalculadas (update vendas_gerais set peso = peso).
+select 1;
