@@ -144,6 +144,69 @@ function Manuais({ dias }) {
   )
 }
 
+// perfil do cliente (prompt de qualidade v2, 14/10): como cada vendedora se sai com cada tipo de cliente
+const PERFIS = [
+  ['decidido', 'Decidido'], ['negociador', 'Negociador'], ['desconfiado', 'Desconfiado'], ['indeciso', 'Indeciso'],
+  ['dificuldade_digital', 'Dificuldade digital'], ['urgente', 'Urgente'], ['pouco_engajado', 'Pouco engajado'], ['sem_condicao', 'Sem condição'],
+]
+const NOME_PERFIL = Object.fromEntries(PERFIS)
+const NOME_OBJECAO = {
+  taxa_juros: 'taxa/juros', valor_baixo: 'valor baixo', parcela_alta: 'parcela alta', prazo: 'prazo', confianca: 'confiança',
+  documentos: 'documentos', nao_precisa: 'não precisa', outra: 'outra',
+}
+function Perfis({ dias }) {
+  const [d, setD] = useState(null)
+  useEffect(() => {
+    fetch(`/api/dashboard?type=robo_perfis&dias=${dias}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
+  }, [dias])
+  if (!d?.perfis) return null
+  const pessoas = [...new Map((d.matriz || []).map((m) => [m.nome, m])).values()]
+  const cel = (nome, perfil) => (d.matriz || []).find((m) => m.nome === nome && m.perfil === perfil)
+  return (
+    <section className="panel table-panel">
+      <p className="section-label">
+        Perfil do cliente · {d.total} atendimentos classificados · nota média e % que avançou (aceitou, mandou dados ou digitou) por perfil
+      </p>
+      {!d.total && <p className="home-vazio">As avaliações passaram a classificar o perfil do cliente em 14/10; os números aparecem conforme as próximas análises.</p>}
+      {d.total > 0 && <>
+        <div className="scroll-table">
+          <table className="robo-desemp">
+            <thead><tr><th>Perfil</th><th>Atend.</th><th>Nota média</th><th>Avançou</th><th>Objeção mais comum</th></tr></thead>
+            <tbody>
+              {d.perfis.map((p) => (
+                <tr key={p.perfil}>
+                  <td>{NOME_PERFIL[p.perfil] || p.perfil}</td><td>{p.n}</td>
+                  <td><span className={`rq-nota ${corNota(Number(p.nota))}`}>{p.nota}</span></td>
+                  <td className={`robo-taxa ${corPct(p.pct_avanco / 100)}`}>{p.pct_avanco}%</td>
+                  <td>{NOME_OBJECAO[p.objecao_comum] || p.objecao_comum || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="section-label robo-sub">Vendedora × perfil · nota · % avançou (atendimentos)</p>
+        <div className="scroll-table">
+          <table className="robo-desemp">
+            <thead><tr><th>Quem atendeu</th>{PERFIS.map(([k, n]) => <th key={k}>{n}</th>)}</tr></thead>
+            <tbody>
+              {pessoas.map((m) => (
+                <tr key={m.nome}>
+                  <td>{m.avaliado === 'ia' ? '🤖 ' : ''}{m.nome}{m.nova ? ' 🌱' : ''}</td>
+                  {PERFIS.map(([k]) => {
+                    const c = cel(m.nome, k)
+                    return <td key={k}>{c ? <><span className={`rq-nota ${corNota(Number(c.nota))}`}>{c.nota}</span>{' '}
+                      <span className={`robo-taxa ${corPct(c.pct_avanco / 100)}`}>{c.pct_avanco}%</span> <small>({c.n})</small></> : '—'}</td>
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>}
+    </section>
+  )
+}
+
 // visão geral da equipe (todas as vendedoras juntas, ponderado pelo nº de atendimentos) x IA da VendeAI
 const fmt = (n, c = 1) => (n == null || Number.isNaN(n) ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c }))
 function Visao({ d }) {
@@ -361,6 +424,7 @@ export default function RoboQualidade() {
       </section>
 
       <Triagem dias={dias} />
+      <Perfis dias={dias} />
       <Manuais dias={dias} />
     </div>
   )
