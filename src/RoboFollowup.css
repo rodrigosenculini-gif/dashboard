@@ -167,6 +167,7 @@
 .ni-mot { opacity: .7; }
 .ni-acao { padding: 1px 8px; border-radius: 10px; background: rgba(120,120,120,.15); font-weight: 600; }
 .ni-passar_vendedora { background: rgba(245,130,32,.18); }
+.ni-seguir_vendeai { background: rgba(62,99,221,.16); }
 .ni-responder, .ni-simular { background: rgba(48,164,108,.18); }
 .ni-ok { color: #30a46c; font-weight: 600; }
 .ni-nao { color: #e5484d; font-weight: 600; }

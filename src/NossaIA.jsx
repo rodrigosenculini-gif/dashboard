@@ -7,7 +7,7 @@ import { DateRangeFilter, presetRange } from './App'
 
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0)
 const usd = (v) => `US$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
-const NOME_ACAO = { responder: 'Responder', simular: 'Ressimular', passar_vendedora: 'Passar p/ vendedora', encerrar: 'Encerrar', aguardar: 'Aguardar', erro: 'Erro' }
+const NOME_ACAO = { responder: 'Responder', simular: 'Ressimular', passar_vendedora: 'Passar p/ vendedora', seguir_vendeai: 'Seguir com a IA VendeAI', encerrar: 'Encerrar', aguardar: 'Aguardar', erro: 'Erro' }
 const NOME_REAL = { ia_vendeai: 'IA VendeAI', humano: 'Pessoa', ninguem: 'Ninguém' }
 // IA da VendeAI calada (robô v68+): motivo pela nota privada da IA e para onde o caso foi
 const NOME_GRUPO = { simulando: 'Simulação em andamento', nao_autorizou: 'Não autorizou (C6)', proposta_andamento: 'Proposta em andamento',
@@ -87,9 +87,9 @@ export default function NossaIA() {
     <div className="rq ri">
       {topo}
       <p className="home-vazio ri-aviso">Em cada transferência da IA da VendeAI, a nossa IA lê a conversa e decide: responder, ressimular, passar para a vendedora,
-        aguardar ou encerrar. Nada é enviado ao cliente. "Concorda" compara a decisão com o que foi feito de verdade antes de o
-        cliente escrever de novo: ressimular = mandaram nova simulação (R$ + parcelas); passar = uma pessoa assumiu; responder = responderam
-        sem simular; aguardar = ninguém respondeu.</p>
+        deixar a IA da VendeAI seguir com a formalização, aguardar ou encerrar. Nada é enviado ao cliente. "Concorda" compara a decisão com o que foi feito de verdade antes de o
+        cliente escrever de novo: ressimular = mandaram nova simulação (R$ + parcelas) ou a pessoa disse que ia simular (áudio conta pela transcrição);
+        passar = uma pessoa assumiu; seguir com a IA VendeAI = ela continuou; responder = responderam sem simular; aguardar = ninguém respondeu.</p>
 
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Conversas</p><p className="kpi-value">{d.conversas}</p></div>
