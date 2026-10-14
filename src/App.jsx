@@ -10,6 +10,7 @@ import PresencaEsteiraModal from './PresencaEsteira'
 import VisaoInicial from './VisaoInicial'
 import Chips from './Chips'
 import RoboFollowup from './RoboFollowup'
+import { NovaCardDiario, MinhaEvolucaoBotao, NovasAlerta, useEvolucao } from './Novas'
 import IAConfiguracao from './IAConfiguracao'
 import FunilAoVivo from './FunilAoVivo'
 import Trello from './Trello'
@@ -5485,6 +5486,10 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
 
+  // vendedora nova (90 dias): card diário no topo e página "Minha evolução"
+  const [evolucao, recarregarEvolucao] = useEvolucao(vendedor)
+  const [evolucaoAberta, setEvolucaoAberta] = useState(false)
+
   const [modo, setModo] = useState('valor') // 'valor' | 'ponto'
   const fmtV = modo === 'ponto' ? ((v) => `${fmtInt(Math.round(v ?? 0))} pts`) : fmtMoeda
 
@@ -5634,6 +5639,7 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
         <img src="/tiger-icon.png" alt="" className="app-logo" />
         <div className="view-switcher-btn" style={{ cursor: 'default' }}>{vendedor}</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <MinhaEvolucaoBotao vendedor={vendedor} dados={evolucao} aberto={evolucaoAberta} setAberto={setEvolucaoAberta} />
           <RefinButton vendedor={vendedor} modo="vendedora" />
           <ArquivosButton dono={vendedor} />
           <PlaybookMenuButton />
@@ -5644,6 +5650,9 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
           <button className="reset-btn" onClick={onLogout} title="Sair">Sair</button>
         </div>
       </div>
+
+      <NovaCardDiario vendedor={vendedor} dados={evolucao} recarregar={recarregarEvolucao}
+                      onAbrirEvolucao={() => setEvolucaoAberta(true)} />
 
       <div className="topbar">
         <StatusNoTopo loading={loading} lastUpdate={lastUpdate} />
@@ -7955,6 +7964,10 @@ function Dashboard({ permitidas, onLogout }) {
             cada view tem seu proprio lastUpdate, entao nao da pra levantar o
             estado */}
         <span id="status-slot" className="status-slot" />
+        {/* vendedoras novas: contador no topo (some quando não há nova) e leva direto à aba 🌱 Novas do robô */}
+        {podeVer('robo') && (
+          <NovasAlerta onAbrir={() => { try { sessionStorage.setItem('robo_aba', 'novas') } catch { /* ignora */ } changeView('robo'); window.dispatchEvent(new Event('robo-abrir-novas')) }} />
+        )}
         {/* Refin/Arquivos/Info sairam daqui: agora ficam na barra de acoes da
             propria tela, junto de Redefinir filtros e Adicionar adesao */}
         {onLogout && (

@@ -1157,6 +1157,14 @@ export default async function handler(req, res) {
                                args: (b) => [b.chave, JSON.stringify(b.valor)] },
       robo_vendedora_salvar: { sql: 'select dashboard_robo_vendedora_salvar($1::jsonb) as r',
                                args: (b) => [JSON.stringify(b)] },
+      // vendedoras novas (14/10): coach em prévia/ativo, vínculo com o agente do CRM, quiz do dia e retorno visto
+      novas_modo:            { sql: 'select dashboard_novas_modo($1::text) as r', args: (b) => [b.modo] },
+      novas_vincular:        { sql: 'select dashboard_novas_vincular($1::text,$2::bigint,$3::text) as r',
+                               args: (b) => [b.vendedora, b.agent_id, b.nome_crm || null] },
+      novas_quiz_responder:  { sql: 'select novas_quiz_responder($1::text,$2::int,$3::int) as r',
+                               args: (b) => [b.vendedor, b.quiz_id, b.resposta] },
+      novas_feedback_visto:  { sql: 'select dashboard_novas_feedback_visto($1::text,$2::bigint) as r',
+                               args: (b) => [b.vendedor, b.id] },
       tarefa_criar:          { sql: 'select dashboard_tarefa_criar($1::text,$2::text,$3::int,$4::text) as r',
                                args: (b) => [b.vendedor || null, b.titulo || '', b.minutos ?? null, b.quando || null] },
       // extensão Esquentadinho: botão "em turno" (o robô atribui só para quem está em turno);
@@ -1301,6 +1309,10 @@ export default async function handler(req, res) {
     robo_resumo:       { sql: 'select dashboard_robo_resumo() as r', args: () => [] },
     robo_config:       { sql: 'select dashboard_robo_config() as r', args: () => [] },
     robo_desempenho:   { sql: 'select dashboard_robo_desempenho() as r', args: () => [] },
+    // vendedoras novas (14/10): aba 🌱 Novas, alerta no topo e "Minha evolução" do portal
+    novas:             { sql: 'select dashboard_novas() as r', args: () => [] },
+    novas_alerta:      { sql: 'select dashboard_novas_alerta() as r', args: () => [] },
+    minha_evolucao:    { sql: 'select dashboard_minha_evolucao($1::text) as r', args: () => [req.query.vendedor || ''] },
     // backoffice: painel ao vivo, dinheiro parado, reincidência, prévia por desempenho (aba Backoffice e extensão)
     robo_backoffice:   { sql: 'select dashboard_robo_backoffice() as r', args: () => [] },
     bo_painel:         { sql: 'select robo_fu_bo_painel() as r', args: () => [] },

@@ -5,6 +5,7 @@ import RoboQualidade from './RoboQualidade'
 import RoboImpacto from './RoboImpacto'
 import NossaIA from './NossaIA'
 import RoboBackoffice from './RoboBackoffice'
+import { NovasPainel } from './Novas'
 import './RoboFollowup.css'
 
 // Robô de follow-up do CRM VendeAI (edge function robo-followup no Supabase).
@@ -123,6 +124,15 @@ export default function RoboFollowup({ onVoltar }) {
   const [verImp, setVerImp] = useState(false)
   const [verIA, setVerIA] = useState(false)
   const [verBO, setVerBO] = useState(false)
+  // aba 🌱 Novas: abre direto quando se chega pelo alerta do topo
+  const [verNovas, setVerNovas] = useState(() => {
+    try { const v = sessionStorage.getItem('robo_aba') === 'novas'; sessionStorage.removeItem('robo_aba'); return v } catch { return false }
+  })
+  useEffect(() => {
+    const abrir = () => { setVerNovas(true); setVerBO(false); setVerImp(false); setVerQual(false); setVerConfig(false); setVerIA(false) }
+    window.addEventListener('robo-abrir-novas', abrir)
+    return () => window.removeEventListener('robo-abrir-novas', abrir)
+  }, [])
   const alternar = (tipo, a, b) => {
     const k = `${tipo}|${a}|${b || ''}`
     setAberta((x) => (x === k ? null : k))
@@ -177,19 +187,22 @@ export default function RoboFollowup({ onVoltar }) {
           </span>
           <button className="reset-btn" onClick={onVoltar}>&#8592; Início</button>
           <button className="refresh-btn" onClick={carregar} disabled={carregando}>&#8635; Atualizar</button>
-          <button className={`reset-btn ${verBO ? 'rc-on' : ''}`} onClick={() => { setVerBO((x) => !x); setVerImp(false); setVerQual(false); setVerConfig(false); setVerIA(false) }}>
+          <button className={`reset-btn ${verNovas ? 'rc-on' : ''}`} onClick={() => { setVerNovas((x) => !x); setVerBO(false); setVerImp(false); setVerQual(false); setVerConfig(false); setVerIA(false) }}>
+            {verNovas ? '← Painel' : '🌱 Novas'}
+          </button>
+          <button className={`reset-btn ${verBO ? 'rc-on' : ''}`} onClick={() => { setVerBO((x) => !x); setVerImp(false); setVerQual(false); setVerConfig(false); setVerIA(false); setVerNovas(false) }}>
             {verBO ? '← Painel' : '🛡 Backoffice'}
           </button>
-          <button className={`reset-btn ${verImp ? 'rc-on' : ''}`} onClick={() => { setVerImp((x) => !x); setVerQual(false); setVerConfig(false); setVerIA(false); setVerBO(false) }}>
+          <button className={`reset-btn ${verImp ? 'rc-on' : ''}`} onClick={() => { setVerImp((x) => !x); setVerQual(false); setVerConfig(false); setVerIA(false); setVerBO(false); setVerNovas(false) }}>
             {verImp ? '← Painel' : '📈 Impacto'}
           </button>
-          <button className={`reset-btn ${verIA ? 'rc-on' : ''}`} onClick={() => { setVerIA((x) => !x); setVerQual(false); setVerConfig(false); setVerImp(false); setVerBO(false) }}>
+          <button className={`reset-btn ${verIA ? 'rc-on' : ''}`} onClick={() => { setVerIA((x) => !x); setVerQual(false); setVerConfig(false); setVerImp(false); setVerBO(false); setVerNovas(false) }}>
             {verIA ? '← Painel' : '🧠 Nossa IA'}
           </button>
-          <button className={`reset-btn ${verQual ? 'rc-on' : ''}`} onClick={() => { setVerQual((x) => !x); setVerConfig(false); setVerImp(false); setVerIA(false); setVerBO(false) }}>
+          <button className={`reset-btn ${verQual ? 'rc-on' : ''}`} onClick={() => { setVerQual((x) => !x); setVerConfig(false); setVerImp(false); setVerIA(false); setVerBO(false); setVerNovas(false) }}>
             {verQual ? '← Painel' : '★ Qualidade e triagem'}
           </button>
-          <button className={`reset-btn ${verConfig ? 'rc-on' : ''}`} onClick={() => { setVerConfig((x) => !x); setVerQual(false); setVerImp(false); setVerIA(false); setVerBO(false) }}>
+          <button className={`reset-btn ${verConfig ? 'rc-on' : ''}`} onClick={() => { setVerConfig((x) => !x); setVerQual(false); setVerImp(false); setVerIA(false); setVerBO(false); setVerNovas(false) }}>
             {verConfig ? '← Painel' : '⚙ Configurações'}
           </button>
           <button className={`robo-modo ${ativo ? 'on' : ''}`} onClick={trocarModo} disabled={!dados || mudando}>
@@ -200,7 +213,7 @@ export default function RoboFollowup({ onVoltar }) {
 
       {erro && <div className="state-msg error">Erro: {erro}</div>}
 
-      {verBO ? <RoboBackoffice /> : verConfig ? <RoboConfig /> : verQual ? <RoboQualidade /> : verImp ? <RoboImpacto /> : verIA ? <NossaIA /> : <>
+      {verNovas ? <NovasPainel /> : verBO ? <RoboBackoffice /> : verConfig ? <RoboConfig /> : verQual ? <RoboQualidade /> : verImp ? <RoboImpacto /> : verIA ? <NossaIA /> : <>
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Casos acompanhados</p><p className="kpi-value">{dados ? totalAbertos : '—'}</p></div>
         <div className="kpi"><p className="kpi-label">Áudios hoje</p><p className="kpi-value accent">{hoje.audio ?? 0}</p></div>
