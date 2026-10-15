@@ -1076,11 +1076,11 @@ function ProdutosResumo({ items }) {
         <div className="produtos-row" key={r.produto}>
           <span className="campanha-nome">{r.produto}</span>
           <span>{fmtInt(r.leads)}</span>
-          <span>{fmtPct(pct(r.interagiu, r.leads))}</span>
+          <span>{fmtPct2(pct(r.interagiu, r.leads))}</span>
           <span>{fmtInt(r.aprovadas)}</span>
-          <span>{fmtPct(pct(r.aprovadas, r.leads))}</span>
+          <span>{fmtPct2(pct(r.aprovadas, r.leads))}</span>
           <span>{fmtInt(r.reprovadas)}</span>
-          <span>{fmtPct(pct(r.reprovadas, r.leads))}</span>
+          <span>{fmtPct2(pct(r.reprovadas, r.leads))}</span>
           <span>{fmtInt(r.pagas)}</span>
           <span>{fmtMoney(r.valor)}</span>
         </div>
