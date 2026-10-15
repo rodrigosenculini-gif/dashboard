@@ -1,0 +1,11 @@
+-- 15/10: aplicado via MCP (interacoes_chatwoot_hotline_e_recupera_crm).
+-- (1) interacoes_lp_chatwoot_sync(p_desde): entradas LP de ENERGIA conversam com a IA Crefaz no nosso Chatwoot
+--     (atendimento.atendimentos/mensagens). Mensagem do cliente ate 7 dias depois da entrada vira interacao
+--     (origem chatwoot_hotline, evento mensagem_cliente) e total_produtos.interacao = 1.
+-- (2) interacoes_recupera_crm(p_de, p_ate): conversa nova com mensagem do cliente no CRM VendeAI (crm_mensagens,
+--     copia do robo) sem interacao em +-2h vira interacao (evento recupera_crm); entradas LP ganham interacao e
+--     reprovada/aprovada pelas etiquetas (rejeitado / ofertado, pago, assinado, digitado, ticket_alto).
+-- Cron interacoes-recupera (*/15): sync ENERGIA dos ultimos 2 dias + recupera_crm da janela [-3h, -1h].
+-- Retroativo rodado: ENERGIA desde 01/10 (216 interacoes, 189 entradas), queda 08/10 09:08-10:20 (156),
+-- 14 entradas FGTS/CLT de 01-14/10 corrigidas pelas etiquetas. Backup: backup_tp_retro_1510.
+-- Ver definicoes completas no banco: \df+ public.interacoes_lp_chatwoot_sync / public.interacoes_recupera_crm
