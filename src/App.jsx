@@ -1049,6 +1049,46 @@ function LeilaoDetalhado() {
 
 const PRODUTO_CORES = ['#d9b877', '#7fa8d9', '#d99089', '#8fd97f', '#c17fd9', '#d9d17f']
 
+// soma a tabela campanha x produto por produto (aprovadas/reprovadas por produto)
+function ProdutosResumo({ items }) {
+  const porProduto = {}
+  for (const c of items) {
+    const k = c.produto || '(sem produto)'
+    const r = porProduto[k] || (porProduto[k] = { produto: k, leads: 0, interagiu: 0, aprovadas: 0, reprovadas: 0, pagas: 0, valor: 0 })
+    r.leads += Number(c.leads) || 0
+    r.interagiu += Number(c.interagiu) || 0
+    r.aprovadas += Number(c.aprovadas) || 0
+    r.reprovadas += Number(c.reprovadas) || 0
+    r.pagas += Number(c.pagas) || 0
+    r.valor += Number(c.valor_liberado) || 0
+  }
+  const linhas = Object.values(porProduto).sort((a, b) => b.leads - a.leads)
+  if (linhas.length === 0) return null
+  const pct = (a, b) => (b > 0 ? (100 * a) / b : null)
+  return (
+    <div className="panel table-panel">
+      <p className="section-label">Por produto</p>
+      <div className="produtos-row head">
+        <span>Produto</span><span>Leads</span><span>Intera&ccedil;&atilde;o %</span><span>Aprovadas</span>
+        <span>Aprov. %</span><span>Reprovadas</span><span>Reprov. %</span><span>Pagas</span><span>Valor Liberado</span>
+      </div>
+      {linhas.map((r) => (
+        <div className="produtos-row" key={r.produto}>
+          <span className="campanha-nome">{r.produto}</span>
+          <span>{fmtInt(r.leads)}</span>
+          <span>{fmtPct(pct(r.interagiu, r.leads))}</span>
+          <span>{fmtInt(r.aprovadas)}</span>
+          <span>{fmtPct(pct(r.aprovadas, r.leads))}</span>
+          <span>{fmtInt(r.reprovadas)}</span>
+          <span>{fmtPct(pct(r.reprovadas, r.leads))}</span>
+          <span>{fmtInt(r.pagas)}</span>
+          <span>{fmtMoney(r.valor)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function ProdutosCampanhasList({ items, loading }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? items : items.slice(0, VISIBLE_DEFAULT)
@@ -1057,7 +1097,7 @@ function ProdutosCampanhasList({ items, loading }) {
       <p className="section-label">Campanha &times; Produto</p>
       <div className="produtos-row head">
         <span>Campanha</span><span>Produto</span><span>Leads</span><span>Intera&ccedil;&atilde;o %</span>
-        <span>Aprovadas</span><span>Conv. Aprov.</span><span>Pagas</span><span>Valor Liberado</span>
+        <span>Aprovadas</span><span>Reprovadas</span><span>Conv. Aprov.</span><span>Pagas</span><span>Valor Liberado</span>
       </div>
       {items.length === 0 && !loading && (
         <div className="state-msg">Nenhum dado para os filtros selecionados.</div>
@@ -1069,6 +1109,7 @@ function ProdutosCampanhasList({ items, loading }) {
           <span>{fmtInt(c.leads)}</span>
           <span>{fmtPct(c.interacao_pct)}</span>
           <span>{fmtInt(c.aprovadas)}</span>
+          <span>{fmtInt(c.reprovadas)}</span>
           <span>{fmtPct(c.conversao_aprovados_pct)}</span>
           <span>{fmtInt(c.pagas)}</span>
           <span>{fmtMoney(c.valor_liberado)}</span>
@@ -1152,6 +1193,7 @@ function EntradasLP() {
       for (const row of aprovadasData ?? []) {
         if (!porDia[row.dia]) porDia[row.dia] = { dia: row.dia }
         porDia[row.dia].aprovadas = Number(row.aprovadas)
+        porDia[row.dia].reprovadas = Number(row.reprovadas) || 0
       }
       const pivotado = Object.values(porDia).sort((a, b) => (a.dia > b.dia ? 1 : -1))
       setEntradas({ rows: pivotado, produtos: Array.from(produtosVistos) })
@@ -1230,6 +1272,7 @@ function EntradasLP() {
               <Bar key={p} yAxisId="left" dataKey={p} stackId="a" fill={PRODUTO_CORES[i % PRODUTO_CORES.length]} />
             ))}
             <Line yAxisId="right" type="monotone" dataKey="aprovadas" stroke="#a9d97f" strokeWidth={2} dot={false} />
+            <Line yAxisId="right" type="monotone" dataKey="reprovadas" stroke="#e08585" strokeWidth={2} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -1251,6 +1294,7 @@ function EntradasLP() {
         <div className="kpi"><p className="kpi-label">Convers&atilde;o Aprovados</p><p className="kpi-value accent">{fmtPct(kpis?.conversao_aprovados_pct)}</p></div>
       </div>
 
+      <ProdutosResumo items={campanhasProdutos} />
       <ProdutosCampanhasList items={campanhasProdutos} loading={loading} />
 
       {showFunil && <FunilProdutos onClose={() => setShowFunil(false)} />}

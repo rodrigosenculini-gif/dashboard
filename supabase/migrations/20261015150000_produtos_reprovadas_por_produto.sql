@@ -1,0 +1,6 @@
+-- 15/10: Entradas LP. Tabela Campanha x Produto e grafico por dia trazem reprovadas (antes so aprovadas);
+-- contagens por lead distinto (o join com interacoes repetia o lead que tinha mais de uma interacao).
+-- Aplicado via MCP: produtos_reprovadas_por_produto e produtos_kpis_sem_duplicar.
+-- dashboard_produtos_campanhas_v2(..., p_atribuicao): + colunas reprovadas, interagiu
+-- dashboard_produtos_aprovadas_por_dia: + coluna reprovadas
+-- dashboard_produtos_kpis_v2(..., p_atribuicao): total/aprovados/reprovados contados por lead, interacao por telefone distinto
