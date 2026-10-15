@@ -1133,9 +1133,10 @@ function EntradasLP() {
     setError(null)
     try {
       const [kpiData, entradasData, aprovadasData, campanhasData] = await Promise.all([
-        callApi('produtos_kpis', { ...args, atribuicao }),
-        callApi('produtos_entradas_por_dia', args),
-        callApi('produtos_aprovadas_por_dia', args),
+        // opts (botão Atualizar = forcar) valia só para campanhas: os KPIs ficavam no cache
+        callApi('produtos_kpis', { ...args, atribuicao }, opts),
+        callApi('produtos_entradas_por_dia', args, opts),
+        callApi('produtos_aprovadas_por_dia', args, opts),
         callApi('produtos_campanhas', { campanha: args.campanha, produto: args.produto, origem: args.origem, date_from: args.date_from, date_to: args.date_to, atribuicao }, opts),
       ])
       setKpis(kpiData?.[0] ?? null)
