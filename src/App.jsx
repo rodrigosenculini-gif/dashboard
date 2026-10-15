@@ -14,6 +14,7 @@ import { NovaCardDiario, MinhaEvolucaoBotao, NovasAlerta, useEvolucao } from './
 import IAConfiguracao from './IAConfiguracao'
 import FunilAoVivo from './FunilAoVivo'
 import Trello from './Trello'
+import Desenvolvimento from './Desenvolvimento'
 import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
 import MetaComemoracao from './MetaComemoracao'
 import MetaJanelasModal from './MetaJanelasModal'
@@ -108,6 +109,8 @@ const VIEWS = [
   { id: 'vendedoras', label: 'Vendedoras' },
   { id: 'propostas', label: 'Propostas' },
   { id: 'vendas', label: 'Vendas' },
+  // treinamentos fora da mesa: agenda, lançamento e evolução (15/10) — só o perfil geral
+  { id: 'desenvolvimento', label: 'Desenvolvimento' },
   { id: 'ia', label: 'IA — Treinamento' },
   // robô de follow-up do CRM VendeAI (edge function robo-followup, 02/10)
   { id: 'robo', label: 'Robô follow-up' },
@@ -807,7 +810,7 @@ function CampanhaDetalhadoList({ items, loading }) {
 const NAV_GRUPOS = [
   ['Visão geral', ['inicio', 'painel', 'funil', 'trello', 'chips']],
   ['Captação', ['disparos', 'leilao', 'produtos']],
-  ['Vendas', ['propostas', 'vendas', 'vendedoras']],
+  ['Vendas', ['propostas', 'vendas', 'vendedoras', 'desenvolvimento']],
   ['Sistema', ['n8n', 'ia', 'robo']],
 ]
 const NAV_ICONE = {
@@ -824,6 +827,7 @@ const NAV_ICONE = {
   vendedoras: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
   n8n: 'M22 12h-4l-3 9L9 3l-3 9H2',
   ia: 'M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
+  desenvolvimento: 'M3 3v18h18M7 15l4-4 3 3 6-6M15 8h5v5',
   robo: 'M12 8V4M8 4h8M5 8h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM9 13h.01M15 13h.01M9 17h6',
   recolher: 'M11 17l-5-5 5-5M18 17l-5-5 5-5',
   menu: 'M3 6h18M3 12h18M3 18h18',
@@ -8045,6 +8049,7 @@ function Dashboard({ permitidas, onLogout }) {
       {view === 'trello' && podeVer('trello') && <Trello onVoltar={() => changeView('inicio')} />}
       {view === 'chips' && podeVer('chips') && <Chips onVoltar={() => changeView('inicio')} />}
       {view === 'robo' && podeVer('robo') && <RoboFollowup onVoltar={() => changeView('inicio')} />}
+      {view === 'desenvolvimento' && podeVer('desenvolvimento') && <Desenvolvimento />}
     </div>
     </div>
     </div>
