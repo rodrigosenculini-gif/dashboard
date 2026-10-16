@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { DateRangeFilter, presetRange } from './App'
 
 // Qualidade dos atendimentos da VendeAI (vendedoras e IA): análise diária pelos 9 critérios
 // (n8n "Qualidade - transcrição e análise de atendimentos" -> tabela crm_qualidade).
@@ -8,16 +9,6 @@ const CRITERIOS = [
   ['agilidade', 'Agilidade', 1.5], ['tempo_resposta', 'Tempo resp.', 1.5], ['texto_audio', 'Texto x áudio', 1],
   ['cordialidade', 'Cordialidade', 1], ['escrita', 'Escrita', 1], ['informacoes', 'Informações', 1],
   ['cross_sell', 'Cross-sell', 1.5], ['agradecimento', 'Agradec./indicação', 1], ['extra', 'Extra', 1],
-]
-// período (mesmo padrão da aba IA · Análises): atalhos + datas de/até, no dia de São Paulo
-const hojeSP = () => new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10)
-const diasAtras = (n) => new Date(Date.now() - 3 * 3600000 - n * 86400000).toISOString().slice(0, 10)
-const inicioMes = () => hojeSP().slice(0, 8) + '01'
-const PERIODOS = [
-  ['hoje', 'Hoje', () => [hojeSP(), hojeSP()]],
-  ['7', 'Últimos 7 dias', () => [diasAtras(6), hojeSP()]],
-  ['30', 'Últimos 30 dias', () => [diasAtras(29), hojeSP()]],
-  ['mes', 'Este mês', () => [inicioMes(), hojeSP()]],
 ]
 const corNota = (n) => (n == null ? '' : n >= 9 ? 'ok' : n >= 7 ? 'bom' : n >= 5 ? 'medio' : 'ruim')
 const corPct = (p) => (p == null ? '' : p >= 0.8 ? 'ok' : p >= 0.5 ? 'medio' : 'ruim')
@@ -32,6 +23,7 @@ const hora = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', m
 function Triagem({ qs }) {
   const [d, setD] = useState(null)
   useEffect(() => {
+    if (!qs) return
     fetch(`/api/dashboard?type=robo_triagem&${qs}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
   }, [qs])
   if (!d?.por_motivo) return null
@@ -78,6 +70,7 @@ const NOME_STATUS = { aguardando: 'no prazo', vencido: 'venceu — robô retoma'
 function Manuais({ qs }) {
   const [d, setD] = useState(null)
   useEffect(() => {
+    if (!qs) return
     fetch(`/api/dashboard?type=robo_manuais&${qs}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
   }, [qs])
   if (!d?.por_etiqueta) return null
@@ -167,6 +160,7 @@ const NOME_OBJECAO = {
 function Perfis({ qs }) {
   const [d, setD] = useState(null)
   useEffect(() => {
+    if (!qs) return
     fetch(`/api/dashboard?type=robo_perfis&${qs}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
   }, [qs])
   if (!d?.perfis) return null
@@ -337,15 +331,10 @@ function Destaques({ d, onEscolher }) {
 }
 
 export default function RoboQualidade() {
-  const [periodo, setPeriodo] = useState('7')
-  const [de, setDe] = useState(diasAtras(6))
-  const [ate, setAte] = useState(hojeSP())
-  const qs = `de=${de}&ate=${ate}`
-  const escolherPeriodo = (k) => {
-    const p = PERIODOS.find((x) => x[0] === k)
-    setPeriodo(k)
-    if (p) { const [a, b] = p[2](); setDe(a); setAte(b) }
-  }
+  // período: filtro padrão do projeto (DateRangeFilter); com o calendário no meio da escolha (ou limpo) não busca
+  const [de, setDe] = useState(() => presetRange('esta_semana').from)
+  const [ate, setAte] = useState(() => presetRange('esta_semana').to)
+  const qs = de && ate ? `de=${de}&ate=${ate}` : null
   const [d, setD] = useState(null)
   const [erro, setErro] = useState(null)
   const [sel, setSel] = useState(null) // avaliado_id escolhido
@@ -357,6 +346,7 @@ export default function RoboQualidade() {
   }
 
   useEffect(() => {
+    if (!qs) return
     setD(null)
     fetch(`/api/dashboard?type=robo_qualidade&${qs}`).then((r) => r.json())
       .then((x) => { const v = x?.data ?? x; if (v?.ranking) setD(v); else setErro(x?.error || 'falha') })
@@ -380,14 +370,7 @@ export default function RoboQualidade() {
 
       <div className="rq-topo rq-periodo">
         <p className="section-label">Período</p>
-        <div className="chip-opcoes">
-          {PERIODOS.map(([k, t]) => <button key={k} className={`chip-opcao ${periodo === k ? 'on' : ''}`} onClick={() => escolherPeriodo(k)}>{t}</button>)}
-          <span className="rq-datas">
-            <input type="date" className="chip-input" value={de} max={ate} onChange={(e) => { if (e.target.value) { setPeriodo(''); setDe(e.target.value) } }} />
-            <span>até</span>
-            <input type="date" className="chip-input" value={ate} min={de} onChange={(e) => { if (e.target.value) { setPeriodo(''); setAte(e.target.value) } }} />
-          </span>
-        </div>
+        <DateRangeFilter dataInicio={de} setDataInicio={setDe} dataFim={ate} setDataFim={setAte} />
       </div>
 
       <Visao d={d} />

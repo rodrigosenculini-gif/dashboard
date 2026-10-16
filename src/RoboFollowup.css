@@ -105,8 +105,6 @@
 .rq-periodo{ margin:4px 0 10px; }
 .rq-dest-link{ cursor:pointer; }
 .rq-dest-link:hover{ text-decoration:underline; }
-.rq-datas{ display:inline-flex; align-items:center; gap:6px; margin-left:6px; color:var(--muted); font-size:12px; }
-.rq-datas .chip-input{ width:auto; padding:5px 8px; font-size:12px; }
 
 /* Visão geral da equipe: KPIs + gráficos (azul = equipe, laranja = IA; validados no fundo escuro) */
 .rq{ --rq-eq:#3987e5; --rq-ia:#d95926; }
