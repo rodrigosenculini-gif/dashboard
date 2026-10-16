@@ -20,6 +20,7 @@ import MetaComemoracao from './MetaComemoracao'
 import MetaJanelasModal from './MetaJanelasModal'
 import MetaJanela from './MetaJanela'
 import MetaIndividual from './MetaIndividual'
+import { useLembrado, useRolagemLembrada } from './lembrar'
 import { callApi as callApiCache, useRevisaoCache, TTL_MS } from './dadosCache'
 import * as XLSX from 'xlsx'
 
@@ -1135,20 +1136,20 @@ function EntradasLP() {
   const [entradas, setEntradas] = useState([])
   const [campanhasProdutos, setCampanhasProdutos] = useState([])
   const [filtros, setFiltros] = useState({ campanhas: [], produtos: [], origens: [] })
-  const [campanhaSel, setCampanhaSel] = useState([])
+  const [campanhaSel, setCampanhaSel] = useLembrado('lp:campanhaSel', [])
   const campanha = campanhaSel.join(',')
   // 'ultimo' = canal que fechou a venda; 'primeiro' = canal que trouxe o lead.
   // A LP costuma ser o primeiro toque e perde o credito pro disparo posterior.
-  const [atribuicao, setAtribuicao] = useState('ultimo')
-  const [produtoSel, setProdutoSel] = useState([])
-  const [origemSel, setOrigemSel] = useState([])
+  const [atribuicao, setAtribuicao] = useLembrado('lp:atribuicao', 'ultimo')
+  const [produtoSel, setProdutoSel] = useLembrado('lp:produtoSel', [])
+  const [origemSel, setOrigemSel] = useLembrado('lp:origemSel', [])
   const produto = produtoSel.join(',')
   const origem = origemSel.join(',')
   const mesAtual = presetRange('este_mes')
-  const [dataInicio, setDataInicio] = useState(mesAtual.from)
-  const [dataFim, setDataFim] = useState(mesAtual.to)
-  const [horaInicio, setHoraInicio] = useState('')
-  const [horaFim, setHoraFim] = useState('')
+  const [dataInicio, setDataInicio] = useLembrado('lp:dataInicio', mesAtual.from)
+  const [dataFim, setDataFim] = useLembrado('lp:dataFim', mesAtual.to)
+  const [horaInicio, setHoraInicio] = useLembrado('lp:horaInicio', '')
+  const [horaFim, setHoraFim] = useLembrado('lp:horaFim', '')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
@@ -5968,15 +5969,15 @@ function VendedorasView({ ferramentas = null }) {
   const week = presetRange('este_mes') // padrão: mês corrente inteiro
   const [vendedores, setVendedores] = useState([])
   const [bancosDisponiveis, setBancosDisponiveis] = useState([])
-  const [vendedorSel, setVendedorSel] = useState([])
-  const [bancoSel, setBancoSel] = useState([])
+  const [vendedorSel, setVendedorSel] = useLembrado('vendedoras:vendedorSel', [])
+  const [bancoSel, setBancoSel] = useLembrado('vendedoras:bancoSel', [])
   // "vendedor" (singular) só existe quando exatamente 1 está selecionada —
   // é o que ativa o modo de detalhe individual, igual antes
   const vendedor = vendedorSel.length === 1 ? vendedorSel[0] : ''
   const vendedorLista = vendedorSel.join(',')
   const banco = bancoSel.join(',')
-  const [dataInicio, setDataInicio] = useState(week.from)
-  const [dataFim, setDataFim] = useState(week.to)
+  const [dataInicio, setDataInicio] = useLembrado('vendedoras:dataInicio', week.from)
+  const [dataFim, setDataFim] = useLembrado('vendedoras:dataFim', week.to)
 
   const [kpisGeral, setKpisGeral] = useState(null)
   const [kpisVendedor, setKpisVendedor] = useState(null)
@@ -6009,7 +6010,7 @@ function VendedorasView({ ferramentas = null }) {
   const [importMsg, setImportMsg] = useState('')
   const fileInputRef = useRef(null)
 
-  const [modo, setModo] = useState('valor') // 'valor' | 'ponto'
+  const [modo, setModo] = useLembrado('vendedoras:modo', 'valor') // 'valor' | 'ponto'
   const fmtV = modo === 'ponto' ? ((v) => `${fmtInt(Math.round(v ?? 0))} pts`) : fmtMoeda
 
   const [metasV2, setMetasV2] = useState(null)
@@ -6765,16 +6766,16 @@ function PropostaDetalhe({ id, onFechar }) {
 
 function PropostasView() {
   const mesAtual = presetRange('este_mes')
-  const [dataInicio, setDataInicio] = useState(mesAtual.from)
-  const [dataFim, setDataFim] = useState(mesAtual.to)
-  const [produtoSel, setProdutoSel] = useState([])
-  const [bancoSel, setBancoSel] = useState([])
-  const [situacaoSel, setSituacaoSel] = useState([])
-  const [statusSel, setStatusSel] = useState([])
-  const [rapido, setRapido] = useState('')
-  const [buscaTexto, setBuscaTexto] = useState('')
-  const [busca, setBusca] = useState('')
-  const [ordem, setOrdem] = useState({ col: 'criado_em', dir: 'desc' })
+  const [dataInicio, setDataInicio] = useLembrado('propostas:dataInicio', mesAtual.from)
+  const [dataFim, setDataFim] = useLembrado('propostas:dataFim', mesAtual.to)
+  const [produtoSel, setProdutoSel] = useLembrado('propostas:produtoSel', [])
+  const [bancoSel, setBancoSel] = useLembrado('propostas:bancoSel', [])
+  const [situacaoSel, setSituacaoSel] = useLembrado('propostas:situacaoSel', [])
+  const [statusSel, setStatusSel] = useLembrado('propostas:statusSel', [])
+  const [rapido, setRapido] = useLembrado('propostas:rapido', '')
+  const [buscaTexto, setBuscaTexto] = useLembrado('propostas:buscaTexto', '')
+  const [busca, setBusca] = useLembrado('propostas:busca', '')
+  const [ordem, setOrdem] = useLembrado('propostas:ordem', { col: 'criado_em', dir: 'desc' })
   const [pagina, setPagina] = useState(0)
   const [filtros, setFiltros] = useState({ bancos: [], produtos: [] })
   const [dados, setDados] = useState(null)
@@ -6985,10 +6986,10 @@ function PropostasView() {
 function VendasView() {
   const revisaoCache = useRevisaoCache()
   const mesAtual = presetRange('este_mes')
-  const [dataInicio, setDataInicio] = useState(mesAtual.from)
-  const [dataFim, setDataFim] = useState(mesAtual.to)
-  const [produtoSel, setProdutoSel] = useState([])
-  const [bancoSel, setBancoSel] = useState([])
+  const [dataInicio, setDataInicio] = useLembrado('vendas:dataInicio', mesAtual.from)
+  const [dataFim, setDataFim] = useLembrado('vendas:dataFim', mesAtual.to)
+  const [produtoSel, setProdutoSel] = useLembrado('vendas:produtoSel', [])
+  const [bancoSel, setBancoSel] = useLembrado('vendas:bancoSel', [])
   const produto = produtoSel.join(',')
   const banco = bancoSel.join(',')
 
@@ -7755,12 +7756,12 @@ function LeilaoConfigOverlay({ onClose }) {
 function VisaoGeral() {
   const revisaoCache = useRevisaoCache()
   const [filtros, setFiltros] = useState({ campanhas: [], origens: [], metas: [], tiposEnvio: [], mensagens: [] })
-  const [campanhaSel, setCampanhaSel] = useState([])
+  const [campanhaSel, setCampanhaSel] = useLembrado('disparos:campanhaSel', [])
   const campanha = campanhaSel.join(',')
-  const [origemSel, setOrigemSel] = useState([])
-  const [metaSel, setMetaSel] = useState([])
-  const [tipoEnvioSel, setTipoEnvioSel] = useState([])
-  const [mensagemFiltroSel, setMensagemFiltroSel] = useState([])
+  const [origemSel, setOrigemSel] = useLembrado('disparos:origemSel', [])
+  const [metaSel, setMetaSel] = useLembrado('disparos:metaSel', [])
+  const [tipoEnvioSel, setTipoEnvioSel] = useLembrado('disparos:tipoEnvioSel', [])
+  const [mensagemFiltroSel, setMensagemFiltroSel] = useLembrado('disparos:mensagemFiltroSel', [])
   const origem = origemSel.join(',')
   const meta = metaSel.join(',')
   const tipoEnvio = tipoEnvioSel.join(',')
@@ -7768,10 +7769,10 @@ function VisaoGeral() {
   // Abre sempre no mes corrente: sem filtro de data a consulta varria
   // 1M de linhas de disparochat a cada entrada na view.
   const mesAtual = presetRange('este_mes')
-  const [dataInicio, setDataInicio] = useState(mesAtual.from)
-  const [dataFim, setDataFim] = useState(mesAtual.to)
-  const [horaInicio, setHoraInicio] = useState('')
-  const [horaFim, setHoraFim] = useState('')
+  const [dataInicio, setDataInicio] = useLembrado('disparos:dataInicio', mesAtual.from)
+  const [dataFim, setDataFim] = useLembrado('disparos:dataFim', mesAtual.to)
+  const [horaInicio, setHoraInicio] = useLembrado('disparos:horaInicio', '')
+  const [horaFim, setHoraFim] = useLembrado('disparos:horaFim', '')
   const [showFunil, setShowFunil] = useState(false)
   const [showLeilao, setShowLeilao] = useState(false)
   // Filtros de atribuicao (modelo de fatos). Default = visao completa.
@@ -7779,7 +7780,7 @@ function VisaoGeral() {
   const [pagoDoPeriodo, setPagoDoPeriodo] = useState(false)
   const [incluirTardias, setIncluirTardias] = useState(true)
   // 'ultimo' = canal que fechou a venda; 'primeiro' = canal que trouxe o lead
-  const [atribuicao, setAtribuicao] = useState('ultimo')
+  const [atribuicao, setAtribuicao] = useLembrado('disparos:atribuicao', 'ultimo')
 
   const [kpis, setKpis] = useState(null)
   const [envios, setEnvios] = useState([])
@@ -8010,6 +8011,9 @@ function Dashboard({ permitidas, onLogout }) {
       return 'inicio'
     }
   })
+
+  // F5 volta ao mesmo ponto da tela (limite de 30 min, ver lembrar.js)
+  useRolagemLembrada(view)
 
   const changeView = (v) => {
     setView(v)
