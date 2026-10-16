@@ -1,0 +1,10 @@
+-- 16/10 (varredura): aplicado via MCP. O lancamento de venda paga casava "mesmo CPF + mesmo valor" sem limite de
+-- data e mesmo quando a venda achada ja era de OUTRO contrato -> segundo contrato do cliente com o mesmo valor
+-- nunca entrava (SF 7294, Facta 124004938 e 124004652).
+-- sf_aplica_venda: fallback CPF + valor (< R$ 1) so dentro de 7 dias e se a venda achada nao tiver outro codigo SF.
+-- conferir_e_lancar_proposta: fallback CPF + valor so dentro de 7 dias da data do banco e se a venda achada nao
+-- tiver codigo de outra proposta do mesmo banco.
+-- Correcoes de dados no mesmo dia (backup_vg_1610, backup_va_1610, backup_pb_1610):
+--   Soma 9301126 (Estornada) removida com a analise e bloqueada; Facta 124004938 e 124004652 lancadas;
+--   Facta 124039202 volta para a conferencia (so VendeAI marcou pago); SF 7294 e 9845 lancadas.
+-- Feito via DO + replace(pg_get_functiondef) para mexer so no trecho do fallback.
