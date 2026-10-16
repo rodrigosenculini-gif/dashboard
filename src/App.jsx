@@ -5988,7 +5988,7 @@ function VendedorasView({ ferramentas = null }) {
   const [metaVendedor, setMetaVendedor] = useState(null)
   const [porDia, setPorDia] = useState({ rows: [], vendedoresVistos: [] })
   const [tabela, setTabela] = useState({ rows: [], total: 0 })
-  const [page, setPage] = useState(0) // 0 = 10 itens, 1 = 40 itens, 2+ = pagina de 30 depois dos 40
+  const [page, setPage] = useState(0) // blocos de 50 ja carregados na tabela de rolagem (0 = primeiros 50)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -6028,9 +6028,8 @@ function VendedorasView({ ferramentas = null }) {
   useEffect(() => { setPage(0) }, [vendedor, banco, dataInicio, dataFim])
 
   const { limit, offset } = useMemo(() => {
-    if (page === 0) return { limit: 10, offset: 0 }
-    if (page === 1) return { limit: 40, offset: 0 }
-    return { limit: 30, offset: 40 + (page - 2) * 30 }
+    // tabela com rolagem: carrega em blocos de 50 e soma ao chegar no fim da lista
+    return { limit: 50 * (page + 1), offset: 0 }
   }, [page, revisaoCache])
 
   const load = useCallback(async (opts) => {
@@ -6152,9 +6151,14 @@ function VendedorasView({ ferramentas = null }) {
   }
 
   const totalPaginas = tabela.total > 40 ? 2 + Math.ceil((tabela.total - 40) / 30) - 1 : 1
-  const podeExpandir = page === 0 && tabela.total > 10
-  const podeProximaPagina = page >= 1 && offset + limit < tabela.total
-  const podePaginaAnterior = page >= 2
+  const temMaisVendas = tabela.rows.length < tabela.total
+  // perto do fim da rolagem, pede o proximo bloco (o resto da tela vem do cache)
+  const aoRolarVendas = (e) => {
+    const el = e.currentTarget
+    if (temMaisVendas && !loading && el.scrollTop + el.clientHeight >= el.scrollHeight - 120) {
+      setPage((p) => (50 * (p + 1) <= tabela.rows.length ? p + 1 : p))
+    }
+  }
 
   const handleDownload = () => {
     // leva o modo atual: em "Ver em pontos", o CSV sai em pontos
@@ -6399,6 +6403,7 @@ function VendedorasView({ ferramentas = null }) {
         {tabela.rows.length === 0 && !loading && (
           <div className="state-msg">Nenhuma venda encontrada para os filtros selecionados.</div>
         )}
+        <div className="tabela-rolagem" onScroll={aoRolarVendas}>
         {tabela.rows.map((r, i) => (
           <div className="template-row" key={i} style={{ gridTemplateColumns: '1.2fr 0.9fr 1fr 1fr 0.8fr 0.6fr' }}>
             <span className="campanha-nome">{r.vendedor}</span>
@@ -6424,23 +6429,15 @@ function VendedorasView({ ferramentas = null }) {
             </span>
           </div>
         ))}
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          {podeExpandir && (
-            <button className="expand-btn" onClick={() => setPage(1)}>Mostrar mais (+30)</button>
-          )}
-          {page >= 1 && (
-            <>
-              <button className="expand-btn" onClick={() => setPage(0)}>Recolher</button>
-              {podePaginaAnterior && (
-                <button className="expand-btn" onClick={() => setPage((p) => p - 1)}>&larr; P&aacute;gina anterior</button>
-              )}
-              {podeProximaPagina && (
-                <button className="expand-btn" onClick={() => setPage((p) => p + 1)}>Pr&oacute;xima p&aacute;gina &rarr;</button>
-              )}
-            </>
-          )}
+        {temMaisVendas && tabela.rows.length > 0 && (
+          <div className="state-msg small">{loading ? 'Carregando mais vendas...' : 'Role para carregar mais'}</div>
+        )}
         </div>
+        {tabela.rows.length > 0 && (
+          <p className="section-sub small" style={{ marginTop: 8 }}>
+            Mostrando {fmtInt(tabela.rows.length)} de {fmtInt(tabela.total)} vendas
+          </p>
+        )}
       </div>
 
       {showRanking && <RankingOverlay onClose={() => setShowRanking(false)} />}

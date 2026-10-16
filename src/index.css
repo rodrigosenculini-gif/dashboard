@@ -3395,3 +3395,11 @@ select, input, textarea{ color-scheme:dark; }
 .prop-etapa.atual .prop-etapa-ponto { border-color: var(--lime); box-shadow: 0 0 0 4px rgba(169,217,127,.15); }
 .prop-etapa.feita, .prop-etapa.atual { color: var(--text); }
 .prop-etapas.cancelada .prop-etapa.atual .prop-etapa-ponto { border-color: var(--rose); box-shadow: 0 0 0 4px rgba(217,144,137,.15); }
+
+/* Vendas da tela Vendedoras: tabela com rolagem propria (16/10) */
+.tabela-rolagem {
+  max-height: 520px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
