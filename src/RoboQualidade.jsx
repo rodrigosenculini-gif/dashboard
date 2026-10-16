@@ -305,7 +305,10 @@ function Visao({ d }) {
 
 // destaques da equipe: em cada critério, quem foi melhor (pódio de 3); só entra quem tem o mínimo de atendimentos
 const MIN_ATEND = 3
-function Destaques({ d }) {
+// % de cada critério = nota média da pessoa no critério ÷ nota máxima do critério (ex.: agilidade 0,74 de 1,5 = 49%).
+// Como quase todo critério é "tudo ou nada" (1,5 ou 0), na prática é a % dos atendimentos em que ela tirou a nota cheia.
+// Clique no nome: abre as análises da pessoa (mesmo filtro do clique na tabela)
+function Destaques({ d, onEscolher }) {
   const eq = d.ranking.filter((r) => r.avaliado !== 'ia' && r.n >= MIN_ATEND)
   if (eq.length < 2) return null
   const cards = [
@@ -316,15 +319,15 @@ function Destaques({ d }) {
   const pctTxt = (c, r) => (c.txt ? c.txt(r) : `${Math.round(c.val(r) * 100)}%`)
   return (
     <section className="panel">
-      <p className="section-label">Destaques da equipe · quem se saiu melhor em cada critério (mín. {MIN_ATEND} atendimentos no período)</p>
+      <p className="section-label">Destaques da equipe · quem se saiu melhor em cada critério (mín. {MIN_ATEND} atendimentos no período) · % = nota média no critério ÷ nota máxima · clique no nome para ver as análises</p>
       <div className="rq-destaques">
         {cards.map((c) => (
           <div key={c.k} className="rq-dest">
             <span className="rq-dest-crit">{c.nome}</span>
-            <span className="rq-dest-nome">🏆 {c.podio[0].nome}</span>
+            <span className="rq-dest-nome rq-dest-link" title="ver as análises" onClick={() => onEscolher(c.podio[0].avaliado_id)}>🏆 {c.podio[0].nome}</span>
             <span className={`rq-dest-val robo-taxa ${c.k === 'media' ? corNota(Number(c.podio[0].media)) : corPct(c.val(c.podio[0]))}`}>{pctTxt(c, c.podio[0])}</span>
             {c.podio.slice(1).map((r, i) => (
-              <span key={r.avaliado_id} className="rq-dest-outro">{i + 2}º {r.nome} · {pctTxt(c, r)}</span>
+              <span key={r.avaliado_id} className="rq-dest-outro rq-dest-link" title="ver as análises" onClick={() => onEscolher(r.avaliado_id)}>{i + 2}º {r.nome} · {pctTxt(c, r)}</span>
             ))}
           </div>
         ))}
@@ -388,7 +391,7 @@ export default function RoboQualidade() {
       </div>
 
       <Visao d={d} />
-      <Destaques d={d} />
+      <Destaques d={d} onEscolher={(id) => { if (sel !== id) escolher(id) }} />
 
       <section className="panel table-panel">
         <div className="rq-topo">
