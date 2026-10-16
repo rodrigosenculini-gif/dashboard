@@ -103,6 +103,8 @@
 .rq .scroll-table thead th{ position:sticky; top:0; background:var(--surface); z-index:1; }
 .rq-lista{ max-height:320px; overflow-y:auto; padding-right:4px; }
 .rq-periodo{ margin:4px 0 10px; }
+.rq-datas{ display:inline-flex; align-items:center; gap:6px; margin-left:6px; color:var(--muted); font-size:12px; }
+.rq-datas .chip-input{ width:auto; padding:5px 8px; font-size:12px; }
 
 /* Visão geral da equipe: KPIs + gráficos (azul = equipe, laranja = IA; validados no fundo escuro) */
 .rq{ --rq-eq:#3987e5; --rq-ia:#d95926; }

@@ -1300,6 +1300,9 @@ export default async function handler(req, res) {
     }
   }
 
+  // data YYYY-MM-DD vinda da tela (filtro de período); qualquer outra coisa vira null
+  const dataQ = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
+
   // ---- Tela Geral / Chips / Trello: RPCs que devolvem um jsonb só ----
   const RPC_JSON = {
     versao:            { sql: 'select dashboard_versao() as r', args: () => [] },
@@ -1328,10 +1331,11 @@ export default async function handler(req, res) {
     bo_email_rascunho: { sql: 'select robo_fu_bo_email_rascunho($1::bigint,$2::text) as r',
                          args: () => [parseInt(req.query.conv, 10) || null, req.query.urgencia || 'normal'] },
     bo_acao_status:    { sql: 'select robo_fu_bo_acao_status($1::bigint) as r', args: () => [parseInt(req.query.id, 10) || null] },
-    robo_triagem:      { sql: 'select dashboard_robo_triagem($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 1] },
-    robo_qualidade:    { sql: 'select dashboard_robo_qualidade($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 7] },
-    robo_manuais:      { sql: 'select dashboard_robo_manuais($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 1] },
-    robo_perfis:       { sql: 'select dashboard_qualidade_perfis($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 7] },
+    // aba Qualidade: período por dias ou de/até (YYYY-MM-DD; o que vier em de/ate vale sobre dias)
+    robo_triagem:      { sql: 'select dashboard_robo_triagem($1::int, $2::date, $3::date) as r', args: () => [parseInt(req.query.dias, 10) || 1, dataQ(req.query.de), dataQ(req.query.ate)] },
+    robo_qualidade:    { sql: 'select dashboard_robo_qualidade($1::int, $2::date, $3::date) as r', args: () => [parseInt(req.query.dias, 10) || 7, dataQ(req.query.de), dataQ(req.query.ate)] },
+    robo_manuais:      { sql: 'select dashboard_robo_manuais($1::int, $2::date, $3::date) as r', args: () => [parseInt(req.query.dias, 10) || 1, dataQ(req.query.de), dataQ(req.query.ate)] },
+    robo_perfis:       { sql: 'select dashboard_qualidade_perfis($1::int, $2::date, $3::date) as r', args: () => [parseInt(req.query.dias, 10) || 7, dataQ(req.query.de), dataQ(req.query.ate)] },
     robo_impacto:      req.query.de && req.query.ate
                          ? { sql: 'select dashboard_robo_impacto_periodo($1::date, $2::date) as r', args: () => [req.query.de, req.query.ate] }
                          : { sql: 'select dashboard_robo_impacto($1::int) as r', args: () => [parseInt(req.query.dias, 10) || 7] },

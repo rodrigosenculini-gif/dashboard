@@ -7,7 +7,17 @@ const CRM = 'https://crm.vendeaitecnologia.com.br/app/accounts/75/conversations/
 const CRITERIOS = [
   ['agilidade', 'Agilidade', 1.5], ['tempo_resposta', 'Tempo resp.', 1.5], ['texto_audio', 'Texto x áudio', 1],
   ['cordialidade', 'Cordialidade', 1], ['escrita', 'Escrita', 1], ['informacoes', 'Informações', 1],
-  ['cross_sell', 'Cross-sell', 1.5], ['agradecimento', 'Agradec./indicação', 1],
+  ['cross_sell', 'Cross-sell', 1.5], ['agradecimento', 'Agradec./indicação', 1], ['extra', 'Extra', 1],
+]
+// período (mesmo padrão da aba IA · Análises): atalhos + datas de/até, no dia de São Paulo
+const hojeSP = () => new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10)
+const diasAtras = (n) => new Date(Date.now() - 3 * 3600000 - n * 86400000).toISOString().slice(0, 10)
+const inicioMes = () => hojeSP().slice(0, 8) + '01'
+const PERIODOS = [
+  ['hoje', 'Hoje', () => [hojeSP(), hojeSP()]],
+  ['7', 'Últimos 7 dias', () => [diasAtras(6), hojeSP()]],
+  ['30', 'Últimos 30 dias', () => [diasAtras(29), hojeSP()]],
+  ['mes', 'Este mês', () => [inicioMes(), hojeSP()]],
 ]
 const corNota = (n) => (n == null ? '' : n >= 9 ? 'ok' : n >= 7 ? 'bom' : n >= 5 ? 'medio' : 'ruim')
 const corPct = (p) => (p == null ? '' : p >= 0.8 ? 'ok' : p >= 0.5 ? 'medio' : 'ruim')
@@ -19,11 +29,11 @@ const NOME_ACAO_TRIAGEM = {
 const hora = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 // derivações da IA da VendeAI para humano e o que a nossa triagem fez/faria
-function Triagem({ dias }) {
+function Triagem({ qs }) {
   const [d, setD] = useState(null)
   useEffect(() => {
-    fetch(`/api/dashboard?type=robo_triagem&dias=${dias}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
-  }, [dias])
+    fetch(`/api/dashboard?type=robo_triagem&${qs}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
+  }, [qs])
   if (!d?.por_motivo) return null
   return (
     <section className="panel table-panel">
@@ -65,11 +75,11 @@ function Triagem({ dias }) {
 // etiquetas colocadas à mão (tratativa, followup1/2, retomar, nova_simulação): quem colocou, quem fez,
 // o que venceu sem atendimento (o robô retoma) e o que ainda está no prazo
 const NOME_STATUS = { aguardando: 'no prazo', vencido: 'venceu — robô retoma', feito: 'feito', removida: 'removida' }
-function Manuais({ dias }) {
+function Manuais({ qs }) {
   const [d, setD] = useState(null)
   useEffect(() => {
-    fetch(`/api/dashboard?type=robo_manuais&dias=${dias}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
-  }, [dias])
+    fetch(`/api/dashboard?type=robo_manuais&${qs}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
+  }, [qs])
   if (!d?.por_etiqueta) return null
   const prazos = d.prazos || {}
   return (
@@ -154,11 +164,11 @@ const NOME_OBJECAO = {
   taxa_juros: 'taxa/juros', valor_baixo: 'valor baixo', parcela_alta: 'parcela alta', prazo: 'prazo', confianca: 'confiança',
   documentos: 'documentos', nao_precisa: 'não precisa', outra: 'outra',
 }
-function Perfis({ dias }) {
+function Perfis({ qs }) {
   const [d, setD] = useState(null)
   useEffect(() => {
-    fetch(`/api/dashboard?type=robo_perfis&dias=${dias}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
-  }, [dias])
+    fetch(`/api/dashboard?type=robo_perfis&${qs}`).then((r) => r.json()).then((x) => setD(x?.data ?? x)).catch(() => {})
+  }, [qs])
   if (!d?.perfis) return null
   const pessoas = [...new Map((d.matriz || []).map((m) => [m.nome, m])).values()]
   const cel = (nome, perfil) => (d.matriz || []).find((m) => m.nome === nome && m.perfil === perfil)
@@ -324,7 +334,15 @@ function Destaques({ d }) {
 }
 
 export default function RoboQualidade() {
-  const [dias, setDias] = useState(7)
+  const [periodo, setPeriodo] = useState('7')
+  const [de, setDe] = useState(diasAtras(6))
+  const [ate, setAte] = useState(hojeSP())
+  const qs = `de=${de}&ate=${ate}`
+  const escolherPeriodo = (k) => {
+    const p = PERIODOS.find((x) => x[0] === k)
+    setPeriodo(k)
+    if (p) { const [a, b] = p[2](); setDe(a); setAte(b) }
+  }
   const [d, setD] = useState(null)
   const [erro, setErro] = useState(null)
   const [sel, setSel] = useState(null) // avaliado_id escolhido
@@ -337,10 +355,10 @@ export default function RoboQualidade() {
 
   useEffect(() => {
     setD(null)
-    fetch(`/api/dashboard?type=robo_qualidade&dias=${dias}`).then((r) => r.json())
+    fetch(`/api/dashboard?type=robo_qualidade&${qs}`).then((r) => r.json())
       .then((x) => { const v = x?.data ?? x; if (v?.ranking) setD(v); else setErro(x?.error || 'falha') })
       .catch((e) => setErro(e.message))
-  }, [dias])
+  }, [qs])
 
   if (erro) return <div className="state-msg error">Erro: {erro}</div>
   if (!d) return <div className="home-vazio">carregando qualidade...</div>
@@ -351,7 +369,7 @@ export default function RoboQualidade() {
     <div className="rq">
       <div className="kpi-grid">
         <div className="kpi"><p className="kpi-label">Mensagens capturadas hoje</p><p className="kpi-value">{d.captura?.mensagens_hoje ?? 0}</p></div>
-        <div className="kpi"><p className="kpi-label">Atendimentos analisados</p><p className="kpi-value accent">{fila.ok ?? 0}</p></div>
+        <div className="kpi"><p className="kpi-label">Atendimentos analisados no período</p><p className="kpi-value accent">{d.analisados ?? fila.ok ?? 0}</p></div>
         <div className="kpi"><p className="kpi-label">Na fila</p><p className="kpi-value">{(fila.pendente ?? 0) + (fila.processando ?? 0)}</p></div>
         <div className="kpi"><p className="kpi-label">Áudios/imagens transcritos (24h)</p><p className="kpi-value">{d.transcricao?.ok ?? 0}<small> / {Object.values(d.transcricao || {}).reduce((s, n) => s + n, 0)}</small></p></div>
         <div className="kpi"><p className="kpi-label">Erros de análise</p><p className={`kpi-value ${fila.erro ? 'alerta' : ''}`}>{fila.erro ?? 0}</p></div>
@@ -359,8 +377,13 @@ export default function RoboQualidade() {
 
       <div className="rq-topo rq-periodo">
         <p className="section-label">Período</p>
-        <div className="rq-dias">
-          {[1, 7, 30].map((n) => <button key={n} className={`reset-btn ${dias === n ? 'rc-on' : ''}`} onClick={() => setDias(n)}>{n === 1 ? 'Hoje' : `${n} dias`}</button>)}
+        <div className="chip-opcoes">
+          {PERIODOS.map(([k, t]) => <button key={k} className={`chip-opcao ${periodo === k ? 'on' : ''}`} onClick={() => escolherPeriodo(k)}>{t}</button>)}
+          <span className="rq-datas">
+            <input type="date" className="chip-input" value={de} max={ate} onChange={(e) => { if (e.target.value) { setPeriodo(''); setDe(e.target.value) } }} />
+            <span>até</span>
+            <input type="date" className="chip-input" value={ate} min={de} onChange={(e) => { if (e.target.value) { setPeriodo(''); setAte(e.target.value) } }} />
+          </span>
         </div>
       </div>
 
@@ -423,9 +446,9 @@ export default function RoboQualidade() {
         </div>
       </section>
 
-      <Triagem dias={dias} />
-      <Perfis dias={dias} />
-      <Manuais dias={dias} />
+      <Triagem qs={qs} />
+      <Perfis qs={qs} />
+      <Manuais qs={qs} />
     </div>
   )
 }
