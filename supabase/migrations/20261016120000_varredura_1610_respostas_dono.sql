@@ -1,0 +1,10 @@
+-- 16/10 (respostas do dono a varredura), aplicado via MCP:
+-- crefaz_vendas_pagas_operacao_do_portal: proposta Crefaz concluida no portal guarda a operacao em
+--   dados->previa->corpo->operacao; agora lida (venda 1089944753 ganhou 15 parcelas, peso 1,65).
+-- sf_reembolso_solicitado_conta_como_cancelado: status SF 163 "Reembolso Solicitado" = cancelado; sf_remove_canceladas
+--   tambem marca a proposta em propostas_bancos (tela Propostas) com o status da SF. 4 vendas de outubro removidas
+--   (5461, 6379, 6636, 8451), log "Reembolso Solicitado - cliente reembolsado", bloqueadas, propostas marcadas.
+-- sf_remove_canceladas_so_mes_aberto: so mes corrente (e anterior ate dia 10) - nao mexe em mes fechado.
+-- add_venda_recusa_codigo_de_outro_cliente: "Adicionar venda" recusa numero de proposta que ja e de outro CPF
+--   (vendas, propostas_bancos, API SF, portal V8), com o nome do cliente dono do numero.
+-- Backups: backup_vg_1610, backup_pb_1610.
