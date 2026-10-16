@@ -33,7 +33,6 @@ export function coletivaCongelada(hoje = new Date()) {
   return uteis <= 2
 }
 
-const TOTAL_FAIXAS = 7
 const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v))
 const fmtPts = (v) => new Intl.NumberFormat('pt-BR').format(Math.round(v || 0))
 const fmtBRL = (v) =>
@@ -62,8 +61,11 @@ export default function MetaColetiva({ dados, congelada }) {
     }
     pct = Math.max(0, Math.min(100, pct))
 
+    // 10/2026: a coletiva virou uma meta so (15 mi = R$ 500 por pessoa). Com uma
+    // faixa, a tira fala em "meta" em vez de "Faixa 1".
+    const total = num(dados.col_total_faixas) || 1
     return {
-      faixa, premio, proxFaixa, premioProx, noTopo, pct,
+      faixa, premio, proxFaixa, premioProx, noTopo, pct, total, unica: total === 1,
       faltam: noTopo ? 0 : Math.max(0, proxMin - pontos),
     }
   }, [dados])
@@ -86,7 +88,9 @@ export default function MetaColetiva({ dados, congelada }) {
       <span className="meta-tira-rot">Coletiva</span>
 
       <span className="meta-tira-sit">
-        {semFaixa ? 'abaixo da Faixa 1' : `Faixa ${c.faixa} · ${fmtBRL(c.premio)}`}
+        {c.unica
+          ? (semFaixa ? 'meta ainda não batida' : `meta batida · ${fmtBRL(c.premio)} por pessoa`)
+          : (semFaixa ? 'abaixo da Faixa 1' : `Faixa ${c.faixa} · ${fmtBRL(c.premio)}`)}
       </span>
 
       <div className="bar-track meta-tira-bar">
@@ -97,17 +101,17 @@ export default function MetaColetiva({ dados, congelada }) {
 
       <span className="meta-tira-falta">
         {c.noTopo ? (
-          'faixa máxima'
+          c.unica ? 'prêmio garantido' : 'faixa máxima'
         ) : (
           <>
-            faltam <strong>{fmtPts(c.faltam)}</strong> p/ Faixa {c.proxFaixa}
-            {c.premioProx ? ` · ${fmtBRL(c.premioProx)}` : ''}
+            faltam <strong>{fmtPts(c.faltam)}</strong> p/ {c.unica ? 'a meta' : `Faixa ${c.proxFaixa}`}
+            {c.premioProx ? ` · ${fmtBRL(c.premioProx)}${c.unica ? ' por pessoa' : ''}` : ''}
           </>
         )}
       </span>
 
-      <span className="meta-tira-trilha">
-        {Array.from({ length: TOTAL_FAIXAS }, (_, i) => {
+      {!c.unica && <span className="meta-tira-trilha">
+        {Array.from({ length: c.total }, (_, i) => {
           const n = i + 1
           return (
             <i
@@ -121,7 +125,7 @@ export default function MetaColetiva({ dados, congelada }) {
             />
           )
         })}
-      </span>
+      </span>}
     </div>
   )
 }

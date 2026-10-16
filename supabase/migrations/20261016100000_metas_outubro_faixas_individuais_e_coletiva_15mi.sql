@@ -1,0 +1,15 @@
+-- 16/10: aplicado via MCP (metas_outubro_faixas_individuais_e_coletiva_15mi). Nova meta a partir de 10/2026,
+-- mensal ate trocar:
+--  * INDIVIDUAL "Premiacao extraordinaria" (tabela metas_individuais): pontos da vendedora no mes
+--    350k R$375 | 400k R$500 | 500k R$625 | 600k R$815 | 700k R$1.000 | 800k R$1.350 | 900k R$1.750 | 1 mi+ R$2.500.
+--    Vale o premio da maior faixa atingida.
+--  * COLETIVA "Meta dada, meta cumprida" (metas_coletivas, vigencia 2026-10-01): Hotline >= 15 mi pontos no mes
+--    -> R$ 500 extra por colaborador(a), acumulativo com a faixa individual.
+-- metas_coletivas: chave passou de (faixa) para (vigencia_ini, faixa).
+-- Funcoes novas: metas_coletivas_vigentes(dia), metas_individuais_vigentes(dia), metas_pontos_vendedora(vendedor, ini, fim),
+--   dashboard_meta_faixas_vendedoras(mes), dashboard_meta_faixas_meses().
+-- dashboard_metas_v2: usa so as faixas vigentes no mes (antes mostrava as faixas coletivas de setembro em outubro)
+--   e devolve col_total_faixas + ind_* (faixa individual da vendedora).
+-- metas_niveis_atingidos: comemoracao tambem por faixa individual do mes (chave indf:AAAA-MM:faixa) e coletiva
+--   por mes (col:AAAA-MM:faixa).
+-- Definicoes completas no banco (\df+).

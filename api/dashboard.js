@@ -1705,6 +1705,13 @@ export default async function handler(req, res) {
   } else if (type === 'meta_periodos') {
     sql = 'select * from dashboard_meta_periodos()';
     params = [];
+  } else if (type === 'meta_faixas_meses') {
+    // meses com faixas individuais (premiacao extraordinaria), para o seletor da gestao
+    sql = 'select * from dashboard_meta_faixas_meses()';
+    params = [];
+  } else if (type === 'meta_faixas_vendedoras') {
+    sql = 'select * from dashboard_meta_faixas_vendedoras($1::date)';
+    params = [req.query.mes || null];
   } else if (type === 'vendedoras_sync') {
     sql = 'select * from dashboard_vendedoras_sync()';
     params = [];

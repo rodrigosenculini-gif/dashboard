@@ -19,6 +19,7 @@ import MetaColetiva, { coletivaCongelada } from './MetaColetiva'
 import MetaComemoracao from './MetaComemoracao'
 import MetaJanelasModal from './MetaJanelasModal'
 import MetaJanela from './MetaJanela'
+import MetaIndividual from './MetaIndividual'
 import { callApi as callApiCache, useRevisaoCache, TTL_MS } from './dadosCache'
 import * as XLSX from 'xlsx'
 
@@ -1968,12 +1969,18 @@ function RankingOverlay({ onClose }) {
   useEffect(() => {
     if (aba !== 'meta' || periodos.length) return
     setLoadingMeta(true)
-    callApi('meta_periodos', {}, { forcar: true })
-      .then((p) => {
-        const lista = p ?? []
+    // 10/2026: meta individual por faixas no mes. Os meses com faixas entram no
+    // topo do seletor como id 'faixas' e o mes no lugar do dia.
+    Promise.all([
+      callApi('meta_periodos', {}, { forcar: true }),
+      callApi('meta_faixas_meses', {}, { forcar: true }).catch(() => []),
+    ])
+      .then(([p, fm]) => {
+        const faixas = (fm ?? []).map((f) => ({ id: 'faixas', dia: String(f.mes).slice(0, 10), descricao: f.descricao, atual: f.atual, base: 'faixas' }))
+        const lista = [...faixas, ...(p ?? [])]
         setPeriodos(lista)
         if (!periodoSel) {
-          const padrao = lista.find((x) => x.atual) || lista[0]
+          const padrao = faixas.find((x) => x.atual) || lista.find((x) => x.atual) || lista[0]
           setPeriodoSel(padrao ? chavePeriodo(padrao) : 'atual')
         }
       })
@@ -1986,7 +1993,9 @@ function RankingOverlay({ onClose }) {
     setLoadingMeta(true)
     const [id, dia] = String(periodoSel).split('|')
     // forcar: o periodo muda a leitura inteira e o usuario espera ver a troca na hora
-    callApi('meta_vendedoras', periodoSel === 'atual' ? {} : { periodo_id: id, ...(dia ? { dia } : {}) }, { forcar: true })
+    ;(id === 'faixas'
+      ? callApi('meta_faixas_vendedoras', { mes: dia }, { forcar: true })
+      : callApi('meta_vendedoras', periodoSel === 'atual' ? {} : { periodo_id: id, ...(dia ? { dia } : {}) }, { forcar: true }))
       .then((m) => setMetas(m ?? []))
       .catch((e) => setError(e.message || 'Erro ao carregar metas.'))
       .finally(() => setLoadingMeta(false))
@@ -2095,13 +2104,50 @@ function RankingOverlay({ onClose }) {
             {!loadingMeta && metas.length === 0 && !error && (
               <div className="state-msg">Nenhuma venda no per&iacute;odo da meta.</div>
             )}
-            {metas.length > 0 && (
+            {metas.length > 0 && metas[0].total_faixas !== undefined && (
+              <>
+                <p className="subtitle" style={{ margin: '0 0 8px' }}>
+                  Premia&ccedil;&atilde;o extraordin&aacute;ria &middot; faixas por pontos no m&ecirc;s &middot; vale o pr&ecirc;mio da maior faixa
+                </p>
+                <div className="ranking-grade">
+                  {metas.map((m) => {
+                    const pontos = Number(m.pontos) || 0
+                    const faixa = m.faixa == null ? null : Number(m.faixa)
+                    const proxMin = m.proxima_min == null ? null : Number(m.proxima_min)
+                    const piso = m.faixa_min == null ? 0 : Number(m.faixa_min)
+                    const pct = proxMin == null ? 100 : Math.max(0, Math.min(100, ((pontos - piso) / Math.max(1, proxMin - piso)) * 100))
+                    return (
+                      <div className={`ranking-cartao ${m.posicao <= 3 ? 'podio p' + m.posicao : ''}`} key={m.vendedor}>
+                        <div className="ranking-cartao-topo">
+                          <span className="ranking-pos">{m.posicao}&ordm;</span>
+                          <p className="ranking-nome">{m.vendedor}</p>
+                        </div>
+                        <p className={`ranking-principal ${faixa ? '' : 'abaixo'}`}>
+                          {faixa ? <>Faixa {faixa} <small>{fmtMoeda(m.premio)}</small></> : <>Sem faixa <small>ainda</small></>}
+                        </p>
+                        <div className="bar-track">
+                          <div className={`bar-fill ${proxMin == null ? 'batida' : ''}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="ranking-cartao-linhas">
+                          <span>Pontos</span><b>{fmtInt(Math.round(pontos))}</b>
+                          <span>{proxMin == null ? 'Próxima' : `Faixa ${m.proxima_faixa}`}</span>
+                          <b>{proxMin == null ? 'faixa máxima' : `faltam ${fmtInt(Math.max(0, Math.round(proxMin - pontos)))}`}</b>
+                          <span>Valor</span><b>{fmtMoeda(m.valor)}</b>
+                          <span>Vendas</span><b>{fmtInt(m.qtd)}</b>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+            {metas.length > 0 && metas[0].total_faixas === undefined && (
               <p className="subtitle" style={{ margin: '0 0 8px' }}>
                 {metas[0].periodo_descricao} &middot; alvo {fmtInt(metas[0].alvo_pontos)} pontos
               </p>
             )}
             {/* mesmos cards do ranking (dono, 01/10): % da meta em destaque */}
-            <div className="ranking-grade">
+            {metas[0]?.total_faixas === undefined && <div className="ranking-grade">
               {metas.map((m) => {
                 const pct = Number(m.pct_meta) || 0
                 const bateu = pct >= 100
@@ -2128,7 +2174,7 @@ function RankingOverlay({ onClose }) {
                   </div>
                 )
               })}
-            </div>
+            </div>}
           </>
         )}
       </div>
@@ -5751,10 +5797,17 @@ function VendedoraPortal({ vendedor, veMetaColetiva = true, onLogout }) {
 
       {veMetaColetiva && <MetaColetiva dados={metasV2} />}
 
+      <MetaIndividual dados={metasV2} />
+
       <div ref={tourChartRef} className="panel chart-panel tall com-meta">
         <p className="section-label">Vendas por semana &mdash; {modo === 'ponto' ? 'pontos' : 'meta'} e proje&ccedil;&atilde;o</p>
         <p className="section-sub">
-          {metasV2?.janela_descricao || 'sem janela de meta vigente hoje'}
+          {metasV2?.janela_descricao
+            || (Number(metasV2?.ind_total_faixas) > 0
+              ? (metasV2?.ind_proxima_min != null
+                ? `meta do mês por faixas · próxima: Faixa ${metasV2.ind_proxima_faixa} em ${fmtInt(Math.round(Number(metasV2.ind_proxima_min)))} pts`
+                : 'meta do mês por faixas · faixa máxima atingida')
+              : 'sem janela de meta vigente hoje')}
           {alvoMes > 0 ? ` \u00b7 alvo do m\u00eas: ${fmtInt(alvoMes)} pts` : ''}
           {' \u00b7 linha tracejada = proje\u00e7\u00e3o do m\u00eas'}
         </p>
